@@ -656,3 +656,325 @@ This method uses Python module paths and is powerful when:
 - Implement proper error handling in custom tasks
 - Return meaningful error messages
 - Consider retry and fallback mechanisms
+
+## State Persistence
+
+The YAML Workflow Engine implements a robust state persistence mechanism that enables workflow resumability and progress tracking. This section details how state management works and how to configure it for your workflows.
+
+### State Storage
+
+By default, workflow state is stored in the `.workflow_state` directory within your workspace. Each workflow run creates a unique state file based on the workflow name and run ID:
+
+```
+.workflow_state/
+├── my_workflow/
+│   ├── run_123.json    # State for run #123
+│   └── run_124.json    # State for run #124
+└── another_workflow/
+    └── run_125.json
+```
+
+### State Structure
+
+The state file contains the following information:
+
+```json
+{
+  "workflow_id": "my_workflow",
+  "run_number": 123,
+  "start_time": "2024-03-20T10:00:00Z",
+  "last_updated": "2024-03-20T10:05:00Z",
+  "status": "in_progress",
+  "current_step": "step2",
+  "steps": {
+    "step1": {
+      "status": "completed",
+      "start_time": "2024-03-20T10:00:01Z",
+      "end_time": "2024-03-20T10:01:00Z",
+      "outputs": {
+        "result_file": "output/step1_result.json"
+      }
+    },
+    "step2": {
+      "status": "in_progress",
+      "start_time": "2024-03-20T10:01:01Z",
+      "retries": 1
+    }
+  },
+  "variables": {
+    "param1": "value1",
+    "computed_value": 42
+  }
+}
+```
+
+### Configuring State Persistence
+
+You can configure state persistence behavior in your workflow YAML:
+
+```yaml
+name: My Workflow
+settings:
+  state:
+    # Directory to store state files (relative to workspace)
+    directory: ".workflow_state"
+    
+    # How often to save state (in seconds)
+    save_interval: 30
+    
+    # Maximum number of state files to keep per workflow
+    max_history: 10
+    
+    # Whether to compress state files
+    compress: true
+    
+    # Custom state backend (default: "file")
+    backend: "file"  # Options: "file", "redis", "s3"
+    
+    # Backend-specific configuration
+    backend_config:
+      redis_url: "redis://localhost:6379"
+      s3_bucket: "my-workflow-states"
+```
+
+### State Management Commands
+
+```bash
+# List all state files for a workflow
+yaml-workflow state list my_workflow
+
+# Show details of a specific run
+yaml-workflow state show my_workflow 123
+
+# Clean up old state files
+yaml-workflow state clean my_workflow --keep-last 5
+
+# Export state to different format
+yaml-workflow state export my_workflow 123 --format json
+```
+
+### Resuming Failed Workflows
+
+When a workflow fails, you can resume it from the last failed step:
+
+```bash
+# Resume from last failed step
+yaml-workflow run my_workflow.yaml --resume
+
+# Resume from specific step
+yaml-workflow run my_workflow.yaml --resume --start-from step2
+
+# Resume with modified parameters
+yaml-workflow run my_workflow.yaml --resume --param new_value=42
+```
+
+## API Reference
+
+### Core Classes
+
+#### WorkflowEngine
+
+The main class responsible for workflow execution.
+
+```python
+from yaml_workflow_engine import WorkflowEngine
+
+# Initialize engine
+engine = WorkflowEngine("workflow.yaml")
+
+# Run workflow
+result = engine.run(
+    params={"param1": "value1"},
+    resume=False,
+    start_from="step1"
+)
+```
+
+**Constructor Parameters:**
+- `workflow_file` (str): Path to workflow YAML file
+- `workspace` (str, optional): Custom workspace directory
+- `state_backend` (str, optional): State persistence backend
+
+**Methods:**
+- `run(params: dict = None, resume: bool = False, start_from: str = None) -> dict`
+- `validate() -> bool`
+- `get_state() -> dict`
+- `save_state() -> None`
+- `load_state(run_id: int) -> None`
+
+#### TaskRunner
+
+Base class for implementing custom tasks.
+
+```python
+from yaml_workflow_engine import TaskRunner
+
+class MyCustomTask(TaskRunner):
+    def run(self, inputs: dict) -> dict:
+        # Task implementation
+        return {"result": "success"}
+    
+    def validate(self, inputs: dict) -> bool:
+        # Input validation
+        return True
+```
+
+**Required Methods:**
+- `run(inputs: dict) -> dict`
+- `validate(inputs: dict) -> bool`
+
+**Optional Methods:**
+- `cleanup() -> None`
+- `on_failure(error: Exception) -> None`
+- `get_progress() -> float`
+
+### Built-in Tasks
+
+#### TemplateTask
+
+Renders Jinja2 templates with workflow variables.
+
+```python
+# Usage in workflow YAML
+steps:
+  - name: render_template
+    task: template
+    template: "Hello, {{ name }}!"
+    output: greeting.txt
+```
+
+**Parameters:**
+- `template`: Template string or file path
+- `output`: Output file path
+- `variables`: Additional variables for rendering
+
+#### ShellTask
+
+Executes shell commands with variable substitution.
+
+```python
+# Usage in workflow YAML
+steps:
+  - name: process_file
+    task: shell
+    command: "python process.py {{ input_file }}"
+    env:
+      PYTHONPATH: "{{ workspace }}"
+```
+
+**Parameters:**
+- `command`: Shell command to execute
+- `env`: Environment variables
+- `working_dir`: Working directory
+- `timeout`: Command timeout in seconds
+
+#### FileTask
+
+Performs file operations with support for multiple formats.
+
+```python
+# Usage in workflow YAML
+steps:
+  - name: read_data
+    task: file
+    operation: read
+    format: json
+    path: "data.json"
+    output_var: data
+```
+
+**Operations:**
+- `read`: Read file content
+- `write`: Write data to file
+- `append`: Append to existing file
+- `delete`: Delete file
+- `copy`: Copy file
+- `move`: Move file
+
+**Supported Formats:**
+- `text`
+- `json`
+- `yaml`
+- `csv`
+- `xml`
+
+### Error Handling
+
+The engine provides several error handling mechanisms:
+
+```python
+from yaml_workflow_engine.exceptions import (
+    WorkflowError,
+    TaskError,
+    ValidationError,
+    StateError
+)
+
+try:
+    engine.run()
+except WorkflowError as e:
+    print(f"Workflow failed: {e}")
+except TaskError as e:
+    print(f"Task failed: {e.task_name} - {e}")
+except ValidationError as e:
+    print(f"Validation failed: {e}")
+```
+
+### Events and Hooks
+
+Subscribe to workflow events:
+
+```python
+from yaml_workflow_engine.events import WorkflowEvents
+
+def on_step_complete(step_name: str, result: dict):
+    print(f"Step {step_name} completed")
+
+engine.events.subscribe(WorkflowEvents.STEP_COMPLETE, on_step_complete)
+```
+
+**Available Events:**
+- `WORKFLOW_START`
+- `WORKFLOW_COMPLETE`
+- `WORKFLOW_FAIL`
+- `STEP_START`
+- `STEP_COMPLETE`
+- `STEP_FAIL`
+- `STATE_SAVE`
+- `STATE_LOAD`
+
+### Configuration
+
+Global configuration can be set through environment variables:
+
+```bash
+# State persistence
+export WORKFLOW_STATE_DIR=".workflow_state"
+export WORKFLOW_STATE_BACKEND="redis"
+export WORKFLOW_STATE_REDIS_URL="redis://localhost:6379"
+
+# Logging
+export WORKFLOW_LOG_LEVEL="DEBUG"
+export WORKFLOW_LOG_FILE="workflow.log"
+
+# Performance
+export WORKFLOW_MAX_WORKERS=4
+export WORKFLOW_TASK_TIMEOUT=3600
+```
+
+Or through a configuration file:
+
+```yaml
+# config.yaml
+state:
+  backend: redis
+  redis_url: redis://localhost:6379
+  
+logging:
+  level: DEBUG
+  file: workflow.log
+  
+performance:
+  max_workers: 4
+  task_timeout: 3600
+```
