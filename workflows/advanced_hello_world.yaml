@@ -18,6 +18,11 @@ description: >
   - Template rendering
   - Custom module tasks
 
+params:
+  name:
+    description: Name to include in the greeting
+    default: World
+
 steps:
   # Step 1: Validate the input name parameter
   # Creates a validation result file that other steps will use

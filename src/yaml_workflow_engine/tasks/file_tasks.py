@@ -7,6 +7,7 @@ import json
 import yaml
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
+from jinja2 import Template
 
 from ..workspace import resolve_path
 from .base import get_task_logger, log_task_execution, log_task_result, log_task_error
@@ -146,7 +147,10 @@ def write_json_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Pa
     if data is None:
         raise ValueError("data parameter is required")
     
-    return write_json(file_path, data, indent, workspace)
+    # Process templates in data
+    processed_data = process_templates(data, context)
+    
+    return write_json(file_path, processed_data, indent, workspace)
 
 @register_task("read_yaml")
 def read_yaml_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, Any]:
@@ -168,6 +172,26 @@ def read_yaml_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Pat
         raise ValueError("file_path parameter is required")
     
     return read_yaml(file_path, workspace)
+
+def process_templates(data: Any, context: Dict[str, Any]) -> Any:
+    """
+    Process Jinja2 templates in data recursively.
+    
+    Args:
+        data: Data to process
+        context: Template context
+        
+    Returns:
+        Any: Processed data
+    """
+    if isinstance(data, str):
+        template = Template(data)
+        return template.render(**context)
+    elif isinstance(data, dict):
+        return {k: process_templates(v, context) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [process_templates(v, context) for v in data]
+    return data
 
 @register_task("write_yaml")
 def write_yaml_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
@@ -191,7 +215,10 @@ def write_yaml_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Pa
     if data is None:
         raise ValueError("data parameter is required")
     
-    return write_yaml(file_path, data, workspace)
+    # Process templates in data
+    processed_data = process_templates(data, context)
+    
+    return write_yaml(file_path, processed_data, workspace)
 
 # Helper functions
 def read_file(

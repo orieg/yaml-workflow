@@ -110,7 +110,7 @@ class WorkflowEngine:
         # Initialize workflow state
         self.state = WorkflowState(self.workspace)
         
-        # Initialize context
+        # Initialize context with default parameter values
         self.context = {
             "workflow_name": self.name,
             "workspace": str(self.workspace),
@@ -119,9 +119,20 @@ class WorkflowEngine:
             "workflow_file": str(self.workflow_file.absolute())
         }
         
+        # Load default parameter values from workflow file
+        params = self.workflow.get("params", {})
+        for param_name, param_config in params.items():
+            if isinstance(param_config, dict) and "default" in param_config:
+                self.context[param_name] = param_config["default"]
+        
         self.logger.info(f"Initialized workflow: {self.name}")
         self.logger.info(f"Workspace: {self.workspace}")
         self.logger.info(f"Run number: {self.context['run_number']}")
+        if params:
+            self.logger.info("Default parameters loaded:")
+            for name, value in self.context.items():
+                if name in params:
+                    self.logger.info(f"  {name}: {value}")
     
     def run(
         self,
@@ -142,9 +153,12 @@ class WorkflowEngine:
         Returns:
             dict: Workflow results
         """
-        # Update context with parameters
+        # Update context with provided parameters (overriding defaults)
         if params:
             self.context.update(params)
+            self.logger.info("Parameters provided:")
+            for name, value in params.items():
+                self.logger.info(f"  {name}: {value}")
         
         # Get steps
         steps = self.workflow.get("steps", [])
