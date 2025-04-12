@@ -1,6 +1,82 @@
 # YAML Workflow Engine
 
-A simple and flexible workflow engine that executes tasks defined in YAML configuration files. This engine allows you to create modular, reusable workflows by connecting Python functions through YAML definitions.
+A powerful and flexible workflow engine that executes tasks defined in YAML configuration files. This engine allows you to create modular, reusable workflows by connecting tasks through YAML definitions, with support for parallel processing, batch operations, and state management.
+
+## Architecture
+
+```mermaid
+graph TD
+    subgraph Input
+        A[YAML Workflow File] --> B[Workflow Parser]
+        C[Parameters] --> B
+        D[Environment Variables] --> B
+    end
+
+    subgraph Engine Core
+        B --> E[Workflow Validator]
+        E --> F[Task Scheduler]
+        F --> G[Execution Engine]
+    end
+
+    subgraph Execution
+        G --> H[Sequential Tasks]
+        G --> I[Parallel Tasks]
+        H --> J[Task Runner]
+        I --> J
+    end
+
+    subgraph Tasks
+        J --> K[Template Tasks]
+        J --> L[Shell Tasks]
+        J --> M[File Tasks]
+        J --> N[Batch Tasks]
+        J --> O[Custom Tasks]
+    end
+
+    subgraph State Management
+        P[State Store] <--> G
+        Q[Resume Handler] --> G
+        R[Error Handler] <--> G
+    end
+
+    subgraph Output
+        K --> S[Task Results]
+        L --> S
+        M --> S
+        N --> S
+        O --> S
+        S --> T[Final Output]
+    end
+```
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant E as Engine
+    participant T as Task Runner
+    participant S as State Store
+
+    U->>C: Run workflow
+    C->>E: Parse & validate
+    E->>S: Load state
+    
+    loop For each step
+        E->>T: Execute task
+        T->>S: Save progress
+        T-->>E: Return result
+        
+        alt Task failed
+            E->>S: Save failure state
+            E-->>C: Report error
+            C-->>U: Display error
+        end
+    end
+    
+    E->>S: Save final state
+    E-->>C: Return results
+    C-->>U: Display output
+```
 
 ## Features
 
@@ -12,6 +88,9 @@ A simple and flexible workflow engine that executes tasks defined in YAML config
 - ⚡ Parallel processing support
 - 🚦 API rate limiting
 - 📊 Progress tracking and logging
+- 💾 State persistence and resume capability
+- 🔄 Batch processing with chunking
+- 🌐 Template variable substitution
 
 ## Quick Start
 
@@ -29,104 +108,225 @@ pip install -e .
 mkdir -p output
 ```
 
-2. Create a workflow file (e.g., `workflows/my_workflow.yaml`):
+2. Create a simple workflow (e.g., `workflows/hello_world.yaml`):
 ```yaml
-workflow:
-  usage:
-    name: My Workflow
-    description: A simple workflow example
-    inputs:
-      name:
-        type: string
-        description: Name to greet
-  steps:
-    - name: greet
-      module: yaml_workflow_engine.tasks.basic_tasks
-      function: hello_world
-      inputs:
-        name: ${name}
-      outputs:
-        - greeting
-    - name: save_greeting
-      module: yaml_workflow_engine.tasks.file_tasks
-      function: write_file
-      inputs:
-        file_path: greetings.txt  # Write to output directory
-        content: ${greeting}
-      outputs:
-        - file_path  # Capture the path where the file was written
+name: Hello World
+description: A simple workflow that creates a greeting
+
+steps:
+  - name: create_greeting
+    task: template
+    template: |
+      Hello, {{ name }}!
+      
+      This is run #{{ run_number }} of the {{ workflow_name }} workflow.
+      Created at: {{ timestamp }}
+    output: greeting.txt
 ```
 
 3. Run your workflow:
 ```bash
 # Run with input parameters
-yaml-workflow run workflows/my_workflow.yaml name=Alice
-
-# The greeting will be saved to output/greetings.txt
+yaml-workflow run workflows/hello_world.yaml name=Alice
 
 # List available workflows
 yaml-workflow list
 
 # Validate a workflow
-yaml-workflow validate workflows/my_workflow.yaml
+yaml-workflow validate workflows/hello_world.yaml
+
+# Resume a failed workflow
+yaml-workflow run workflows/hello_world.yaml --resume
 ```
 
-## Project Structure
+## CLI Usage
 
+```bash
+# Run a workflow
+yaml-workflow run workflows/hello_world.yaml name=Alice
+
+# Run with specific options
+yaml-workflow run workflows/hello_world.yaml --resume  # Resume from last failure
+yaml-workflow run workflows/hello_world.yaml --start-from step2  # Start from specific step
+yaml-workflow run workflows/hello_world.yaml --skip-steps step1,step3  # Skip specific steps
+
+# List available workflows
+yaml-workflow list
+yaml-workflow list --base-dir custom/workflows  # Custom workflows directory
+
+# Validate a workflow
+yaml-workflow validate workflows/hello_world.yaml
+
+# Workspace management
+yaml-workflow workspace list  # List all workspaces
+yaml-workflow workspace clean  # Clean old workspaces
+yaml-workflow workspace remove workspace_name  # Remove specific workspace
 ```
-yaml-workflow-engine/
-├── src/
-│   └── yaml_workflow_engine/
-│       ├── tasks/                 # Task modules
-│       │   ├── basic_tasks.py     # Basic utility tasks
-│       │   ├── file_tasks.py      # File operation tasks
-│       │   └── shell_tasks.py     # Shell command tasks
-│       ├── __init__.py           # Package initialization
-│       ├── cli.py                # Command-line interface
-│       ├── engine.py             # Core workflow engine
-│       └── exceptions.py         # Custom exceptions
-├── workflows/                    # Example workflows
-│   └── hello_world.yaml         # Hello world example
-├── pyproject.toml              # Project configuration
-├── MANIFEST.in                 # Package manifest
-└── README.md                   # This file
+
+## Workflow Structure
+
+### Basic Structure
+```yaml
+name: My Workflow
+description: Workflow description
+version: "0.1.0"  # Optional
+
+# Optional global settings
+settings:
+  timeout: 3600
+  retry_count: 3
+  max_workers: 4
+
+# Optional environment variables
+env:
+  API_KEY: ${env:API_KEY}
+  DEBUG: "true"
+
+# Optional parameter definitions
+params:
+  input_file:
+    description: Input file path
+    type: string
+    required: true
+  batch_size:
+    description: Number of items to process at once
+    type: integer
+    default: 10
+
+# Workflow steps
+steps:
+  - name: step_name
+    task: task_type
+    params:
+      param1: value1
+    outputs:
+      - output_var
 ```
 
-## Available Task Modules
+### Available Task Types
 
-### 1. Basic Tasks (`yaml_workflow_engine.tasks.basic_tasks`)
-- `hello_world(name: str = "World") -> str`
-  - Simple greeting function
-- `add_numbers(a: float, b: float) -> float`
-  - Add two numbers
-- `join_strings(*strings: str, separator: str = " ") -> str`
-  - Join multiple strings
-- `create_greeting(template: str, **kwargs) -> str`
-  - Create custom greetings
+1. **Template Tasks**
+```yaml
+- name: create_text
+  task: template
+  params:
+    template: |
+      Hello, {{ name }}!
+      Created at: {{ timestamp }}
+    output_file: output.txt
+```
 
-### 2. File Tasks (`yaml_workflow_engine.tasks.file_tasks`)
-- `read_file(file_path: str, encoding: str = "utf-8") -> str`
-  - Read text files
-- `write_file(file_path: str, content: str, encoding: str = "utf-8") -> str`
-  - Write text files
-- `read_json(file_path: str) -> Union[Dict, List]`
-  - Read JSON files
-- `write_json(file_path: str, data: Union[Dict, List], indent: int = 2) -> str`
-  - Write JSON files
-- `read_yaml(file_path: str) -> Dict`
-  - Read YAML files
-- `write_yaml(file_path: str, data: Dict) -> str`
-  - Write YAML files
+2. **Shell Tasks**
+```yaml
+- name: run_command
+  task: shell
+  params:
+    command: |
+      echo "Processing ${input_file}"
+      cat ${input_file} | grep "pattern"
+```
 
-### 3. Shell Tasks (`yaml_workflow_engine.tasks.shell_tasks`)
-- `run_command(command: Union[str, List[str]], **kwargs) -> Tuple[int, str, str]`
-  - Execute shell commands
-- `check_command(command: Union[str, List[str]], **kwargs) -> str`
-  - Execute commands with error checking
-- `get_environment() -> Dict[str, str]`
-  - Get environment variables
-- `set_environment(env_vars: Dict[str, str]) -> Dict[str, str]`
-  - Set environment variables
+3. **File Tasks**
+```yaml
+- name: read_data
+  task: file_utils
+  params:
+    file_path: data.txt
+    encoding: utf-8
+    format: json  # Optional: json, yaml, or text (default)
+```
+
+4. **Batch Processing Tasks**
+```yaml
+- name: process_files
+  task: batch_processor
+  params:
+    parallel: true
+    max_workers: 4
+    chunk_size: 10
+    items: ${file_list}
+    processing_task:
+      task: file_processor
+      params:
+        output_dir: ${output_directory}
+```
+
+### Task Features
+
+1. **Parallel Processing**
+- Use `parallel: true` to enable parallel execution
+- Configure with `parallel_settings`:
+  ```yaml
+  parallel_settings:
+    max_workers: 4  # Number of parallel workers
+    timeout: 3600   # Timeout in seconds
+    chunk_size: 10  # Items per chunk
+  ```
+
+2. **State Management**
+- Enable state tracking with `resume_state: true`
+- Use `--resume` flag to continue from failures
+- State is saved per step and per chunk
+
+3. **Conditional Execution**
+```yaml
+- name: conditional_step
+  task: processor
+  condition: ${previous_result.count > 0}
+  inputs:
+    data: ${previous_result.data}
+```
+
+4. **Error Handling**
+```yaml
+- name: api_call
+  task: api_client
+  error_handling:
+    type: retry  # Available: skip, fail, retry, notify
+    retry_count: 3
+    retry_delay: 60
+```
+
+5. **Variable Substitution**
+- Environment variables: `${env:VAR_NAME}`
+- Step outputs: `${step_name.output_var}`
+- Workflow parameters: `${param_name}`
+- Special variables:
+  - `${workspace}`: Current workspace directory
+  - `${run_number}`: Current run number
+  - `${timestamp}`: Current timestamp
+  - `${workflow_name}`: Name of the workflow
+
+6. **Template Processing**
+- Use Jinja2 syntax in templates: `{{ variable }}`
+- Supports filters: `{{ name|upper }}`
+- Conditional rendering: `{% if condition %}...{% endif %}`
+
+### Best Practices
+
+1. **Workflow Organization**
+- Use descriptive step names
+- Group related steps together
+- Add comments to explain complex steps
+- Use consistent naming conventions
+
+2. **Error Handling**
+- Add appropriate retry mechanisms
+- Define fallback behaviors
+- Log important information
+- Use conditional steps for error handling
+
+3. **Resource Management**
+- Configure appropriate timeouts
+- Set reasonable parallel worker counts
+- Use chunking for large datasets
+- Monitor memory usage
+
+4. **State Management**
+- Enable resume capability for long-running workflows
+- Save important state information
+- Use appropriate chunk sizes
+- Handle cleanup in failure cases
 
 ## Development
 
@@ -155,47 +355,44 @@ mypy src/
 1. Create a new task module in `src/yaml_workflow_engine/tasks/`:
 ```python
 """
-My custom tasks.
+Custom task module.
 """
+from typing import Any, Dict
+from pathlib import Path
+from . import register_task
 
-def my_task(param1: str, param2: int = 42) -> str:
+@register_task("my_task_type")
+def my_custom_task(
+    step: Dict[str, Any],
+    context: Dict[str, Any],
+    workspace: Path
+) -> Any:
     """
-    Task description.
+    Custom task implementation.
     
     Args:
-        param1: First parameter
-        param2: Second parameter (default: 42)
+        step: Step configuration
+        context: Workflow context
+        workspace: Workspace directory
     
     Returns:
-        str: Result
+        Any: Task result
     """
-    return f"Processed {param1} with {param2}"
+    # Implementation here
+    return result
 ```
 
 2. Use it in your workflow:
 ```yaml
-workflow:
-  steps:
-    - name: my_step
-      module: yaml_workflow_engine.tasks.my_tasks
-      function: my_task
-      inputs:
-        param1: value1
-        param2: 123
-      outputs:
-        - result
+steps:
+  - name: custom_step
+    task: my_task_type
+    function: my_function
+    inputs:
+      param1: value1
+    outputs:
+      - result
 ```
-
-## Error Handling
-
-The engine provides comprehensive error handling through custom exceptions:
-
-- `WorkflowError`: Base exception for all workflow errors
-- `WorkflowValidationError`: YAML validation errors
-- `StepError`: Step execution errors
-- `ModuleNotFoundError`: Missing module errors
-- `FunctionNotFoundError`: Missing function errors
-- And more...
 
 ## Contributing
 
