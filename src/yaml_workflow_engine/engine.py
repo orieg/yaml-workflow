@@ -10,7 +10,13 @@ from typing import Any, Dict, Optional, List
 
 import yaml
 
-from .exceptions import WorkflowError
+from .exceptions import (
+    WorkflowError,
+    FlowError,
+    FlowNotFoundError,
+    InvalidFlowDefinitionError,
+    StepNotInFlowError
+)
 from .workspace import create_workspace, get_workspace_info, WorkflowState
 from .tasks import get_task_handler
 
@@ -125,6 +131,9 @@ class WorkflowEngine:
             if isinstance(param_config, dict) and "default" in param_config:
                 self.context[param_name] = param_config["default"]
         
+        # Validate flows if present
+        self._validate_flows()
+        
         self.logger.info(f"Initialized workflow: {self.name}")
         self.logger.info(f"Workspace: {self.workspace}")
         self.logger.info(f"Run number: {self.context['run_number']}")
@@ -134,12 +143,109 @@ class WorkflowEngine:
                 if name in params:
                     self.logger.info(f"  {name}: {value}")
     
+    def _validate_flows(self) -> None:
+        """Validate workflow flows configuration."""
+        flows = self.workflow.get("flows", {})
+        if not flows:
+            return
+            
+        if not isinstance(flows, dict):
+            raise InvalidFlowDefinitionError("root", "flows must be a mapping")
+            
+        # Validate flows structure
+        if "definitions" not in flows:
+            raise InvalidFlowDefinitionError("root", "missing 'definitions' section")
+            
+        if not isinstance(flows["definitions"], list):
+            raise InvalidFlowDefinitionError("root", "'definitions' must be a list")
+            
+        # Validate each flow definition
+        defined_flows = set()
+        for flow_def in flows["definitions"]:
+            if not isinstance(flow_def, dict):
+                raise InvalidFlowDefinitionError("unknown", "flow definition must be a mapping")
+                
+            for flow_name, steps in flow_def.items():
+                if not isinstance(steps, list):
+                    raise InvalidFlowDefinitionError(flow_name, "steps must be a list")
+                    
+                # Check for duplicate flow names
+                if flow_name in defined_flows:
+                    raise InvalidFlowDefinitionError(flow_name, "duplicate flow name")
+                defined_flows.add(flow_name)
+                
+                # Validate step references
+                workflow_steps = {step.get("name") for step in self.workflow.get("steps", [])}
+                for step in steps:
+                    if step not in workflow_steps:
+                        raise StepNotInFlowError(step, flow_name)
+        
+        # Validate default flow
+        default_flow = flows.get("default")
+        if default_flow and default_flow not in defined_flows and default_flow != "all":
+            raise FlowNotFoundError(default_flow)
+    
+    def _get_flow_steps(self, flow_name: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get the list of steps for a given flow.
+        
+        Args:
+            flow_name: Name of the flow to get steps for. If None, uses default flow.
+            
+        Returns:
+            List[Dict[str, Any]]: List of step configurations in the flow order
+        """
+        all_steps = self.workflow.get("steps", [])
+        flows = self.workflow.get("flows", {})
+        
+        # If no flows defined, only allow "all" flow
+        if not flows:
+            if flow_name and flow_name != "all":
+                raise FlowNotFoundError(flow_name)
+            return all_steps
+            
+        # Get flow name to use
+        flow_to_use = flow_name or flows.get("default", "all")
+        
+        # Special case: "all" flow always returns all steps
+        if flow_to_use == "all":
+            return all_steps
+            
+        # Find the flow definition
+        flow_steps = None
+        defined_flows = set()
+        for flow_def in flows.get("definitions", []):
+            if not isinstance(flow_def, dict):
+                continue
+            for name, steps in flow_def.items():
+                defined_flows.add(name)
+                if name == flow_to_use:
+                    flow_steps = steps
+                    break
+            if flow_steps is not None:
+                break
+                
+        # Validate flow exists
+        if flow_to_use not in defined_flows:
+            raise FlowNotFoundError(flow_to_use)
+            
+        # Map step names to step configurations
+        step_map = {step.get("name"): step for step in all_steps}
+        ordered_steps = []
+        for step_name in flow_steps:
+            if step_name not in step_map:
+                raise StepNotInFlowError(step_name, flow_to_use)
+            ordered_steps.append(step_map[step_name])
+            
+        return ordered_steps
+    
     def run(
         self,
         params: Optional[Dict[str, Any]] = None,
         resume_from: Optional[str] = None,
         start_from: Optional[str] = None,
-        skip_steps: Optional[List[str]] = None
+        skip_steps: Optional[List[str]] = None,
+        flow: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Run the workflow.
@@ -149,6 +255,7 @@ class WorkflowEngine:
             resume_from: Optional step name to resume from after failure (preserves outputs)
             start_from: Optional step name to start execution from (fresh start)
             skip_steps: Optional list of step names to skip during execution
+            flow: Optional flow name to execute. If not specified, uses default flow.
             
         Returns:
             dict: Workflow results
@@ -160,10 +267,49 @@ class WorkflowEngine:
             for name, value in params.items():
                 self.logger.info(f"  {name}: {value}")
         
-        # Get steps
-        steps = self.workflow.get("steps", [])
-        if not isinstance(steps, list):
-            raise WorkflowError("Invalid workflow format: steps must be a list")
+        # Get flow configuration
+        flows = self.workflow.get("flows", {})
+        
+        # Determine which flow to use
+        if resume_from:
+            # When resuming, use the flow from the previous execution
+            saved_flow = self.state.get_flow()
+            if saved_flow and flow and flow != saved_flow:
+                raise WorkflowError(
+                    f"Cannot resume with different flow. Previous flow was '{saved_flow}', "
+                    f"requested flow is '{flow}'"
+                )
+            flow = saved_flow
+        else:
+            # For new runs, determine the flow to use
+            flow_to_use = flow or flows.get("default", "all")
+            
+            # Validate flow exists if specified
+            if flow and flows:
+                # Check if flow exists in definitions
+                defined_flows = set()
+                for flow_def in flows.get("definitions", []):
+                    if isinstance(flow_def, dict):
+                        defined_flows.update(flow_def.keys())
+                
+                if flow != "all" and flow not in defined_flows:
+                    raise FlowNotFoundError(flow)
+            
+            # Set the flow before we start
+            if flows or (flow and flow != "all"):
+                self.state.set_flow(flow_to_use)
+                self.logger.info(f"Using flow: {flow_to_use}")
+            flow = flow_to_use
+        
+        # Get steps for the specified flow
+        try:
+            steps = self._get_flow_steps(flow)
+        except WorkflowError as e:
+            self.logger.error(str(e))
+            raise
+            
+        if not steps:
+            raise WorkflowError("No steps to execute")
         
         # Handle workflow resumption vs fresh start
         if resume_from:
@@ -179,6 +325,9 @@ class WorkflowEngine:
         else:
             # Reset state for fresh run
             self.state.reset_state()
+            # Set the flow for the new run (again after reset)
+            if flows or (flow and flow != "all"):
+                self.state.set_flow(flow)
         
         # Run steps
         results = {}

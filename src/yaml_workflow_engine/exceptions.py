@@ -100,4 +100,29 @@ class WorkflowValidationSchema:
     """Schema definitions for workflow validation."""
     REQUIRED_STEP_FIELDS = ['name', 'module', 'function']
     OPTIONAL_STEP_FIELDS = ['inputs', 'outputs', 'condition', 'error_handling', 'retry', 'always_run']
-    VALID_ERROR_HANDLING = ['skip', 'fail', 'retry', 'notify'] 
+    VALID_ERROR_HANDLING = ['skip', 'fail', 'retry', 'notify']
+
+class FlowError(WorkflowError):
+    """Base exception class for flow-related errors."""
+    def __init__(self, message: str):
+        super().__init__(f"Flow error: {message}")
+
+class FlowNotFoundError(FlowError):
+    """Raised when a specified flow is not found."""
+    def __init__(self, flow_name: str):
+        super().__init__(f"Flow '{flow_name}' not found")
+        self.flow_name = flow_name
+
+class InvalidFlowDefinitionError(FlowError):
+    """Raised when a flow definition is invalid."""
+    def __init__(self, flow_name: str, reason: str):
+        super().__init__(f"Invalid flow '{flow_name}': {reason}")
+        self.flow_name = flow_name
+        self.reason = reason
+
+class StepNotInFlowError(FlowError):
+    """Raised when trying to access a step that is not in the current flow."""
+    def __init__(self, step_name: str, flow_name: str):
+        super().__init__(f"Step '{step_name}' not found in flow '{flow_name}'")
+        self.step_name = step_name
+        self.flow_name = flow_name 

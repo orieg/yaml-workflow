@@ -30,6 +30,7 @@ def create_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--resume", action="store_true", help="Resume workflow from last failed step")
     run_parser.add_argument("--start-from", help="Start workflow execution from specified step")
     run_parser.add_argument("--skip-steps", help="Comma-separated list of steps to skip during execution")
+    run_parser.add_argument("--flow", help="Name of the flow to execute (default: use flow specified in workflow file)")
     # Add -- before params to handle parameters after flags
     run_parser.add_argument("params", nargs="*", help="Workflow parameters in key=value format", default=[])
     
@@ -178,7 +179,8 @@ def run_workflow(args: argparse.Namespace) -> None:
             params,
             resume_from=resume_from,
             start_from=start_from,
-            skip_steps=skip_steps
+            skip_steps=skip_steps,
+            flow=args.flow
         )
         
         # Print results
@@ -190,6 +192,8 @@ def run_workflow(args: argparse.Namespace) -> None:
             print("\nWorkflow completed successfully!")
         if skip_steps:
             print(f"Skipped steps: {', '.join(skip_steps)}")
+        if args.flow:
+            print(f"Flow executed: {args.flow}")
         print("Results:", results)
         
     except WorkflowError as e:

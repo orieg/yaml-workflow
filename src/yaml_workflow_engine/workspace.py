@@ -35,7 +35,8 @@ class WorkflowState:
                 'failed_step': None,
                 'step_outputs': {},
                 'last_updated': None,
-                'status': 'not_started'  # Possible values: not_started, in_progress, completed, failed
+                'status': 'not_started',  # Possible values: not_started, in_progress, completed, failed
+                'flow': None  # Track which flow is being executed
             }
     
     def save(self) -> None:
@@ -71,6 +72,16 @@ class WorkflowState:
         state['completed_at'] = datetime.now().isoformat()
         self.save()
     
+    def set_flow(self, flow_name: Optional[str]) -> None:
+        """Set the flow being executed."""
+        state = self.metadata['execution_state']
+        state['flow'] = flow_name
+        self.save()
+    
+    def get_flow(self) -> Optional[str]:
+        """Get the name of the flow being executed."""
+        return self.metadata['execution_state'].get('flow')
+    
     def can_resume_from_step(self, step_name: str) -> bool:
         """Check if workflow can be resumed from a specific step."""
         state = self.metadata['execution_state']
@@ -92,7 +103,8 @@ class WorkflowState:
             'failed_step': None,
             'step_outputs': {},
             'last_updated': datetime.now().isoformat(),
-            'status': 'not_started'
+            'status': 'not_started',
+            'flow': None
         }
         self.save()
 

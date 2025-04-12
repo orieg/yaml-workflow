@@ -91,6 +91,7 @@ sequenceDiagram
 - 💾 State persistence and resume capability
 - 🔄 Batch processing with chunking
 - 🌐 Template variable substitution
+- 🔀 Flow control with custom step sequences
 
 ## Quick Start
 
@@ -149,6 +150,7 @@ yaml-workflow run workflows/hello_world.yaml name=Alice
 yaml-workflow run workflows/hello_world.yaml --resume  # Resume from last failure
 yaml-workflow run workflows/hello_world.yaml --start-from step2  # Start from specific step
 yaml-workflow run workflows/hello_world.yaml --skip-steps step1,step3  # Skip specific steps
+yaml-workflow run workflows/hello_world.yaml --flow data_collection  # Run specific flow
 
 # List available workflows
 yaml-workflow list
@@ -193,15 +195,92 @@ params:
     type: integer
     default: 10
 
+# Optional flow definitions
+flows:
+  default: process  # Optional, defaults to "all" if not specified
+  definitions:
+    - process: [step1, step3, step4]  # Main processing flow
+    - data_collection: [step2, step5]  # Data collection flow
+    - validation: [step1, step2]  # Validation flow
+
 # Workflow steps
 steps:
-  - name: step_name
+  - name: step1
     task: task_type
     params:
-      param1: value1
-    outputs:
-      - output_var
+      # ... step parameters ...
+
+  - name: step2
+    task: task_type
+    params:
+      # ... step parameters ...
 ```
+
+### Flow Control
+
+The workflow engine supports defining multiple flows within a single workflow. Each flow represents a specific sequence of steps to execute. This allows you to:
+
+- Define different execution paths for different purposes
+- Reuse steps across different flows
+- Switch between flows via command line
+- Resume failed flows from the last failed step
+
+#### Flow Configuration
+
+```yaml
+flows:
+  # Optional default flow to use when no flow is specified
+  default: process
+  
+  # Flow definitions
+  definitions:
+    # Each item defines a named flow with its step sequence
+    - process: [step1, step3, step4]
+    - data_collection: [step2, step5]
+    - validation: [step1, step2]
+```
+
+#### Special Flows
+
+- `all`: A predefined flow that executes all steps in sequence (default if no flows defined)
+- Default flow: Specified by `flows.default`, used when no flow is provided via CLI
+
+#### Using Flows
+
+1. Command Line:
+```bash
+# Run specific flow
+yaml-workflow run workflow.yaml --flow data_collection
+
+# Run default flow
+yaml-workflow run workflow.yaml
+
+# Run all steps in sequence
+yaml-workflow run workflow.yaml --flow all
+```
+
+2. Resuming Flows:
+```bash
+# Resume failed workflow (continues with same flow)
+yaml-workflow run workflow.yaml --resume
+```
+
+#### Flow Validation
+
+The engine validates:
+- All referenced steps exist in the workflow
+- No duplicate flow names
+- Default flow exists in definitions (if specified)
+- Flow exists when specified via CLI
+- Same flow is used when resuming a workflow
+
+#### Best Practices
+
+1. Define a default flow for common execution paths
+2. Use descriptive flow names that indicate their purpose
+3. Keep flows focused and minimal
+4. Use the "all" flow for full workflow execution
+5. Consider step dependencies when defining flows
 
 ### Available Task Types
 
