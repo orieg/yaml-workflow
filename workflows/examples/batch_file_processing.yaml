@@ -1,0 +1,84 @@
+# Example workflow demonstrating batch file processing with resume capability
+# This workflow processes multiple files in parallel and can resume from failures
+
+name: Batch File Processing
+description: Process multiple files in parallel with resume capability
+version: "1.0"
+
+# Global settings for parallel processing
+parallel_settings:
+  max_workers: 4  # Number of parallel processes
+  timeout: 3600   # Maximum time in seconds for each file
+  chunk_size: 10  # Number of files to process in each batch
+
+# Parameters for the workflow
+params:
+  input_directory:
+    description: Directory containing files to process
+    type: string
+    required: true
+  file_pattern:
+    description: Glob pattern to match files
+    type: string
+    default: "*.txt"
+  output_directory:
+    description: Directory to store processed files
+    type: string
+    required: true
+
+steps:
+  # Step 1: List and validate input files
+  - name: discover_files
+    task: file_utils
+    function: list_files
+    inputs:
+      directory: ${input_directory}
+      pattern: ${file_pattern}
+      recursive: true
+    outputs:
+      - file_list
+      - total_files
+
+  # Step 2: Process files in parallel with resume capability
+  - name: process_files
+    task: batch_processor
+    function: process_file_batch
+    parallel: true  # Enable parallel processing
+    iterate_over: ${file_list}  # List to iterate over
+    resume_state: true  # Enable resume capability
+    inputs:
+      input_file: ${item}  # Current item from iteration
+      output_dir: ${output_directory}
+      processing_config:
+        # Example processing configuration
+        validate: true
+        transform: true
+        compress: false
+    outputs:
+      - processed_files  # List of successfully processed files
+      - failed_files    # List of files that failed processing
+      - skipped_files   # List of files skipped (already processed)
+
+  # Step 3: Generate processing report
+  - name: generate_report
+    task: reporting
+    function: create_batch_report
+    inputs:
+      total_files: ${total_files}
+      processed_files: ${processed_files}
+      failed_files: ${failed_files}
+      skipped_files: ${skipped_files}
+      output_file: "processing_report.json"
+    outputs:
+      - report_path
+
+  # Step 4: Handle any failures
+  - name: handle_failures
+    task: error_handler
+    function: process_failures
+    condition: ${len(failed_files) > 0}  # Only run if there were failures
+    inputs:
+      failed_files: ${failed_files}
+      error_log: "error_report.txt"
+    outputs:
+      - error_report 
