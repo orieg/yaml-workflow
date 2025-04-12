@@ -3,6 +3,7 @@ Core workflow engine implementation.
 """
 
 import logging
+import logging.handlers
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -13,12 +14,59 @@ from .exceptions import WorkflowError
 from .workspace import create_workspace, get_workspace_info
 from .tasks import get_task_handler
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+def setup_logging(workspace: Path, name: str) -> logging.Logger:
+    """
+    Set up logging configuration for the workflow.
+    
+    Args:
+        workspace: Workspace directory
+        name: Name of the workflow
+        
+    Returns:
+        logging.Logger: Configured logger
+    """
+    # Create logs directory if it doesn't exist
+    logs_dir = workspace / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    
+    # Create log file path
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = logs_dir / f"{name}_{timestamp}.log"
+    
+    # Create formatters
+    file_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    console_formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s'
+    )
+    
+    # Create file handler
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setFormatter(file_formatter)
+    file_handler.setLevel(logging.DEBUG)
+    
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(console_formatter)
+    console_handler.setLevel(logging.INFO)
+    
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+    
+    # Remove any existing handlers
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Add handlers
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
+    
+    # Create and return workflow logger
+    logger = logging.getLogger("workflow")
+    logger.info(f"Logging to: {log_file}")
+    return logger
 
 class WorkflowEngine:
     """Main workflow engine class."""
@@ -56,6 +104,9 @@ class WorkflowEngine:
         self.workspace = create_workspace(self.name, workspace, base_dir)
         self.workspace_info = get_workspace_info(self.workspace)
         
+        # Set up logging
+        self.logger = setup_logging(self.workspace, self.name)
+        
         # Initialize context
         self.context = {
             "workflow_name": self.name,
@@ -64,6 +115,10 @@ class WorkflowEngine:
             "timestamp": datetime.now().isoformat(),
             "workflow_file": str(self.workflow_file.absolute())
         }
+        
+        self.logger.info(f"Initialized workflow: {self.name}")
+        self.logger.info(f"Workspace: {self.workspace}")
+        self.logger.info(f"Run number: {self.context['run_number']}")
     
     def run(self, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -102,7 +157,7 @@ class WorkflowEngine:
                 raise WorkflowError(f"Unknown task type: {task_type}")
             
             # Run task
-            logger.info(f"Running step {i}: {name}")
+            self.logger.info(f"Running step {i}: {name}")
             try:
                 result = handler(step, self.context, self.workspace)
                 results[name] = result
@@ -111,10 +166,10 @@ class WorkflowEngine:
             except Exception as e:
                 raise WorkflowError(f"Error in step {name}: {str(e)}") from e
         
-        logger.info("Workflow completed successfully.")
-        logger.info("Final workflow outputs:")
+        self.logger.info("Workflow completed successfully.")
+        self.logger.info("Final workflow outputs:")
         for key, value in results.items():
-            logger.info(f"  {key}: {value}")
+            self.logger.info(f"  {key}: {value}")
         
         return results
         
@@ -148,7 +203,7 @@ class WorkflowEngine:
             'workflow_file': str(self.workflow_file.absolute()),
         })
         
-        logger.info(f"Created workspace: {self.workspace}")
+        self.logger.info(f"Created workspace: {self.workspace}")
         return self.workspace
         
     def resolve_value(self, value: Any) -> Any:
@@ -197,7 +252,7 @@ class WorkflowEngine:
             step: Step definition from workflow
         """
         name = step.get('name', 'unnamed_step')
-        logger.info(f"Running step: {name}")
+        self.logger.info(f"Running step: {name}")
         
         # Import module
         try:
@@ -219,7 +274,7 @@ class WorkflowEngine:
         if 'workspace' in sig.parameters and self.workspace:
             inputs['workspace'] = self.workspace
             
-        logger.info(f"Step inputs: {inputs}")
+        self.logger.info(f"Step inputs: {inputs}")
         
         # Execute function
         try:
@@ -236,5 +291,5 @@ class WorkflowEngine:
                 for output, value in zip(outputs, result):
                     self.context[output] = value
         
-        logger.info(f"Step '{name}' completed. Outputs: {self.context}")
+        self.logger.info(f"Step '{name}' completed. Outputs: {self.context}")
         

@@ -146,6 +146,10 @@ def resolve_path(workspace: Path, file_path: str) -> Path:
     """
     if os.path.isabs(file_path):
         return Path(file_path)
+        
+    # If path already starts with output/, don't add it again
+    if file_path.startswith("output/"):
+        return workspace / file_path
     return workspace / "output" / file_path
 
 def get_workspace_info(workspace: Path) -> Dict[str, Any]:

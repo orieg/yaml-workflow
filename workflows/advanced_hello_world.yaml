@@ -1,0 +1,127 @@
+name: Advanced Hello World
+description: >
+  An advanced hello world workflow demonstrating:
+  - Input validation
+  - Conditional execution
+  - Error handling
+  - Multiple output formats
+  - Shell commands
+  - Template rendering
+  - Custom module tasks
+
+steps:
+  - name: validate_input
+    task: shell
+    command: |
+      mkdir -p "{{ workspace }}/output"
+      if [ -z "{{ name|default('') }}" ]; then
+        echo "Error: Name parameter is required" > "{{ workspace }}/output/validation_result.txt"
+      elif [ "{{ name|length }}" -lt 2 ]; then
+        echo "Error: Name must be at least 2 characters long" > "{{ workspace }}/output/validation_result.txt"
+      elif [ "{{ name|length }}" -gt 50 ]; then
+        echo "Error: Name must not exceed 50 characters" > "{{ workspace }}/output/validation_result.txt"
+      else
+        echo "Valid: {{ name }}" > "{{ workspace }}/output/validation_result.txt"
+      fi
+
+  - name: check_validation
+    task: read_file
+    module: yaml_workflow_engine.tasks.file_tasks
+    params:
+      file_path: "validation_result.txt"
+      encoding: "utf-8"
+    output_var: validation_content
+
+  - name: process_validation
+    task: shell
+    command: |
+      if echo "{{ validation_content }}" | grep -q "^Error:"; then
+        echo "Validation failed:"
+        echo "{{ validation_content }}"
+        echo "false" > "{{ workspace }}/output/validation_passed.txt"
+      else
+        echo "Validation passed"
+        echo "true" > "{{ workspace }}/output/validation_passed.txt"
+      fi
+
+  - name: get_timestamp
+    task: shell
+    command: date -u +"%Y-%m-%dT%H:%M:%SZ"
+    output_var: current_timestamp
+    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "true"
+
+  - name: create_greeting
+    task: write_json
+    module: yaml_workflow_engine.tasks.file_tasks
+    params:
+      file_path: "greeting.json"
+      data: 
+        greeting: "Hello, {{ name }}!"
+        timestamp: "{{ current_timestamp }}"
+        run_number: "{{ run_number }}"
+        language: "en"
+      indent: 2
+    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "true"
+
+  - name: translate_greeting
+    task: write_yaml
+    module: yaml_workflow_engine.tasks.file_tasks
+    params:
+      file_path: "greetings.yaml"
+      data:
+        English: "Hello, {{ name }}!"
+        Spanish: "¡Hola, {{ name }}!"
+        French: "Bonjour, {{ name }}!"
+        German: "Hallo, {{ name }}!"
+        Italian: "Ciao, {{ name }}!"
+        Japanese: "こんにちは、{{ name }}さん！"
+    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "true"
+
+  - name: format_output
+    task: shell
+    command: |
+      if [ -f "{{ workspace }}/output/greeting.json" ]; then
+        echo "=== Workflow Results ==="
+        echo "Run #{{ run_number }} at {{ current_timestamp }}"
+        echo
+        echo "JSON Greeting:"
+        cat "{{ workspace }}/output/greeting.json"
+        echo
+        echo "Multiple Languages:"
+        cat "{{ workspace }}/output/greetings.yaml"
+        echo
+        echo "=== End of Results ==="
+      fi
+    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "true"
+
+  - name: handle_error
+    task: write_file
+    module: yaml_workflow_engine.tasks.file_tasks
+    params:
+      file_path: "error_report.txt"
+      content: |
+        Workflow encountered an error:
+        Input validation failed{% if name %} for name: {{ name }}{% else %}: name parameter not provided{% endif %}
+        
+        Please check the requirements and try again.
+        
+        Requirements:
+        - Name must be provided
+        - Name must be between 2 and 50 characters
+        - Name must not contain special characters
+    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "false"
+
+  - name: notify_status
+    task: shell
+    command: |
+      if [ "$(cat {{ workspace }}/output/validation_passed.txt)" = "true" ]; then
+        echo "Workflow completed successfully!"
+        echo "Check the output files for detailed results:"
+        echo "- greeting.json: JSON formatted greeting"
+        echo "- greetings.yaml: Multi-language greetings"
+        echo "- validation_result.txt: Input validation details"
+      else
+        echo "Workflow failed due to validation errors."
+        echo "Check error_report.txt for details."
+        cat "{{ workspace }}/output/error_report.txt"
+      fi 
