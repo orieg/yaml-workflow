@@ -405,3 +405,168 @@ steps:
 ## License
 
 MIT License - see LICENSE file for details
+
+## Task Definition Methods
+
+The workflow engine supports two complementary methods for defining tasks in your workflow:
+
+### 1. Task Registry
+```yaml
+- name: create_greeting
+  task: template  # Registered task name
+  params:  # Parameters passed to the task
+    template: |
+      Hello, {{ name }}!
+      Created at: {{ timestamp }}
+    output_file: greeting.txt
+  outputs:
+    - greeting_path
+```
+
+This method uses registered task names and is ideal when:
+- ✅ Using built-in tasks
+- ✅ Working with common, standardized operations
+- ✅ Wanting simpler configuration
+- ✅ Needing quick access to core functionality
+
+### 2. Module/Function
+```yaml
+- name: create_greeting
+  module: my_company.workflow_tasks.template  # Custom module path
+  function: render_template  # Function name in module
+  inputs:  # Parameters passed to the function
+    template: |
+      Hello, {{ name }}!
+      Created at: {{ timestamp }}
+    output_file: greeting.txt
+  outputs:
+    - greeting_path
+```
+
+This method uses Python module paths and is powerful when:
+- ✅ Implementing custom task logic
+- ✅ Avoiding task name conflicts
+- ✅ Maintaining organization-specific task libraries
+- ✅ Needing full control over task implementation
+- ✅ Working with multiple versions of similar tasks
+
+### Task Implementation Strategies
+
+1. **Using Built-in Tasks**
+```yaml
+# Using registered task
+- name: run_shell
+  task: shell
+  params:
+    command: "echo 'Hello'"
+```
+
+2. **Custom Implementation of Standard Task**
+```yaml
+# Using custom shell implementation
+- name: run_shell
+  module: my_company.tasks.shell
+  function: run_command
+  inputs:
+    command: "echo 'Hello'"
+```
+
+3. **Namespace Management**
+```yaml
+# Default shell task
+- name: basic_shell
+  task: shell
+  params:
+    command: "echo 'Basic'"
+
+# Custom shell task with additional features
+- name: advanced_shell
+  module: my_company.enhanced_tasks.shell
+  function: run_secure_command
+  inputs:
+    command: "echo 'Advanced'"
+    security_level: high
+```
+
+4. **Version-Specific Implementation**
+```yaml
+# Version 1 implementation
+- name: process_data_v1
+  module: my_company.tasks.v1.processor
+  function: process
+  inputs:
+    data: ${input_data}
+
+# Version 2 implementation
+- name: process_data_v2
+  module: my_company.tasks.v2.processor
+  function: process
+  inputs:
+    data: ${input_data}
+    new_feature: true
+```
+
+### Task Implementation Examples
+
+1. **Template Processing**
+```yaml
+# Built-in template task
+- name: simple_template
+  task: template
+  params:
+    template: "Basic template"
+    output_file: output.txt
+
+# Custom template implementation
+- name: advanced_template
+  module: my_company.templates
+  function: render_with_validation
+  inputs:
+    template: "Advanced template"
+    output_file: output.txt
+    schema: validation_schema.json
+```
+
+2. **File Operations**
+```yaml
+# Built-in file task
+- name: read_file
+  task: read_file
+  params:
+    file_path: input.txt
+
+# Custom file handling
+- name: read_file_secure
+  module: my_company.secure_io
+  function: read_encrypted_file
+  inputs:
+    file_path: input.txt
+    encryption_key: ${env:ENCRYPTION_KEY}
+```
+
+### Best Practices for Task Implementation
+
+1. **Choose the Right Approach**
+- Use task registry for standard operations
+- Use module/function for custom or specialized implementations
+- Mix both approaches as needed within the same workflow
+
+2. **Module Organization**
+- Group related tasks in meaningful modules
+- Use clear namespace hierarchy
+- Version modules when breaking changes are needed
+
+3. **Task Naming**
+- Use descriptive names for both tasks and functions
+- Include version or variant information if needed
+- Consider namespacing in module paths
+
+4. **Documentation**
+- Document custom module paths and functions
+- Specify required inputs and expected outputs
+- Include examples for both implementation methods
+
+5. **Error Handling**
+- Implement proper error handling in custom tasks
+- Return meaningful error messages
+- Consider retry and fallback mechanisms
