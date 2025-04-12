@@ -1,19 +1,33 @@
 """
-Batch processing tasks for handling multiple files in parallel with resume capability.
+Batch processing tasks for handling multiple items in parallel with resume capability.
 """
 
 import os
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Set
+from typing import Any, Dict, List, Optional, Tuple, Set, Iterator
 from datetime import datetime
 
-from . import register_task
+from . import register_task, get_task_handler
 from .base import get_task_logger
 
+def chunk_iterator(items: List[Any], chunk_size: int) -> Iterator[List[Any]]:
+    """
+    Split a list of items into chunks.
+    
+    Args:
+        items: List of items to chunk
+        chunk_size: Size of each chunk
+        
+    Returns:
+        Iterator[List[Any]]: Iterator yielding chunks of items
+    """
+    for i in range(0, len(items), chunk_size):
+        yield items[i:i + chunk_size]
+
 class BatchProcessor:
-    """Handles batch processing of files with resume capability."""
+    """Handles batch processing of items with resume capability."""
     
     def __init__(self, workspace: Path, name: str):
         """
@@ -41,7 +55,7 @@ class BatchProcessor:
         Load the processing state from files.
         
         Returns:
-            Tuple[Set[str], Set[str]]: Sets of processed and failed files
+            Tuple[Set[str], Set[str]]: Sets of processed and failed items
         """
         processed = set()
         failed = set()
@@ -61,8 +75,8 @@ class BatchProcessor:
         Save the processing state to files.
         
         Args:
-            processed: Set of successfully processed files
-            failed: Set of failed files
+            processed: Set of successfully processed items
+            failed: Set of failed items
         """
         with open(self.processed_file, 'w') as f:
             json.dump(list(processed), f)
@@ -70,58 +84,63 @@ class BatchProcessor:
         with open(self.failed_file, 'w') as f:
             json.dump(list(failed), f)
             
-    def process_file(self, file_path: str, config: Dict[str, Any], output_dir: str) -> bool:
+    def process_item(
+        self,
+        item: Any,
+        task_config: Dict[str, Any],
+        context: Dict[str, Any]
+    ) -> Tuple[bool, Any]:
         """
-        Process a single file.
+        Process a single item using the specified task.
         
         Args:
-            file_path: Path to the input file
-            config: Processing configuration
-            output_dir: Output directory
+            item: Item to process
+            task_config: Task configuration including task type and function
+            context: Workflow context
             
         Returns:
-            bool: True if processing was successful
+            Tuple[bool, Any]: Success status and task result
         """
         try:
-            self.logger.info(f"Processing file: {file_path}")
+            self.logger.info(f"Processing item: {item}")
             
-            # Create output path
-            input_path = Path(file_path)
-            rel_path = input_path.relative_to(input_path.parent.parent)
-            output_path = Path(output_dir) / rel_path
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # TODO: Implement actual file processing logic here
-            # This is just a placeholder that copies the file
-            if config.get('validate', True):
-                # Validate file
-                if not input_path.exists():
-                    raise FileNotFoundError(f"Input file not found: {file_path}")
-                    
-            if config.get('transform', True):
-                # Transform file
-                with open(input_path, 'rb') as src, open(output_path, 'wb') as dst:
-                    dst.write(src.read())
-                    
-            if config.get('compress', False):
-                # Compress file
-                pass
+            # Get task handler
+            task_type = task_config.get('task')
+            if not task_type:
+                raise ValueError("task parameter is required in processing_config")
                 
-            self.logger.info(f"Successfully processed: {file_path}")
-            return True
+            task_handler = get_task_handler(task_type)
+            if not task_handler:
+                raise ValueError(f"Task handler not found: {task_type}")
+            
+            # Prepare task step configuration
+            step = {
+                'name': f'process_{item}',
+                'task': task_type,
+                'function': task_config.get('function', 'process'),
+                'inputs': {
+                    **task_config.get('inputs', {}),
+                    'item': item  # Add current item to inputs
+                }
+            }
+            
+            # Execute task
+            result = task_handler(step, context, self.workspace)
+            self.logger.info(f"Successfully processed: {item}")
+            return True, result
             
         except Exception as e:
-            self.logger.error(f"Failed to process {file_path}: {str(e)}")
-            return False
+            self.logger.error(f"Failed to process {item}: {str(e)}")
+            return False, str(e)
 
 @register_task("batch_processor")
-def process_file_batch(
+def process_batch(
     step: Dict[str, Any],
     context: Dict[str, Any],
     workspace: Path
-) -> Dict[str, List[str]]:
+) -> Dict[str, List[Any]]:
     """
-    Process a batch of files in parallel with resume capability.
+    Process a batch of items in parallel with resume capability.
     
     Args:
         step: Step configuration
@@ -129,86 +148,109 @@ def process_file_batch(
         workspace: Workspace directory
         
     Returns:
-        Dict[str, List[str]]: Dictionary containing lists of processed, failed, and skipped files
+        Dict[str, List[Any]]: Dictionary containing lists of processed, failed, and skipped items
     """
     # Get step configuration
     parallel = step.get('parallel', False)
     resume_state = step.get('resume_state', False)
     iterate_over = step.get('iterate_over', [])
-    max_workers = step.get('parallel_settings', {}).get('max_workers', 4)
     
-    # Get input parameters
-    inputs = step.get('inputs', {})
-    output_dir = inputs.get('output_dir')
-    config = inputs.get('processing_config', {})
+    # Get parallel processing settings
+    parallel_settings = step.get('parallel_settings', {})
+    max_workers = parallel_settings.get('max_workers', 4)
+    chunk_size = parallel_settings.get('chunk_size', len(iterate_over))  # Default to all items if not specified
     
-    if not output_dir:
-        raise ValueError("output_dir is required")
+    # Get processing task configuration
+    processing_config = step.get('processing_task', {})
+    if not processing_config:
+        raise ValueError("processing_task configuration is required")
     
     # Initialize batch processor
     processor = BatchProcessor(workspace, step.get('name', 'batch_processor'))
     
     # Load previous state if resuming
-    processed_files, failed_files = processor.load_state() if resume_state else (set(), set())
+    processed_items, failed_items = processor.load_state() if resume_state else (set(), set())
     
-    # Track newly processed files
-    newly_processed = set()
-    newly_failed = set()
-    skipped = set()
+    # Track items and results
+    newly_processed = []
+    newly_failed = []
+    skipped = []
+    results = []
     
-    # Process files
-    if parallel and len(iterate_over) > 1:
-        # Parallel processing
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_file = {}
-            
-            # Submit jobs
-            for file_path in iterate_over:
-                if file_path in processed_files:
-                    skipped.add(file_path)
-                    continue
+    # Filter out already processed items
+    remaining_items = [
+        item for item in iterate_over 
+        if str(item) not in processed_items
+    ]
+    
+    # Add skipped items to tracking
+    skipped.extend([
+        item for item in iterate_over 
+        if str(item) in processed_items
+    ])
+    
+    # Process items in chunks
+    for chunk in chunk_iterator(remaining_items, chunk_size):
+        processor.logger.info(f"Processing chunk of {len(chunk)} items")
+        
+        if parallel and len(chunk) > 1:
+            # Parallel processing of chunk
+            with ThreadPoolExecutor(max_workers=min(max_workers, len(chunk))) as executor:
+                future_to_item = {}
+                
+                # Submit jobs for chunk
+                for item in chunk:
+                    future = executor.submit(
+                        processor.process_item,
+                        item,
+                        processing_config,
+                        context
+                    )
+                    future_to_item[future] = (item, str(item))
                     
-                future = executor.submit(
-                    processor.process_file,
-                    file_path,
-                    config,
-                    output_dir
-                )
-                future_to_file[future] = file_path
-                
-            # Process results as they complete
-            for future in as_completed(future_to_file):
-                file_path = future_to_file[future]
-                try:
-                    success = future.result()
-                    if success:
-                        newly_processed.add(file_path)
-                    else:
-                        newly_failed.add(file_path)
-                except Exception as e:
-                    processor.logger.error(f"Error processing {file_path}: {str(e)}")
-                    newly_failed.add(file_path)
-    else:
-        # Sequential processing
-        for file_path in iterate_over:
-            if file_path in processed_files:
-                skipped.add(file_path)
-                continue
-                
-            if processor.process_file(file_path, config, output_dir):
-                newly_processed.add(file_path)
-            else:
-                newly_failed.add(file_path)
-                
-    # Update and save state
-    processed_files.update(newly_processed)
-    failed_files.update(newly_failed)
-    if resume_state:
-        processor.save_state(processed_files, failed_files)
+                # Process results as they complete
+                for future in as_completed(future_to_item):
+                    item, item_id = future_to_item[future]
+                    try:
+                        success, result = future.result()
+                        if success:
+                            newly_processed.append(item)
+                            results.append(result)
+                            processed_items.add(item_id)
+                        else:
+                            newly_failed.append(item)
+                            failed_items.add(item_id)
+                    except Exception as e:
+                        processor.logger.error(f"Error processing {item}: {str(e)}")
+                        newly_failed.append(item)
+                        failed_items.add(item_id)
+        else:
+            # Sequential processing of chunk
+            for item in chunk:
+                item_id = str(item)
+                success, result = processor.process_item(item, processing_config, context)
+                if success:
+                    newly_processed.append(item)
+                    results.append(result)
+                    processed_items.add(item_id)
+                else:
+                    newly_failed.append(item)
+                    failed_items.add(item_id)
+                    
+        # Save state after each chunk
+        if resume_state:
+            processor.save_state(processed_items, failed_items)
+            processor.logger.info(
+                f"Chunk complete. "
+                f"Total processed: {len(processed_items)}, "
+                f"Total failed: {len(failed_items)}, "
+                f"Total skipped: {len(skipped)}"
+            )
         
     # Return results
     return {
-        'processed_files': list(newly_processed),
-        'failed_files': list(newly_failed),
-        'skipped_files': list(skipped)
+        'processed_items': newly_processed,
+        'failed_items': newly_failed,
+        'skipped_items': skipped,
+        'results': results
     } 
