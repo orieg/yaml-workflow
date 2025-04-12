@@ -14,41 +14,26 @@ from .engine import WorkflowEngine
 from .exceptions import WorkflowError
 from .workspace import get_workspace_info
 
-def parse_args() -> argparse.Namespace:
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description="YAML Workflow Engine")
+def create_parser() -> argparse.ArgumentParser:
+    """Create the argument parser."""
+    parser = argparse.ArgumentParser(description="YAML Workflow Engine CLI")
     
-    # Create subparsers for different commands
+    # Add subparsers
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
     
     # Run command
     run_parser = subparsers.add_parser("run", help="Run a workflow")
     run_parser.add_argument("workflow", help="Path to workflow YAML file")
-    run_parser.add_argument(
-        "--workspace",
-        "-w",
-        help="Custom workspace directory (default: runs/<workflow>)"
-    )
-    run_parser.add_argument(
-        "--base-dir",
-        "-b",
-        default="runs",
-        help="Base directory for workflow runs (default: runs)"
-    )
-    run_parser.add_argument(
-        "params",
-        nargs="*",
-        help="Input parameters in the format name=value"
-    )
+    run_parser.add_argument("--workspace", help="Custom workspace directory")
+    run_parser.add_argument("--base-dir", default="runs", help="Base directory for workflow runs")
+    run_parser.add_argument("--resume", action="store_true", help="Resume from last failed step")
+    run_parser.add_argument("--resume-from", help="Resume workflow from specified step")
+    # Add -- before params to handle parameters after flags
+    run_parser.add_argument("params", nargs="*", help="Workflow parameters in key=value format", default=[])
     
     # List command
     list_parser = subparsers.add_parser("list", help="List available workflows")
-    list_parser.add_argument(
-        "--directory",
-        "-d",
-        default="workflows",
-        help="Directory containing workflow files (default: workflows)"
-    )
+    list_parser.add_argument("--base-dir", default="runs", help="Base directory containing workflows")
     
     # Validate command
     validate_parser = subparsers.add_parser("validate", help="Validate a workflow")
@@ -119,15 +104,18 @@ def parse_args() -> argparse.Namespace:
         help="Don't ask for confirmation"
     )
     
-    return parser.parse_args()
+    return parser
 
-def parse_params(params: List[str]) -> Dict[str, str]:
+def parse_params(params: Optional[List[str]]) -> Dict[str, str]:
     """Parse command line parameters."""
+    if not params:
+        return {}
+        
     result = {}
     for param in params:
         try:
             name, value = param.split("=", 1)
-            result[name] = value
+            result[name.strip()] = value.strip()
         except ValueError:
             print(f"Invalid parameter format: {param}")
             print("Parameters must be in the format: name=value")
@@ -140,16 +128,35 @@ def run_workflow(args: argparse.Namespace) -> None:
         # Parse parameters
         params = parse_params(args.params)
         
-        # Create and run workflow
+        # Create workflow engine
         engine = WorkflowEngine(
             workflow_file=args.workflow,
             workspace=args.workspace,
             base_dir=args.base_dir
         )
-        results = engine.run(params)
+        
+        # If --resume flag is set, try to get the last failed step
+        resume_from = args.resume_from
+        if args.resume and not resume_from:
+            try:
+                state = engine.state
+                if state.metadata['execution_state']['status'] == 'failed':
+                    failed_step = state.metadata['execution_state']['failed_step']
+                    if failed_step:
+                        resume_from = failed_step['step_name']
+                        print(f"Resuming from last failed step: {resume_from}")
+            except Exception as e:
+                print(f"Warning: Could not determine last failed step: {e}")
+                print("Starting workflow from the beginning")
+        
+        # Run workflow with resume information
+        results = engine.run(params, resume_from=resume_from)
         
         # Print results
-        print("\nWorkflow completed successfully!")
+        if resume_from:
+            print(f"\nWorkflow resumed from step '{resume_from}' and completed successfully!")
+        else:
+            print("\nWorkflow completed successfully!")
         print("Results:", results)
         
     except WorkflowError as e:
@@ -161,7 +168,7 @@ def run_workflow(args: argparse.Namespace) -> None:
 
 def list_workflows(args: argparse.Namespace) -> None:
     """List available workflows in the specified directory."""
-    workflow_dir = Path(args.directory)
+    workflow_dir = Path(args.base_dir)
     if not workflow_dir.exists():
         print(f"Error: Directory not found: {workflow_dir}")
         sys.exit(1)
@@ -323,28 +330,64 @@ def remove_workspaces(args: argparse.Namespace) -> None:
 
 def main() -> None:
     """Main entry point for the CLI."""
-    args = parse_args()
+    parser = create_parser()
     
-    if args.command == "run":
-        run_workflow(args)
-    elif args.command == "list":
-        list_workflows(args)
-    elif args.command == "validate":
-        validate_workflow(args)
-    elif args.command == "workspace":
-        if args.ws_command == "list":
-            list_workspaces(args)
-        elif args.ws_command == "clean":
-            clean_workspaces(args)
-        elif args.ws_command == "remove":
-            remove_workspaces(args)
+    try:
+        # First try to parse with standard format (params before flags)
+        try:
+            args = parser.parse_args()
+            params = args.params
+        except SystemExit as e:
+            if e.code == 2:
+                # If that fails, try to parse with -- format
+                argv = sys.argv[1:]
+                try:
+                    split_idx = argv.index('--')
+                    # Parse everything before --
+                    args = parser.parse_args(argv[:split_idx])
+                    # Get parameters after --
+                    params = argv[split_idx + 1:]
+                    args.params = params
+                except ValueError:
+                    # If no -- found, show helpful error message
+                    cmd_line = ' '.join(sys.argv)
+                    if any('=' in arg for arg in sys.argv) and any(arg.startswith('--') for arg in sys.argv):
+                        print("\nError: Parameters must either:")
+                        print("  1. Come before flags:")
+                        print("     yaml-workflow run workflow.yaml param1=value1 param2=value2 --resume")
+                        print("\n  2. Or be separated with --:")
+                        print("     yaml-workflow run workflow.yaml --resume -- param1=value1 param2=value2")
+                        print("\nYour command:")
+                        print(f"  {cmd_line}")
+                        print("\nPlease use one of the formats above.")
+                    sys.exit(2)
+            else:
+                raise
+        
+        if args.command == "run":
+            run_workflow(args)
+        elif args.command == "list":
+            list_workflows(args)
+        elif args.command == "validate":
+            validate_workflow(args)
+        elif args.command == "workspace":
+            if args.ws_command == "list":
+                list_workspaces(args)
+            elif args.ws_command == "clean":
+                clean_workspaces(args)
+            elif args.ws_command == "remove":
+                remove_workspaces(args)
+            else:
+                print("Error: No workspace command specified")
+                print("Use 'workspace --help' for usage information")
+                sys.exit(1)
         else:
-            print("Error: No workspace command specified")
-            print("Use 'workspace --help' for usage information")
+            print("Error: No command specified")
+            print("Use --help for usage information")
             sys.exit(1)
-    else:
-        print("Error: No command specified")
-        print("Use --help for usage information")
+            
+    except Exception as e:
+        print(f"Error: {str(e)}")
         sys.exit(1)
 
 if __name__ == "__main__":

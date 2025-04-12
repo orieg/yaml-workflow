@@ -7,9 +7,94 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 
 METADATA_FILE = ".workflow_metadata.json"
+
+class WorkflowState:
+    """Manages workflow execution state and persistence."""
+    
+    def __init__(self, workspace: Path):
+        self.workspace = workspace
+        self.metadata_path = workspace / METADATA_FILE
+        self._load_state()
+    
+    def _load_state(self) -> None:
+        """Load workflow state from metadata file."""
+        if self.metadata_path.exists():
+            with open(self.metadata_path) as f:
+                self.metadata = json.load(f)
+        else:
+            self.metadata = {}
+        
+        # Initialize execution state if not present
+        if 'execution_state' not in self.metadata:
+            self.metadata['execution_state'] = {
+                'current_step': 0,
+                'completed_steps': [],
+                'failed_step': None,
+                'step_outputs': {},
+                'last_updated': None,
+                'status': 'not_started'  # Possible values: not_started, in_progress, completed, failed
+            }
+    
+    def save(self) -> None:
+        """Save current state to metadata file."""
+        self.metadata['execution_state']['last_updated'] = datetime.now().isoformat()
+        with open(self.metadata_path, 'w') as f:
+            json.dump(self.metadata, f, indent=2)
+    
+    def mark_step_complete(self, step_name: str, outputs: Dict[str, Any]) -> None:
+        """Mark a step as completed and store its outputs."""
+        state = self.metadata['execution_state']
+        state['current_step'] += 1
+        state['completed_steps'].append(step_name)
+        state['step_outputs'][step_name] = outputs
+        state['status'] = 'in_progress'
+        self.save()
+    
+    def mark_step_failed(self, step_name: str, error: str) -> None:
+        """Mark a step as failed with error information."""
+        state = self.metadata['execution_state']
+        state['failed_step'] = {
+            'step_name': step_name,
+            'error': error,
+            'failed_at': datetime.now().isoformat()
+        }
+        state['status'] = 'failed'
+        self.save()
+    
+    def mark_workflow_completed(self) -> None:
+        """Mark the workflow as completed."""
+        state = self.metadata['execution_state']
+        state['status'] = 'completed'
+        state['completed_at'] = datetime.now().isoformat()
+        self.save()
+    
+    def can_resume_from_step(self, step_name: str) -> bool:
+        """Check if workflow can be resumed from a specific step."""
+        state = self.metadata['execution_state']
+        return (
+            state['status'] == 'failed' 
+            and state['failed_step'] is not None 
+            and step_name not in state['completed_steps']
+        )
+    
+    def get_completed_outputs(self) -> Dict[str, Any]:
+        """Get outputs from all completed steps."""
+        return self.metadata['execution_state']['step_outputs']
+    
+    def reset_state(self) -> None:
+        """Reset workflow execution state."""
+        self.metadata['execution_state'] = {
+            'current_step': 0,
+            'completed_steps': [],
+            'failed_step': None,
+            'step_outputs': {},
+            'last_updated': datetime.now().isoformat(),
+            'status': 'not_started'
+        }
+        self.save()
 
 def sanitize_name(name: str) -> str:
     """

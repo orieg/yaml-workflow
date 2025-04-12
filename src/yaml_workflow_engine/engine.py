@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 import yaml
 
 from .exceptions import WorkflowError
-from .workspace import create_workspace, get_workspace_info
+from .workspace import create_workspace, get_workspace_info, WorkflowState
 from .tasks import get_task_handler
 
 def setup_logging(workspace: Path, name: str) -> logging.Logger:
@@ -107,6 +107,9 @@ class WorkflowEngine:
         # Set up logging
         self.logger = setup_logging(self.workspace, self.name)
         
+        # Initialize workflow state
+        self.state = WorkflowState(self.workspace)
+        
         # Initialize context
         self.context = {
             "workflow_name": self.name,
@@ -120,13 +123,14 @@ class WorkflowEngine:
         self.logger.info(f"Workspace: {self.workspace}")
         self.logger.info(f"Run number: {self.context['run_number']}")
     
-    def run(self, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def run(self, params: Optional[Dict[str, Any]] = None, resume_from: Optional[str] = None) -> Dict[str, Any]:
         """
         Run the workflow.
         
         Args:
             params: Optional parameters to pass to the workflow
-        
+            resume_from: Optional step name to resume from after failure
+            
         Returns:
             dict: Workflow results
         """
@@ -139,6 +143,20 @@ class WorkflowEngine:
         if not isinstance(steps, list):
             raise WorkflowError("Invalid workflow format: steps must be a list")
         
+        # Handle workflow resumption
+        if resume_from:
+            if not self.state.can_resume_from_step(resume_from):
+                raise WorkflowError(
+                    f"Cannot resume from step '{resume_from}'. "
+                    "Workflow must be in failed state and step must not be completed."
+                )
+            # Restore outputs from completed steps
+            self.context.update(self.state.get_completed_outputs())
+            self.logger.info(f"Resuming workflow from step: {resume_from}")
+        else:
+            # Reset state for fresh run
+            self.state.reset_state()
+            
         # Run steps
         results = {}
         for i, step in enumerate(steps, 1):
@@ -147,6 +165,17 @@ class WorkflowEngine:
             
             # Get step info
             name = step.get("name", f"step_{i}")
+            
+            # Skip already completed steps when resuming
+            if resume_from and name in self.state.metadata['execution_state']['completed_steps']:
+                self.logger.info(f"Skipping completed step: {name}")
+                continue
+            
+            # Skip steps until we reach the resume point
+            if resume_from and name != resume_from and not self.state.metadata['execution_state']['completed_steps']:
+                self.logger.info(f"Skipping step before resume point: {name}")
+                continue
+                
             task_type = step.get("task")
             if not task_type:
                 raise WorkflowError(f"No task type specified for step: {name}")
@@ -163,9 +192,13 @@ class WorkflowEngine:
                 results[name] = result
                 # Update context with step result
                 self.context[name] = result
+                # Update workflow state
+                self.state.mark_step_complete(name, {name: result})
             except Exception as e:
+                self.state.mark_step_failed(name, str(e))
                 raise WorkflowError(f"Error in step {name}: {str(e)}") from e
         
+        self.state.mark_workflow_completed()
         self.logger.info("Workflow completed successfully.")
         self.logger.info("Final workflow outputs:")
         for key, value in results.items():
