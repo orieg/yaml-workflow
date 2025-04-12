@@ -1,0 +1,85 @@
+# Example workflow demonstrating data processing with conditional logic and error handling
+# This workflow processes a CSV file, validates its contents, and performs different
+# actions based on the validation results
+
+workflow:
+  description: "Process and validate CSV data with error handling"
+  version: "1.0"
+  
+  # Define workflow-level error handling strategy
+  error_handling:
+    retry_count: 3
+    retry_delay: 60  # seconds
+    on_failure: "notify_admin"
+  
+  steps:
+    - name: load_csv_file
+      module: data_utils
+      function: read_csv
+      inputs:
+        file_path: ${input_file}
+        encoding: "utf-8"
+      outputs:
+        - raw_data
+      error_handling:
+        retry_count: 2
+        on_failure: "skip"  # Skip this step on failure
+    
+    - name: validate_data
+      module: validation
+      function: check_data_quality
+      inputs:
+        data: ${raw_data}
+        rules:
+          - "no_empty_values"
+          - "valid_date_format"
+          - "numeric_range_check"
+      outputs:
+        - validation_results
+        - error_count
+    
+    # Conditional step - only runs if validation finds errors
+    - name: handle_validation_errors
+      module: error_handlers
+      function: process_validation_errors
+      condition: "${error_count} > 0"
+      inputs:
+        results: ${validation_results}
+        threshold: 10
+      outputs:
+        - should_proceed
+        - error_report
+    
+    # Conditional step - only runs if data is clean or errors are acceptable
+    - name: transform_data
+      module: transformers
+      function: apply_transformations
+      condition: "${error_count} == 0 || ${should_proceed} == true"
+      inputs:
+        data: ${raw_data}
+        transformations:
+          - "normalize_dates"
+          - "calculate_metrics"
+      outputs:
+        - transformed_data
+    
+    - name: save_results
+      module: data_utils
+      function: save_output
+      inputs:
+        data: ${transformed_data}
+        format: "parquet"
+        path: ${output_path}
+      outputs:
+        - save_status
+      
+    # Always run this step regardless of previous steps' status
+    - name: send_notification
+      module: notifications
+      function: send_email
+      always_run: true
+      inputs:
+        template: "workflow_completion"
+        status: ${save_status}
+        error_report: ${error_report}
+        recipient: ${notify_email} 

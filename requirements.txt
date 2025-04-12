@@ -1,0 +1,11 @@
+# Core dependencies
+PyYAML>=6.0.1        # YAML file parsing
+importlib>=1.0.4     # Dynamic module importing (usually part of Python standard library)
+
+# Optional dependencies (uncomment as needed for specific workflow implementations)
+# requests>=2.31.0   # For HTTP/API workflows
+# jira>=3.5.1        # For Jira integration workflows
+# confluence-py>=3.0.0  # For Confluence integration workflows
+# pandas>=2.1.0      # For data processing workflows
+# numpy>=1.24.0      # For numerical computations
+# slack-sdk>=3.21.0  # For Slack notifications 

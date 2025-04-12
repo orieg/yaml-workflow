@@ -1,0 +1,96 @@
+# This workflow demonstrates an automated process for analyzing Jira tickets and their associated
+# Confluence pages using Ollama for content evaluation and summarization.
+
+workflow:
+  steps:
+    # Step 1: Query Jira to get relevant tickets
+    # Input: JQL query provided at runtime
+    # Output: List of Jira ticket objects stored in 'tickets' variable
+    - name: fetch_jira_tickets
+      module: jira_tasks
+      function: fetch_tickets
+      inputs:
+        jql_query: ${jql_query}  # JQL query string provided when starting the workflow
+      outputs:
+        - tickets
+
+    # Step 2: Extract Confluence wiki links from the Jira tickets
+    # Input: Jira tickets from previous step
+    # Output: List of Confluence page URLs stored in 'wiki_links' variable
+    - name: extract_wiki_links
+      module: confluence_tasks
+      function: extract_links
+      inputs:
+        tickets: ${tickets}
+      outputs:
+        - wiki_links
+
+    # Step 3: Download the content of identified Confluence pages
+    # Input: List of wiki links from previous step
+    # Output: Dictionary/list of page contents stored in 'confluence_pages' variable
+    - name: download_confluence_pages
+      module: confluence_tasks
+      function: download_pages
+      inputs:
+        wiki_links: ${wiki_links}
+      outputs:
+        - confluence_pages
+
+    # Step 4: Convert Confluence pages to markdown format for easier processing
+    # Input: Raw Confluence pages from previous step
+    # Output: List of markdown-formatted documents stored in 'markdown_files' variable
+    - name: convert_pages_to_markdown
+      module: conversion_tasks
+      function: convert_to_markdown
+      inputs:
+        confluence_pages: ${confluence_pages}
+      outputs:
+        - markdown_files
+
+    # Step 5: First Ollama analysis - evaluates content against first prompt
+    # Input: Markdown files and analysis prompt
+    # Output: First set of analysis results stored in 'ollama_results_1' variable
+    - name: ollama_evaluate_prompt1
+      module: ollama_tasks
+      function: evaluate_with_ollama
+      inputs:
+        files: ${markdown_files}
+        prompt: "Analyze this document for [prompt 1]"
+      outputs:
+        - ollama_results_1
+
+    # Step 6: Second Ollama analysis - evaluates content against second prompt
+    # Input: Same markdown files with different analysis prompt
+    # Output: Second set of analysis results stored in 'ollama_results_2' variable
+    - name: ollama_evaluate_prompt2
+      module: ollama_tasks
+      function: evaluate_with_ollama
+      inputs:
+        files: ${markdown_files}
+        prompt: "Analyze this document for [prompt 2]"
+      outputs:
+        - ollama_results_2
+
+    # Step 7: Combine results from both Ollama analyses
+    # Input: Results from both Ollama evaluations
+    # Output: Combined analysis data stored in 'aggregated_data' variable
+    - name: aggregate_ollama_results
+      module: analysis_tasks
+      function: aggregate_results
+      inputs:
+        results_1: ${ollama_results_1}
+        results_2: ${ollama_results_2}
+      outputs:
+        - aggregated_data
+
+    # Step 8: Generate final executive summary
+    # Input: Aggregated analysis data
+    # Output: Final executive summary stored in 'executive_summary' variable
+    - name: summarize_results
+      module: analysis_tasks
+      function: summarize_with_ollama
+      inputs:
+        data: ${aggregated_data}
+        prompt: "Create an executive summary with detailed outputs."
+      outputs:
+        - executive_summary
