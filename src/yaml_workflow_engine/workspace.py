@@ -45,6 +45,23 @@ class WorkflowState:
         with open(self.metadata_path, 'w') as f:
             json.dump(self.metadata, f, indent=2)
     
+    def get_state(self) -> Dict[str, Any]:
+        """Get the current workflow state.
+        
+        Returns:
+            Dict[str, Any]: Current workflow state including execution state and step outputs
+        """
+        return {
+            'execution_state': self.metadata['execution_state'],
+            'steps': {
+                step: {
+                    'status': 'completed' if step in self.metadata['execution_state']['completed_steps'] else 'failed' if self.metadata['execution_state']['failed_step'] and self.metadata['execution_state']['failed_step']['step_name'] == step else 'not_started',
+                    'outputs': self.metadata['execution_state']['step_outputs'].get(step, {})
+                }
+                for step in set(self.metadata['execution_state']['completed_steps'] + ([self.metadata['execution_state']['failed_step']['step_name']] if self.metadata['execution_state']['failed_step'] else []))
+            }
+        }
+    
     def mark_step_complete(self, step_name: str, outputs: Dict[str, Any]) -> None:
         """Mark a step as completed and store its outputs."""
         state = self.metadata['execution_state']

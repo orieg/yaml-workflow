@@ -2,6 +2,30 @@
 Basic task functions for demonstration and testing.
 """
 
+def echo(message: str) -> str:
+    """
+    Echo back the input message.
+    
+    Args:
+        message: Message to echo
+        
+    Returns:
+        str: The input message
+    """
+    return message
+
+def fail(message: str = "Task failed") -> None:
+    """
+    A task that always fails.
+    
+    Args:
+        message: Error message
+        
+    Raises:
+        RuntimeError: Always raises this error
+    """
+    raise RuntimeError(message)
+
 def hello_world(name: str = "World") -> str:
     """
     A simple hello world function.

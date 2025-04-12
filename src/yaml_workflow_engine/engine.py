@@ -388,7 +388,11 @@ class WorkflowEngine:
         for key, value in results.items():
             self.logger.info(f"  {key}: {value}")
         
-        return results
+        return {
+            "status": "completed",
+            "outputs": results,
+            "execution_state": self.state.metadata["execution_state"]
+        }
         
     def setup_workspace(self) -> Path:
         """
