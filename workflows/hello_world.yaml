@@ -14,7 +14,7 @@ workflow:
     # Input: Optional name parameter that can be provided at runtime
     # Output: The greeting message stored in 'greeting' variable
     - name: say_hello
-      module: tasks.say_hello
+      module: yaml_workflow_engine.tasks.basic_tasks
       function: hello_world
       inputs:
         name: ${name}  # Optional runtime input, defaults to "World" if not provided

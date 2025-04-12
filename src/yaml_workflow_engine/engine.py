@@ -1,12 +1,14 @@
+"""
+Core workflow engine implementation
+"""
+
 import yaml
 import importlib
 import logging
-import os
-import sys
-import json
 import inspect
 from typing import Any, Dict, List, Optional, Tuple
-from workflow_exceptions import (
+
+from .exceptions import (
     WorkflowDefinitionError,
     WorkflowValidationError,
     ModuleImportError,
@@ -17,8 +19,6 @@ from workflow_exceptions import (
     RequiredVariableError,
     WorkflowValidationSchema
 )
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def _validate_workflow_definition(workflow_def: Dict[str, Any]) -> None:
     """
@@ -252,40 +252,5 @@ def run_workflow(yaml_path: str, runtime_inputs: Dict[str, Any]) -> Dict[str, An
         return context
         
     except Exception as e:
-        logging.error(f"Workflow failed: {e}", exc_info=True)
-        sys.exit(1)
-
-def print_usage():
-    """Print command-line usage instructions."""
-    print("Usage: python run_workflow.py <workflow_yaml_path> [runtime_inputs_key=value ...]")
-    print("Example: python run_workflow.py workflows/hello_world.yaml name=Alice")
-    sys.exit(1)
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print_usage()
-
-    workflow_path = sys.argv[1]
-    
-    # Parse runtime inputs if provided
-    runtime_inputs = {}
-    if len(sys.argv) > 2:
-        try:
-            for arg in sys.argv[2:]:
-                key, value = arg.split('=')
-                runtime_inputs[key] = value
-        except Exception as e:
-            logging.error(f"Invalid runtime inputs: {e}")
-            print_usage()
-    
-    try:
-        # Run the workflow
-        final_context = run_workflow(workflow_path, runtime_inputs)
-        
-        # Print final outputs
-        logging.info("Final workflow outputs:")
-        for key, value in final_context.items():
-            logging.info(f"  {key}: {value}")
-    except Exception as e:
-        logging.error(str(e))
-        sys.exit(1)
+        logging.error(f"Workflow failed: {e}")
+        raise 
