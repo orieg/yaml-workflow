@@ -25,4 +25,5 @@ steps:
       echo "Created: {{ timestamp }}"
       echo "Workspace: {{ workspace }}"
       echo "------------------------"
-      cat {{ workspace }}/output/greeting.txt 
+      echo "Current directory: $(pwd)"
+      cat output/greeting.txt 

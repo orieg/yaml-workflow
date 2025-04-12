@@ -9,6 +9,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
+import yaml
 
 from .engine import WorkflowEngine
 from .exceptions import WorkflowError
@@ -26,14 +27,15 @@ def create_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("workflow", help="Path to workflow YAML file")
     run_parser.add_argument("--workspace", help="Custom workspace directory")
     run_parser.add_argument("--base-dir", default="runs", help="Base directory for workflow runs")
-    run_parser.add_argument("--resume", action="store_true", help="Resume from last failed step")
-    run_parser.add_argument("--resume-from", help="Resume workflow from specified step")
+    run_parser.add_argument("--resume", action="store_true", help="Resume workflow from last failed step")
+    run_parser.add_argument("--start-from", help="Start workflow execution from specified step")
+    run_parser.add_argument("--skip-steps", help="Comma-separated list of steps to skip during execution")
     # Add -- before params to handle parameters after flags
     run_parser.add_argument("params", nargs="*", help="Workflow parameters in key=value format", default=[])
     
     # List command
     list_parser = subparsers.add_parser("list", help="List available workflows")
-    list_parser.add_argument("--base-dir", default="runs", help="Base directory containing workflows")
+    list_parser.add_argument("--base-dir", default="workflows", help="Base directory containing workflows")
     
     # Validate command
     validate_parser = subparsers.add_parser("validate", help="Validate a workflow")
@@ -135,28 +137,59 @@ def run_workflow(args: argparse.Namespace) -> None:
             base_dir=args.base_dir
         )
         
-        # If --resume flag is set, try to get the last failed step
-        resume_from = args.resume_from
-        if args.resume and not resume_from:
+        # Parse skip steps
+        skip_steps = []
+        if args.skip_steps:
+            skip_steps = [step.strip() for step in args.skip_steps.split(',')]
+            print(f"Skipping steps: {', '.join(skip_steps)}")
+        
+        # Handle start-from and resume logic
+        start_from = None
+        resume_from = None
+        
+        # Check start-from first (takes precedence)
+        if args.start_from:
+            start_from = args.start_from
+            print(f"Starting workflow from step: {start_from}")
+        # Check resume flag - only if workflow is in failed state
+        elif args.resume:
             try:
                 state = engine.state
                 if state.metadata['execution_state']['status'] == 'failed':
                     failed_step = state.metadata['execution_state']['failed_step']
                     if failed_step:
                         resume_from = failed_step['step_name']
-                        print(f"Resuming from last failed step: {resume_from}")
+                        print(f"Resuming workflow from failed step: {resume_from}")
+                    else:
+                        print("No failed step found to resume from.")
+                        sys.exit(1)
+                elif state.metadata['execution_state']['status'] == 'completed':
+                    print("Cannot resume: Workflow is already completed. Use --start-from to run from a specific step.")
+                    sys.exit(1)
+                else:
+                    print("Cannot resume: No failed workflow found.")
+                    sys.exit(1)
             except Exception as e:
-                print(f"Warning: Could not determine last failed step: {e}")
-                print("Starting workflow from the beginning")
+                print(f"Cannot resume: Could not determine workflow state: {e}")
+                sys.exit(1)
         
-        # Run workflow with resume information
-        results = engine.run(params, resume_from=resume_from)
+        # Run workflow with appropriate parameters
+        results = engine.run(
+            params,
+            resume_from=resume_from,
+            start_from=start_from,
+            skip_steps=skip_steps
+        )
         
         # Print results
         if resume_from:
-            print(f"\nWorkflow resumed from step '{resume_from}' and completed successfully!")
+            print(f"\nWorkflow resumed from failed step '{resume_from}' and completed successfully!")
+        elif start_from:
+            print(f"\nWorkflow started from step '{start_from}' and completed successfully!")
         else:
             print("\nWorkflow completed successfully!")
+        if skip_steps:
+            print(f"Skipped steps: {', '.join(skip_steps)}")
         print("Results:", results)
         
     except WorkflowError as e:
@@ -174,8 +207,36 @@ def list_workflows(args: argparse.Namespace) -> None:
         sys.exit(1)
         
     print("\nAvailable workflows:")
-    for workflow in workflow_dir.glob("*.yaml"):
-        print(f"- {workflow.relative_to(workflow_dir)}")
+    # Recursively find all .yaml files
+    found = False
+    for workflow in sorted(workflow_dir.rglob("*.yaml")):
+        try:
+            # Try to load the file to verify it's a valid workflow
+            with open(workflow) as f:
+                content = yaml.safe_load(f)
+                
+                # Handle both top-level workflow and direct steps format
+                if isinstance(content, dict):
+                    if "workflow" in content:
+                        content = content["workflow"]
+                    
+                    # Check if it's a valid workflow file
+                    if "steps" in content:
+                        name = content.get("usage", {}).get("name") or workflow.stem
+                        desc = content.get("usage", {}).get("description", "No description available")
+                        print(f"\n- {workflow.relative_to(workflow_dir)}")
+                        print(f"  Name: {name}")
+                        print(f"  Description: {desc}")
+                        found = True
+                        
+        except Exception as e:
+            # Skip files that can't be parsed as YAML
+            continue
+    
+    if not found:
+        print("No workflow files found. Workflows should be YAML files containing 'steps' section.")
+        print(f"\nMake sure you have workflow YAML files in the '{workflow_dir}' directory.")
+        print("You can specify a different directory with --base-dir option.")
     print()
 
 def validate_workflow(args: argparse.Namespace) -> None:
@@ -336,7 +397,6 @@ def main() -> None:
         # First try to parse with standard format (params before flags)
         try:
             args = parser.parse_args()
-            params = args.params
         except SystemExit as e:
             if e.code == 2:
                 # If that fails, try to parse with -- format
@@ -346,8 +406,8 @@ def main() -> None:
                     # Parse everything before --
                     args = parser.parse_args(argv[:split_idx])
                     # Get parameters after --
-                    params = argv[split_idx + 1:]
-                    args.params = params
+                    if args.command == "run":
+                        args.params = argv[split_idx + 1:]
                 except ValueError:
                     # If no -- found, show helpful error message
                     cmd_line = ' '.join(sys.argv)

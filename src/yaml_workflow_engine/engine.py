@@ -6,7 +6,7 @@ import logging
 import logging.handlers
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 
 import yaml
 
@@ -123,13 +123,21 @@ class WorkflowEngine:
         self.logger.info(f"Workspace: {self.workspace}")
         self.logger.info(f"Run number: {self.context['run_number']}")
     
-    def run(self, params: Optional[Dict[str, Any]] = None, resume_from: Optional[str] = None) -> Dict[str, Any]:
+    def run(
+        self,
+        params: Optional[Dict[str, Any]] = None,
+        resume_from: Optional[str] = None,
+        start_from: Optional[str] = None,
+        skip_steps: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
         """
         Run the workflow.
         
         Args:
             params: Optional parameters to pass to the workflow
-            resume_from: Optional step name to resume from after failure
+            resume_from: Optional step name to resume from after failure (preserves outputs)
+            start_from: Optional step name to start execution from (fresh start)
+            skip_steps: Optional list of step names to skip during execution
             
         Returns:
             dict: Workflow results
@@ -143,20 +151,21 @@ class WorkflowEngine:
         if not isinstance(steps, list):
             raise WorkflowError("Invalid workflow format: steps must be a list")
         
-        # Handle workflow resumption
+        # Handle workflow resumption vs fresh start
         if resume_from:
-            if not self.state.can_resume_from_step(resume_from):
-                raise WorkflowError(
-                    f"Cannot resume from step '{resume_from}'. "
-                    "Workflow must be in failed state and step must not be completed."
-                )
+            # Verify workflow is in failed state and step exists
+            if self.state.metadata['execution_state']['status'] != 'failed':
+                raise WorkflowError("Cannot resume: workflow is not in failed state")
+            if not any(step.get("name") == resume_from for step in steps):
+                raise WorkflowError(f"Cannot resume: step '{resume_from}' not found in workflow")
+            
             # Restore outputs from completed steps
             self.context.update(self.state.get_completed_outputs())
-            self.logger.info(f"Resuming workflow from step: {resume_from}")
+            self.logger.info(f"Resuming workflow from failed step: {resume_from}")
         else:
             # Reset state for fresh run
             self.state.reset_state()
-            
+        
         # Run steps
         results = {}
         for i, step in enumerate(steps, 1):
@@ -166,16 +175,28 @@ class WorkflowEngine:
             # Get step info
             name = step.get("name", f"step_{i}")
             
-            # Skip already completed steps when resuming
-            if resume_from and name in self.state.metadata['execution_state']['completed_steps']:
-                self.logger.info(f"Skipping completed step: {name}")
+            # Skip steps that are in the skip list
+            if skip_steps and name in skip_steps:
+                self.logger.info(f"Skipping step: {name} (explicitly skipped)")
                 continue
             
-            # Skip steps until we reach the resume point
-            if resume_from and name != resume_from and not self.state.metadata['execution_state']['completed_steps']:
-                self.logger.info(f"Skipping step before resume point: {name}")
-                continue
+            # Handle resume vs start from logic
+            if resume_from:
+                # Skip already completed steps when resuming
+                if name in self.state.metadata['execution_state']['completed_steps']:
+                    self.logger.info(f"Skipping completed step: {name}")
+                    continue
                 
+                # Skip steps until we reach the resume point
+                if name != resume_from and not self.state.metadata['execution_state']['completed_steps']:
+                    self.logger.info(f"Skipping step before resume point: {name}")
+                    continue
+            elif start_from:
+                # For start-from, simply skip until we reach the starting point
+                if name != start_from and not results:
+                    self.logger.info(f"Skipping step before start point: {name}")
+                    continue
+            
             task_type = step.get("task")
             if not task_type:
                 raise WorkflowError(f"No task type specified for step: {name}")
