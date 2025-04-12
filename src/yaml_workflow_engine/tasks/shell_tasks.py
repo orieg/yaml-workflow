@@ -4,7 +4,12 @@ Shell operation tasks for executing commands and managing processes.
 
 import os
 import subprocess
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
+from pathlib import Path
+
+from jinja2 import Template
+
+from . import register_task
 
 def run_command(
     command: Union[str, List[str]],
@@ -100,4 +105,38 @@ def set_environment(env_vars: Dict[str, str]) -> Dict[str, str]:
         Dict[str, str]: Updated environment variables
     """
     os.environ.update(env_vars)
-    return dict(os.environ) 
+    return dict(os.environ)
+
+@register_task("shell")
+def run_shell_command(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+    """
+    Run a shell command.
+    
+    Args:
+        step: Step configuration
+        context: Workflow context
+        workspace: Workspace directory
+        
+    Returns:
+        str: Command output
+    """
+    # Get command
+    command_template = step.get("command")
+    if not command_template:
+        raise ValueError("No command provided")
+    
+    # Render command with context
+    template = Template(command_template)
+    command = template.render(**context)
+    
+    # Run command from workspace directory
+    result = subprocess.run(
+        command,
+        shell=True,
+        cwd=workspace,
+        capture_output=True,
+        text=True,
+        check=True
+    )
+    
+    return result.stdout 

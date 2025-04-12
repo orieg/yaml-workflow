@@ -1,256 +1,240 @@
 """
-Core workflow engine implementation
+Core workflow engine implementation.
 """
 
-import yaml
-import importlib
 import logging
-import inspect
-from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
 
-from .exceptions import (
-    WorkflowDefinitionError,
-    WorkflowValidationError,
-    ModuleImportError,
-    FunctionNotFoundError,
-    TaskExecutionError,
-    InputResolutionError,
-    OutputHandlingError,
-    RequiredVariableError,
-    WorkflowValidationSchema
+import yaml
+
+from .exceptions import WorkflowError
+from .workspace import create_workspace, get_workspace_info
+from .tasks import get_task_handler
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
 
-def _validate_workflow_definition(workflow_def: Dict[str, Any]) -> None:
-    """
-    Validate the workflow definition structure.
+class WorkflowEngine:
+    """Main workflow engine class."""
     
-    Args:
-        workflow_def: Workflow definition dictionary
-    
-    Raises:
-        WorkflowValidationError: If validation fails
-    """
-    if not isinstance(workflow_def, dict):
-        raise WorkflowValidationError("Workflow definition must be a dictionary")
-    
-    if 'workflow' not in workflow_def:
-        raise WorkflowValidationError("Missing 'workflow' key in definition")
-    
-    if 'steps' not in workflow_def['workflow']:
-        raise WorkflowValidationError("Missing 'steps' in workflow definition")
-    
-    steps = workflow_def['workflow']['steps']
-    if not isinstance(steps, list):
-        raise WorkflowValidationError("Workflow steps must be a list")
-    
-    for i, step in enumerate(steps):
-        if not isinstance(step, dict):
-            raise WorkflowValidationError(f"Step {i} must be a dictionary")
+    def __init__(
+        self,
+        workflow_file: str,
+        workspace: Optional[str] = None,
+        base_dir: str = "runs"
+    ):
+        """
+        Initialize the workflow engine.
         
-        # Check required fields
-        for field in WorkflowValidationSchema.REQUIRED_STEP_FIELDS:
-            if field not in step:
-                raise WorkflowValidationError(f"Missing required field '{field}' in step {i}")
-
-def _load_workflow(yaml_path: str) -> Dict[str, Any]:
-    """
-    Load and parse the workflow YAML file.
-    
-    Args:
-        yaml_path: Path to the workflow YAML file
-    
-    Returns:
-        Dict containing the workflow definition
-    
-    Raises:
-        WorkflowDefinitionError: If workflow file cannot be loaded or parsed
-    """
-    try:
-        with open(yaml_path, 'r') as f:
-            workflow_def = yaml.safe_load(f)
-            _validate_workflow_definition(workflow_def)
-            return workflow_def
-    except FileNotFoundError:
-        raise WorkflowDefinitionError(f"Workflow file not found: {yaml_path}")
-    except yaml.YAMLError as e:
-        raise WorkflowDefinitionError(f"Invalid YAML in workflow file: {e}")
-    except WorkflowValidationError as e:
-        raise WorkflowDefinitionError(f"Invalid workflow structure: {e}")
-
-def _has_default_value(func: callable, param_name: str) -> bool:
-    """
-    Check if a function parameter has a default value.
-    
-    Args:
-        func: Function to inspect
-        param_name: Name of the parameter to check
-    
-    Returns:
-        bool: True if parameter has a default value, False otherwise
-    """
-    try:
-        signature = inspect.signature(func)
-        param = signature.parameters.get(param_name)
-        if param is None:
-            return False  # Parameter doesn't exist
-        return param.default is not inspect.Parameter.empty
-    except ValueError:
-        return False  # Can't inspect the function
-
-def _resolve_inputs(step_name: str, inputs: Dict[str, Any], context: Dict[str, Any], func: callable) -> Dict[str, Any]:
-    """
-    Resolve input values from the context or use literal values.
-    
-    Args:
-        step_name: Name of the current step
-        inputs: Dictionary of input definitions
-        context: Current workflow context
-        func: Function to execute (used to check parameter defaults)
-    
-    Returns:
-        Dictionary of resolved input values
-    
-    Raises:
-        InputResolutionError: If required inputs cannot be resolved
-    """
-    resolved_inputs = {}
-    for k, v in inputs.items():
-        try:
-            if isinstance(v, str) and v.startswith('${'):
-                var_name = v[2:-1]  # Remove ${}
-                if var_name not in context and not _has_default_value(func, k):
-                    # Only raise error if parameter has no default value
-                    raise RequiredVariableError(var_name, step_name)
-                context_value = context.get(var_name)
-                if context_value is not None:
-                    resolved_inputs[k] = context_value
-                # If context_value is None and parameter has default, don't add to resolved_inputs
-            else:
-                resolved_inputs[k] = v
-        except Exception as e:
-            raise InputResolutionError(step_name, k, str(e))
-    return resolved_inputs
-
-def _load_function(module_name: str, function_name: str) -> callable:
-    """
-    Load a function from a module dynamically.
-    
-    Args:
-        module_name: Name of the module to import
-        function_name: Name of the function to load
-    
-    Returns:
-        Function object
-    
-    Raises:
-        ModuleImportError: If module cannot be imported
-        FunctionNotFoundError: If function doesn't exist in module
-    """
-    try:
-        module = importlib.import_module(module_name)
-    except ImportError as e:
-        raise ModuleImportError(f"Failed to import module '{module_name}': {e}")
-    
-    try:
-        return getattr(module, function_name)
-    except AttributeError:
-        raise FunctionNotFoundError(f"Function '{function_name}' not found in module '{module_name}'")
-
-def _handle_outputs(step_name: str, outputs: List[str], result: Any, context: Dict[str, Any]) -> None:
-    """
-    Store function outputs in the workflow context.
-    
-    Args:
-        step_name: Name of the current step
-        outputs: List of output variable names
-        result: Function execution result
-        context: Current workflow context to update
-    
-    Raises:
-        OutputHandlingError: If outputs cannot be properly handled
-    """
-    try:
-        if len(outputs) == 1:
-            context[outputs[0]] = result
-        elif len(outputs) > 1:
-            if not isinstance(result, (list, tuple)):
-                raise OutputHandlingError(step_name, "Multiple outputs defined but function return is not a list or tuple")
-            if len(result) != len(outputs):
-                raise OutputHandlingError(step_name, f"Expected {len(outputs)} outputs but got {len(result)}")
-            for i, output_name in enumerate(outputs):
-                context[output_name] = result[i]
-    except Exception as e:
-        raise OutputHandlingError(step_name, str(e))
-
-def _execute_step(step: Dict[str, Any], context: Dict[str, Any]) -> None:
-    """
-    Execute a single workflow step.
-    
-    Args:
-        step: Step definition from workflow
-        context: Current workflow context
-    
-    Raises:
-        TaskExecutionError: If step execution fails
-    """
-    step_name = step['name']
-    try:
-        # Load the function
-        function_to_call = _load_function(step['module'], step['function'])
+        Args:
+            workflow_file: Path to the workflow YAML file
+            workspace: Optional custom workspace directory
+            base_dir: Base directory for workflow runs
+        """
+        self.workflow_file = Path(workflow_file)
+        if not self.workflow_file.exists():
+            raise WorkflowError(f"Workflow file not found: {workflow_file}")
         
-        # Resolve inputs
-        inputs = step.get('inputs', {})
-        resolved_inputs = _resolve_inputs(step_name, inputs, context, function_to_call)
+        # Load workflow definition
+        with open(workflow_file) as f:
+            self.workflow = yaml.safe_load(f)
         
-        # Execute the function
-        logging.info(f"Running step: {step_name} with inputs: {resolved_inputs}")
-        result = function_to_call(**resolved_inputs)
+        # Validate workflow structure
+        if not isinstance(self.workflow, dict):
+            raise WorkflowError("Invalid workflow format: root must be a mapping")
         
-        # Handle outputs
-        outputs = step.get('outputs', [])
-        _handle_outputs(step_name, outputs, result, context)
+        # Get workflow name
+        self.name = self.workflow.get("name", self.workflow_file.stem)
         
-        logging.info(f"Step '{step_name}' completed. Outputs: {context}")
-    except Exception as e:
-        raise TaskExecutionError(step_name, e)
-
-def run_workflow(yaml_path: str, runtime_inputs: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Execute a workflow defined in a YAML file.
+        # Create workspace
+        self.workspace = create_workspace(self.name, workspace, base_dir)
+        self.workspace_info = get_workspace_info(self.workspace)
+        
+        # Initialize context
+        self.context = {
+            "workflow_name": self.name,
+            "workspace": str(self.workspace),
+            "run_number": self.workspace_info.get("run_number"),
+            "timestamp": datetime.now().isoformat(),
+            "workflow_file": str(self.workflow_file.absolute())
+        }
     
-    Args:
-        yaml_path: Path to the workflow YAML file
-        runtime_inputs: Dictionary of runtime input values
-    
-    Returns:
-        Final workflow context containing all outputs
-    
-    Raises:
-        WorkflowError: If workflow execution fails
-    """
-    try:
-        # Load and validate workflow definition
-        workflow_def = _load_workflow(yaml_path)
+    def run(self, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Run the workflow.
         
-        # Initialize context with runtime inputs
-        context = {}
-        context.update(runtime_inputs)
+        Args:
+            params: Optional parameters to pass to the workflow
         
-        # Execute each step
-        for step in workflow_def['workflow']['steps']:
+        Returns:
+            dict: Workflow results
+        """
+        # Update context with parameters
+        if params:
+            self.context.update(params)
+        
+        # Get steps
+        steps = self.workflow.get("steps", [])
+        if not isinstance(steps, list):
+            raise WorkflowError("Invalid workflow format: steps must be a list")
+        
+        # Run steps
+        results = {}
+        for i, step in enumerate(steps, 1):
+            if not isinstance(step, dict):
+                raise WorkflowError(f"Invalid step format at position {i}")
+            
+            # Get step info
+            name = step.get("name", f"step_{i}")
+            task_type = step.get("task")
+            if not task_type:
+                raise WorkflowError(f"No task type specified for step: {name}")
+            
+            # Get task handler
+            handler = get_task_handler(task_type)
+            if not handler:
+                raise WorkflowError(f"Unknown task type: {task_type}")
+            
+            # Run task
+            logger.info(f"Running step {i}: {name}")
             try:
-                _execute_step(step, context)
-            except TaskExecutionError as e:
-                # Handle step-specific error handling configuration
-                error_handling = step.get('error_handling', {})
-                if error_handling.get('on_failure') == 'skip':
-                    logging.warning(f"Step '{step['name']}' failed but continuing due to error handling config: {e}")
-                    continue
-                raise
+                result = handler(step, self.context, self.workspace)
+                results[name] = result
+                # Update context with step result
+                self.context[name] = result
+            except Exception as e:
+                raise WorkflowError(f"Error in step {name}: {str(e)}") from e
         
-        logging.info("Workflow completed successfully.")
-        return context
+        logger.info("Workflow completed successfully.")
+        logger.info("Final workflow outputs:")
+        for key, value in results.items():
+            logger.info(f"  {key}: {value}")
         
-    except Exception as e:
-        logging.error(f"Workflow failed: {e}")
-        raise 
+        return results
+        
+    def setup_workspace(self) -> Path:
+        """
+        Set up the workspace for this workflow run.
+        
+        Returns:
+            Path: Path to the workspace directory
+        """
+        # Get workflow name from usage section or file name
+        workflow_name = (
+            self.workflow_def.get('usage', {}).get('name')
+            or self.workflow_file.stem
+        )
+        
+        # Create workspace
+        self.workspace = create_workspace(
+            workflow_name=workflow_name,
+            custom_dir=self.workspace_dir,
+            base_dir=self.base_dir
+        )
+        
+        # Initialize workspace info in context
+        workspace_info = get_workspace_info(self.workspace)
+        self.context.update({
+            'workspace': str(self.workspace),
+            'run_number': int(self.workspace.name.split('_run_')[-1]),
+            'timestamp': datetime.now().isoformat(),
+            'workflow_name': workflow_name,
+            'workflow_file': str(self.workflow_file.absolute()),
+        })
+        
+        logger.info(f"Created workspace: {self.workspace}")
+        return self.workspace
+        
+    def resolve_value(self, value: Any) -> Any:
+        """
+        Resolve a value, replacing any ${var} references with context values.
+        
+        Args:
+            value: Value to resolve
+            
+        Returns:
+            Any: Resolved value
+        """
+        if isinstance(value, str) and '${' in value:
+            # Simple variable substitution
+            for var_name, var_value in self.context.items():
+                placeholder = '${' + var_name + '}'
+                if placeholder in value:
+                    value = value.replace(placeholder, str(var_value))
+        return value
+        
+    def resolve_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Resolve all inputs, replacing variables with their values from context.
+        
+        Args:
+            inputs: Input dictionary
+            
+        Returns:
+            Dict[str, Any]: Resolved inputs
+        """
+        resolved = {}
+        for key, value in inputs.items():
+            if isinstance(value, dict):
+                resolved[key] = self.resolve_inputs(value)
+            elif isinstance(value, list):
+                resolved[key] = [self.resolve_value(v) for v in value]
+            else:
+                resolved[key] = self.resolve_value(value)
+        return resolved
+        
+    def execute_step(self, step: Dict[str, Any]) -> None:
+        """
+        Execute a single workflow step.
+        
+        Args:
+            step: Step definition from workflow
+        """
+        name = step.get('name', 'unnamed_step')
+        logger.info(f"Running step: {name}")
+        
+        # Import module
+        try:
+            module = importlib.import_module(step['module'])
+        except ImportError as e:
+            raise ModuleNotFoundError(name, step['module']) from e
+            
+        # Get function
+        try:
+            func = getattr(module, step['function'])
+        except AttributeError as e:
+            raise FunctionNotFoundError(name, step['module'], step['function']) from e
+            
+        # Prepare inputs
+        inputs = self.resolve_inputs(step.get('inputs', {}))
+        
+        # Add workspace to inputs if function accepts it
+        sig = inspect.signature(func)
+        if 'workspace' in sig.parameters and self.workspace:
+            inputs['workspace'] = self.workspace
+            
+        logger.info(f"Step inputs: {inputs}")
+        
+        # Execute function
+        try:
+            result = func(**inputs)
+        except Exception as e:
+            raise StepExecutionError(name, e) from e
+            
+        # Store outputs in context
+        outputs = step.get('outputs', [])
+        if isinstance(outputs, list):
+            if len(outputs) == 1:
+                self.context[outputs[0]] = result
+            elif len(outputs) > 1 and isinstance(result, (list, tuple)):
+                for output, value in zip(outputs, result):
+                    self.context[output] = value
+        
+        logger.info(f"Step '{name}' completed. Outputs: {self.context}")
+        

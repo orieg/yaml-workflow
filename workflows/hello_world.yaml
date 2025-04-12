@@ -1,22 +1,28 @@
 # A minimal example workflow that demonstrates the basic structure
-# with a simple hello world function
+# with a simple hello world function and file output
 
-workflow:
-  usage:
-    name: Hello World
-    description: A simple hello world workflow
-    inputs:
-      name:
-        type: string
-        description: The name to greet
-  steps:
-    # Step 1: Print a hello world message
-    # Input: Optional name parameter that can be provided at runtime
-    # Output: The greeting message stored in 'greeting' variable
-    - name: say_hello
-      module: yaml_workflow_engine.tasks.basic_tasks
-      function: hello_world
-      inputs:
-        name: ${name}  # Optional runtime input, defaults to "World" if not provided
-      outputs:
-        - greeting  # Will contain the message "Hello, {name}!" 
+name: Hello World
+description: A simple workflow that creates a greeting
+
+steps:
+  - name: create_greeting
+    task: template
+    template: |
+      Hello, {{ name }}!
+      
+      This is run #{{ run_number }} of the {{ workflow_name }} workflow.
+      Created at: {{ timestamp }}
+      Workspace: {{ workspace }}
+    output: greeting.txt
+
+  - name: show_info
+    task: shell
+    command: |
+      echo "Workflow run information:"
+      echo "------------------------"
+      echo "Run number: {{ run_number }}"
+      echo "Workflow: {{ workflow_name }}"
+      echo "Created: {{ timestamp }}"
+      echo "Workspace: {{ workspace }}"
+      echo "------------------------"
+      cat {{ workspace }}/output/greeting.txt 
