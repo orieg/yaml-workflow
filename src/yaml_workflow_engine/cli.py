@@ -6,6 +6,7 @@ import argparse
 import logging
 import shutil
 import sys
+import importlib.resources
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -21,6 +22,11 @@ def create_parser() -> argparse.ArgumentParser:
     
     # Add subparsers
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+    
+    # Init command
+    init_parser = subparsers.add_parser("init", help="Initialize a new project with example workflows")
+    init_parser.add_argument("--dir", default="workflows", help="Directory to create workflows in (default: workflows)")
+    init_parser.add_argument("--example", help="Specific example workflow to copy (if not specified, copies all examples)")
     
     # Run command
     run_parser = subparsers.add_parser("run", help="Run a workflow")
@@ -393,6 +399,36 @@ def remove_workspaces(args: argparse.Namespace) -> None:
         except Exception as e:
             print(f"Error removing {run_dir}: {e}")
 
+def init_project(args: argparse.Namespace) -> None:
+    """Initialize a new project with example workflows."""
+    target_dir = Path(args.dir)
+    target_dir.mkdir(exist_ok=True)
+    
+    # Get example workflows from package
+    with importlib.resources.path("yaml_workflow_engine.examples", "") as examples_dir:
+        if args.example:
+            # Copy specific example
+            example_file = examples_dir / f"{args.example}.yaml"
+            if not example_file.exists():
+                print(f"Error: Example workflow '{args.example}' not found")
+                print("Available examples:")
+                for yaml_file in examples_dir.glob("*.yaml"):
+                    print(f"  {yaml_file.stem}")
+                sys.exit(1)
+            shutil.copy2(example_file, target_dir)
+            print(f"Copied example workflow '{args.example}' to {target_dir}")
+        else:
+            # Copy all examples
+            for yaml_file in examples_dir.glob("*.yaml"):
+                shutil.copy2(yaml_file, target_dir)
+            print(f"Copied example workflows to {target_dir}")
+            print("\nAvailable workflows:")
+            for yaml_file in target_dir.glob("*.yaml"):
+                print(f"  {yaml_file.name}")
+    
+    print("\nTo run a workflow:")
+    print(f"  yaml-workflow run {target_dir}/hello_world.yaml")
+
 def main() -> None:
     """Main entry point for the CLI."""
     parser = create_parser()
@@ -445,6 +481,8 @@ def main() -> None:
                 print("Error: No workspace command specified")
                 print("Use 'workspace --help' for usage information")
                 sys.exit(1)
+        elif args.command == "init":
+            init_project(args)
         else:
             print("Error: No command specified")
             print("Use --help for usage information")

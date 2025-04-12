@@ -1,0 +1,34 @@
+# A minimal example workflow that demonstrates core features:
+# - Template task for generating text with variable substitution
+# - Shell task for running commands and displaying information
+# - Built-in variables (run_number, workflow_name, timestamp, workspace)
+#
+# Required parameters:
+# - name: The name to include in the greeting (e.g., name=World)
+
+name: Hello World
+description: A simple workflow that creates a greeting
+
+steps:
+  - name: create_greeting
+    task: template
+    template: |
+      Hello, {{ name }}!
+      
+      This is run #{{ run_number }} of the {{ workflow_name }} workflow.
+      Created at: {{ timestamp }}
+      Workspace: {{ workspace }}
+    output: greeting.txt
+
+  - name: show_info
+    task: shell
+    command: |
+      echo "Workflow run information:"
+      echo "------------------------"
+      echo "Run number: {{ run_number }}"
+      echo "Workflow: {{ workflow_name }}"
+      echo "Created: {{ timestamp }}"
+      echo "Workspace: {{ workspace }}"
+      echo "------------------------"
+      echo "Current directory: $(pwd)"
+      cat output/greeting.txt 

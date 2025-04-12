@@ -105,8 +105,10 @@ source .venv/bin/activate  # On Unix/macOS
 # Install the package
 pip install -e .
 
-# Create output directory
-mkdir -p output
+# Initialize project with example workflows
+yaml-workflow init
+# Or specify custom directory:
+# yaml-workflow init --dir my-workflows
 ```
 
 2. Create a simple workflow (e.g., `workflows/hello_world.yaml`):
@@ -143,6 +145,11 @@ yaml-workflow run workflows/hello_world.yaml --resume
 ## CLI Usage
 
 ```bash
+# Initialize project with example workflows
+yaml-workflow init  # Creates workflows in 'workflows' directory
+yaml-workflow init --dir custom/workflows  # Custom directory
+yaml-workflow init --example hello_world  # Copy specific example only
+
 # Run a workflow
 yaml-workflow run workflows/hello_world.yaml name=Alice
 

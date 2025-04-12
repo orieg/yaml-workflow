@@ -40,4 +40,4 @@ yaml-workflow = "yaml_workflow_engine.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"*" = ["*.yaml"] 
+"yaml_workflow_engine.examples" = ["*.yaml"] 
