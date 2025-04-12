@@ -189,18 +189,40 @@ def run_workflow(args: argparse.Namespace) -> None:
             flow=args.flow
         )
         
-        # Print results
+        # Print completion status
+        print("\n=== Workflow Status ===")
         if resume_from:
-            print(f"\nWorkflow resumed from failed step '{resume_from}' and completed successfully!")
+            print(f"✓ Workflow resumed from '{resume_from}' and completed successfully")
         elif start_from:
-            print(f"\nWorkflow started from step '{start_from}' and completed successfully!")
+            print(f"✓ Workflow started from '{start_from}' and completed successfully")
         else:
-            print("\nWorkflow completed successfully!")
+            print("✓ Workflow completed successfully")
+            
         if skip_steps:
-            print(f"Skipped steps: {', '.join(skip_steps)}")
+            print(f"• Skipped steps: {', '.join(skip_steps)}")
         if args.flow:
-            print(f"Flow executed: {args.flow}")
-        print("Results:", results)
+            print(f"• Flow executed: {args.flow}")
+            
+        # Print step outputs in a clean format
+        if results.get("outputs"):
+            print("\n=== Step Outputs ===")
+            for step_name, output in results["outputs"].items():
+                # Skip empty outputs or None values
+                if output is None or (isinstance(output, str) and not output.strip()):
+                    continue
+                print(f"\n• {step_name}:")
+                if isinstance(output, (dict, list)):
+                    import json
+                    formatted_output = json.dumps(output, indent=2)
+                    print("  " + formatted_output.replace("\n", "\n  "))
+                else:
+                    print("  " + str(output).replace("\n", "\n  "))
+        
+        print("\n=== Workspace Info ===")
+        print(f"• Location: {engine.workspace}")
+        # Get run number from the workspace metadata
+        run_number = engine.state.metadata.get('run_number', 'unknown')
+        print(f"• Run number: {run_number}")
         
     except WorkflowError as e:
         print(f"Workflow error: {str(e)}")
