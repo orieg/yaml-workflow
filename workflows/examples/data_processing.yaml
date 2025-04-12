@@ -1,85 +1,94 @@
-# Example workflow demonstrating data processing with conditional logic and error handling
-# This workflow processes a CSV file, validates its contents, and performs different
-# actions based on the validation results
+# Example workflow demonstrating data processing and transformation
+# This workflow loads data from various sources, processes it, and generates reports
 
-workflow:
-  description: "Process and validate CSV data with error handling"
-  version: "1.0"
-  
-  # Define workflow-level error handling strategy
-  error_handling:
-    retry_count: 3
-    retry_delay: 60  # seconds
-    on_failure: "notify_admin"
-  
-  steps:
-    - name: load_csv_file
-      module: data_utils
-      function: read_csv
-      inputs:
-        file_path: ${input_file}
-        encoding: "utf-8"
-      outputs:
-        - raw_data
-      error_handling:
-        retry_count: 2
-        on_failure: "skip"  # Skip this step on failure
-    
-    - name: validate_data
-      module: validation
-      function: check_data_quality
-      inputs:
-        data: ${raw_data}
-        rules:
-          - "no_empty_values"
-          - "valid_date_format"
-          - "numeric_range_check"
-      outputs:
-        - validation_results
-        - error_count
-    
-    # Conditional step - only runs if validation finds errors
-    - name: handle_validation_errors
-      module: error_handlers
-      function: process_validation_errors
-      condition: "${error_count} > 0"
-      inputs:
-        results: ${validation_results}
-        threshold: 10
-      outputs:
-        - should_proceed
-        - error_report
-    
-    # Conditional step - only runs if data is clean or errors are acceptable
-    - name: transform_data
-      module: transformers
-      function: apply_transformations
-      condition: "${error_count} == 0 || ${should_proceed} == true"
-      inputs:
-        data: ${raw_data}
-        transformations:
-          - "normalize_dates"
-          - "calculate_metrics"
-      outputs:
-        - transformed_data
-    
-    - name: save_results
-      module: data_utils
-      function: save_output
-      inputs:
-        data: ${transformed_data}
-        format: "parquet"
-        path: ${output_path}
-      outputs:
-        - save_status
-      
-    # Always run this step regardless of previous steps' status
-    - name: send_notification
-      module: notifications
-      function: send_email
-      always_run: true
-      inputs:
-        template: "workflow_completion"
-        status: ${save_status}
-        error_report: ${error_report}
-        recipient: ${notify_email} 
+name: Data Processing Example
+description: Load, transform, and analyze data from multiple sources
+version: "1.0"
+
+# Global settings for data processing
+settings:
+  batch_size: 1000
+  max_memory: "2GB"
+  temp_directory: "/tmp/data_processing"
+
+# Environment variables needed for the workflow
+env:
+  DATABASE_URL: ${env:DATABASE_URL}
+  API_KEY: ${env:API_KEY}
+
+steps:
+  # Load data from multiple sources
+  - name: load_csv_data
+    task: data_loader
+    function: load_csv
+    inputs:
+      file_path: ${input_csv}
+      delimiter: ","
+      encoding: "utf-8"
+    outputs:
+      - csv_data
+
+  - name: fetch_api_data
+    task: data_loader
+    function: fetch_api
+    inputs:
+      url: ${api_endpoint}
+      headers:
+        Authorization: "Bearer ${env:API_KEY}"
+    outputs:
+      - api_data
+
+  # Clean and transform data
+  - name: clean_data
+    task: data_processor
+    function: clean_dataset
+    inputs:
+      data: 
+        - ${csv_data}
+        - ${api_data}
+      operations:
+        - remove_duplicates
+        - fill_missing_values
+        - normalize_dates
+    outputs:
+      - cleaned_data
+
+  # Perform analysis
+  - name: analyze_data
+    task: data_analyzer
+    function: run_analysis
+    inputs:
+      dataset: ${cleaned_data}
+      metrics:
+        - "mean"
+        - "median"
+        - "correlation"
+    outputs:
+      - analysis_results
+
+  # Generate visualizations
+  - name: create_visualizations
+    task: visualizer
+    function: plot_data
+    inputs:
+      data: ${cleaned_data}
+      analysis: ${analysis_results}
+      plot_types:
+        - "histogram"
+        - "scatter"
+        - "boxplot"
+    outputs:
+      - plots
+
+  # Export results
+  - name: export_results
+    task: exporter
+    function: save_results
+    inputs:
+      data: ${cleaned_data}
+      analysis: ${analysis_results}
+      plots: ${plots}
+      format: "pdf"
+      output_path: ${output_directory}
+    outputs:
+      - report_path 
