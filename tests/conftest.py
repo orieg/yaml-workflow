@@ -1,13 +1,20 @@
+import json
 import os
-import sys
-import pytest
-import tempfile
 import shutil
+import sys
+import tempfile
+from datetime import datetime
 from pathlib import Path
+
+import pytest
+import yaml
+
+from yaml_workflow.tasks import create_task_handler, register_task
 
 # Add the src directory to Python path
 src_dir = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_dir))
+
 
 @pytest.fixture
 def temp_workspace():
@@ -17,6 +24,7 @@ def temp_workspace():
         os.chdir(temp_dir)
         yield Path(temp_dir)
         os.chdir(old_cwd)
+
 
 @pytest.fixture
 def sample_workflow_file(temp_workspace):
@@ -44,6 +52,7 @@ steps:
     workflow_file = temp_workspace / "workflow.yaml"
     workflow_file.write_text(content)
     return workflow_file
+
 
 @pytest.fixture
 def sample_batch_workflow(temp_workspace):
@@ -77,6 +86,7 @@ steps:
     workflow_file.write_text(content)
     return workflow_file
 
+
 @pytest.fixture
 def sample_parallel_workflow(temp_workspace):
     """Create a sample parallel execution workflow."""
@@ -105,6 +115,7 @@ steps:
     workflow_file.write_text(content)
     return workflow_file
 
+
 @pytest.fixture
 def rate_limited_workflow(temp_workspace):
     """Create a sample rate-limited workflow."""
@@ -130,26 +141,31 @@ steps:
     workflow_file.write_text(content)
     return workflow_file
 
+
 @pytest.fixture
 def custom_task_module(temp_workspace):
     """Create a sample custom task module."""
     module_dir = temp_workspace / "custom_tasks"
     module_dir.mkdir()
-    
+
     init_file = module_dir / "__init__.py"
     init_file.write_text("")
-    
-    task_file = module_dir / "my_task.py"
-    task_file.write_text("""
-from yaml_workflow_engine import TaskRunner
 
-class MyCustomTask(TaskRunner):
-    def run(self, inputs):
-        message = inputs.get('message', 'Hello')
-        return {'result': f"{message} from custom task!"}
-        
-    def validate(self, inputs):
-        return 'message' in inputs
-""")
-    
-    return module_dir 
+    task_file = module_dir / "my_task.py"
+    task_file.write_text(
+        """
+from yaml_workflow.tasks import register_task, create_task_handler
+
+def my_custom_task(message='Hello'):
+    return {'result': f"{message} from custom task!"}
+
+@register_task('my_custom_task')
+def my_custom_task_handler(step, context, workspace):
+    inputs = step.get('inputs', {})
+    if 'message' not in inputs:
+        raise ValueError("'message' is required in inputs")
+    return my_custom_task(**inputs)
+"""
+    )
+
+    return module_dir

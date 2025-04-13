@@ -1,6 +1,107 @@
-# YAML Workflow Engine
+# YAML Workflow
 
-A powerful and flexible workflow engine that executes tasks defined in YAML configuration files. This engine allows you to create modular, reusable workflows by connecting tasks through YAML definitions, with support for parallel processing, batch operations, and state management.
+A lightweight, powerful, and flexible workflow engine that executes tasks defined in YAML configuration files. This engine allows you to create modular, reusable workflows by connecting tasks through YAML definitions, with support for parallel processing, batch operations, and state management.
+
+## Installation
+
+```bash
+# Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate  # On Unix/macOS
+# On Windows use: venv\Scripts\activate
+
+# Install the package
+pip install -e .
+
+# Install with test dependencies
+pip install -e ".[test]"
+```
+
+## Building and Distribution
+
+To build and distribute this package, follow these steps:
+
+1. Ensure you have the latest build tools:
+```bash
+python -m pip install --upgrade pip
+python -m pip install --upgrade build twine
+```
+
+2. Build both source distribution (sdist) and wheel:
+```bash
+# This will create both sdist and wheel in the dist/ directory
+python -m build
+
+# Or build them separately:
+python -m build --sdist  # Create source distribution
+python -m build --wheel  # Create wheel
+```
+
+3. Check your distribution files:
+```bash
+# Validate distribution files
+twine check dist/*
+```
+
+4. Upload to TestPyPI first (recommended):
+```bash
+# Upload to TestPyPI
+twine upload --repository testpypi dist/*
+
+# Install from TestPyPI to test
+pip install --index-url https://test.pypi.org/simple/ yaml-workflow
+```
+
+5. Upload to PyPI:
+```bash
+# Upload to PyPI
+twine upload dist/*
+```
+
+Note: Make sure your `pyproject.toml` is properly configured before building. Here's the minimum required configuration:
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "yaml-workflow"
+version = "0.1.0"
+description = "A powerful and flexible workflow engine that executes tasks defined in YAML configuration files"
+readme = "README.md"
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+license = { file = "LICENSE" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pyyaml>=6.0",
+    "jinja2>=3.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+dev = [
+    "black>=23.0",
+    "isort>=5.0",
+    "mypy>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/yaml-workflow"
+Issues = "https://github.com/yourusername/yaml-workflow/issues"
+
+[project.scripts]
+yaml-workflow = "yaml_workflow.cli:main"
+```
 
 ## Architecture
 
@@ -97,9 +198,9 @@ sequenceDiagram
 1. Set up your environment:
 ```bash
 # Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Unix/macOS
-# On Windows use: .venv\Scripts\activate
+python -m venv venv
+source venv/bin/activate  # On Unix/macOS
+# On Windows use: venv\Scripts\activate
 
 # Install the package
 pip install -e .
@@ -427,7 +528,12 @@ pytest
 
 3. Format code:
 ```bash
-black src/
+# Format Python files
+black src/ tests/  # Code formatting
+isort --profile black src/ tests/  # Import sorting (using black-compatible settings)
+
+# Run both formatters in one command
+black src/ tests/ && isort --profile black src/ tests/
 ```
 
 4. Type checking:
@@ -896,84 +1002,3 @@ steps:
 - `yaml`
 - `csv`
 - `xml`
-
-### Error Handling
-
-The engine provides several error handling mechanisms:
-
-```python
-from yaml_workflow_engine.exceptions import (
-    WorkflowError,
-    TaskError,
-    ValidationError,
-    StateError
-)
-
-try:
-    engine.run()
-except WorkflowError as e:
-    print(f"Workflow failed: {e}")
-except TaskError as e:
-    print(f"Task failed: {e.task_name} - {e}")
-except ValidationError as e:
-    print(f"Validation failed: {e}")
-```
-
-### Events and Hooks
-
-Subscribe to workflow events:
-
-```python
-from yaml_workflow_engine.events import WorkflowEvents
-
-def on_step_complete(step_name: str, result: dict):
-    print(f"Step {step_name} completed")
-
-engine.events.subscribe(WorkflowEvents.STEP_COMPLETE, on_step_complete)
-```
-
-**Available Events:**
-- `WORKFLOW_START`
-- `WORKFLOW_COMPLETE`
-- `WORKFLOW_FAIL`
-- `STEP_START`
-- `STEP_COMPLETE`
-- `STEP_FAIL`
-- `STATE_SAVE`
-- `STATE_LOAD`
-
-### Configuration
-
-Global configuration can be set through environment variables:
-
-```bash
-# State persistence
-export WORKFLOW_STATE_DIR=".workflow_state"
-export WORKFLOW_STATE_BACKEND="redis"
-export WORKFLOW_STATE_REDIS_URL="redis://localhost:6379"
-
-# Logging
-export WORKFLOW_LOG_LEVEL="DEBUG"
-export WORKFLOW_LOG_FILE="workflow.log"
-
-# Performance
-export WORKFLOW_MAX_WORKERS=4
-export WORKFLOW_TASK_TIMEOUT=3600
-```
-
-Or through a configuration file:
-
-```yaml
-# config.yaml
-state:
-  backend: redis
-  redis_url: redis://localhost:6379
-  
-logging:
-  level: DEBUG
-  file: workflow.log
-  
-performance:
-  max_workers: 4
-  task_timeout: 3600
-```

@@ -5,14 +5,15 @@ This package contains various task modules that can be used in workflows.
 Each module provides specific functionality that can be referenced in workflow YAML files.
 """
 
-from typing import Any, Callable, Dict, Optional, TypeVar, ParamSpec
-from pathlib import Path
 from functools import wraps
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional, ParamSpec, TypeVar
+
 from jinja2 import Template, UndefinedError
 
 # Type variables for task function signatures
-P = ParamSpec('P')
-R = TypeVar('R')
+P = ParamSpec("P")
+R = TypeVar("R")
 
 # Type for task handlers
 TaskHandler = Callable[[Dict[str, Any], Dict[str, Any], Path], Any]
@@ -20,53 +21,59 @@ TaskHandler = Callable[[Dict[str, Any], Dict[str, Any], Path], Any]
 # Registry of task handlers
 _task_handlers: Dict[str, TaskHandler] = {}
 
+
 def register_task(name: str) -> Callable[[TaskHandler], TaskHandler]:
     """
     Decorator to register a task handler.
-    
+
     Args:
         name: Name of the task type
-        
+
     Returns:
         Callable: Decorator function
     """
+
     def decorator(func: TaskHandler) -> TaskHandler:
         _task_handlers[name] = func
         return func
+
     return decorator
+
 
 def get_task_handler(task_type: str) -> Optional[TaskHandler]:
     """
     Get a task handler by type.
-    
+
     Args:
         task_type: Type of task
-        
+
     Returns:
         Optional[TaskHandler]: Task handler function if found, None otherwise
     """
     return _task_handlers.get(task_type)
 
+
 def create_task_handler(func: Callable[P, R]) -> TaskHandler:
     """
     Create a task handler that wraps a basic function.
-    
+
     This wrapper:
     1. Extracts parameters from the step's inputs
     2. Resolves template variables in string inputs using Jinja2
     3. Handles workspace paths if needed
-    
+
     Args:
         func: The function to wrap as a task handler
-        
+
     Returns:
         TaskHandler: Wrapped task handler
     """
+
     @wraps(func)
     def wrapper(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> R:
         # Get inputs, defaulting to empty dict if not present
         inputs = step.get("inputs", {})
-        
+
         # Process each input value
         processed_inputs = {}
         for key, value in inputs.items():
@@ -79,21 +86,15 @@ def create_task_handler(func: Callable[P, R]) -> TaskHandler:
                     raise KeyError(f"Missing template variable in '{value}': {str(e)}")
             else:
                 processed_inputs[key] = value
-        
+
         # Call the function with processed inputs
         return func(**processed_inputs)
-    
+
     return wrapper
 
+
 # Import task modules
-from . import (
-    basic_tasks,
-    file_tasks,
-    shell_tasks,
-    template_tasks,
-    python_tasks,
-    batch_processor
-)
+from . import basic_tasks, batch_processor, file_tasks, python_tasks, shell_tasks, template_tasks
 
 # Register basic tasks
 register_task("echo")(create_task_handler(basic_tasks.echo))
@@ -121,4 +122,4 @@ register_task("template")(template_tasks.render_template)
 register_task("python")(python_tasks.python_task)
 
 # Register batch processor
-register_task("batch")(batch_processor.process_batch) 
+register_task("batch")(batch_processor.process_batch)
