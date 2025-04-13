@@ -334,6 +334,44 @@
   - Handle large files
   - Compare files
 
+- `file.markdown`
+  - Convert Markdown to HTML
+  - Convert HTML to Markdown
+  - Apply custom styles
+  - Handle GitHub Flavored Markdown
+  - Process frontmatter
+  - Extract metadata
+  - Handle code blocks
+  - Process tables
+  - Manage images/links
+  - Custom extensions
+  - Generate TOC
+  - Syntax highlighting
+  - Handle math equations
+  - Validate links
+  - Custom templates
+  - Batch conversion
+  - Handle multiple dialects
+  - Export to other formats (PDF, DOCX)
+
+- `file.html`
+  - Parse HTML documents
+  - Extract content/structure
+  - Modify DOM elements
+  - Handle templates
+  - Clean/sanitize HTML
+  - Apply styles/CSS
+  - Validate HTML
+  - Fix malformed HTML
+  - Minify/prettify
+  - Handle encodings
+  - Process forms
+  - Extract metadata
+  - Manage links/images
+  - Convert to other formats
+  - Batch processing
+  - Custom transformations
+
 ## Implementation Priority
 
 ### Phase 1 - Core Development Tasks
