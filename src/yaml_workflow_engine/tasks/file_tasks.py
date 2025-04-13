@@ -5,6 +5,7 @@ File operation tasks for working with files and directories.
 import os
 import json
 import yaml
+import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from jinja2 import Template
@@ -22,57 +23,113 @@ def ensure_directory(file_path: Path) -> None:
     """
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
-@register_task("read_file")
-def read_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
-    """
-    Task handler for reading files.
-    
-    Args:
-        step: Step configuration
-        context: Workflow context
-        workspace: Workspace directory
-        
-    Returns:
-        str: File content
-    """
-    logger = get_task_logger(workspace, step.get("name", "read_file"))
-    log_task_execution(logger, step, context, workspace)
-    
-    try:
-        params = step.get("params", {})
-        file_path = params.get("file_path")
-        encoding = params.get("encoding", "utf-8")
-        
-        if not file_path:
-            raise ValueError("file_path parameter is required")
-        
-        if params.get("format") == "json":
-            result = read_json(file_path, workspace)
-        elif params.get("format") == "yaml":
-            result = read_yaml(file_path, workspace)
-        else:
-            result = read_file(file_path, encoding, workspace)
-            
-        log_task_result(logger, result)
-        return result
-        
-    except Exception as e:
-        log_task_error(logger, e)
-        raise
+# Direct file operations
 
-@register_task("write_file")
-def write_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
-    """
-    Task handler for writing files.
+def write_file_direct(file_path: str, content: str, workspace: Path, encoding: str = "utf-8") -> str:
+    """Write content to a file.
     
     Args:
-        step: Step configuration
-        context: Workflow context
+        file_path: Path to the file
+        content: Content to write
         workspace: Workspace directory
+        encoding: File encoding (default: utf-8)
         
     Returns:
         str: Path to written file
     """
+    resolved_path = resolve_path(workspace, file_path)
+    ensure_directory(resolved_path)
+    with open(resolved_path, "wb") as f:
+        f.write(content.encode(encoding))
+    return str(resolved_path)
+
+def read_file_direct(file_path: str, workspace: Path, encoding: str = "utf-8") -> str:
+    """Read content from a file.
+    
+    Args:
+        file_path: Path to the file
+        workspace: Workspace directory
+        encoding: File encoding (default: utf-8)
+        
+    Returns:
+        str: File content
+    """
+    resolved_path = resolve_path(workspace, file_path)
+    with open(resolved_path, "rb") as f:
+        return f.read().decode(encoding)
+
+def append_file_direct(file_path: str, content: str, workspace: Path, encoding: str = "utf-8") -> str:
+    """Append content to a file.
+    
+    Args:
+        file_path: Path to the file
+        content: Content to append
+        workspace: Workspace directory
+        encoding: File encoding (default: utf-8)
+        
+    Returns:
+        str: Path to the file
+    """
+    resolved_path = resolve_path(workspace, file_path)
+    ensure_directory(resolved_path)
+    with open(resolved_path, "a", encoding=encoding) as f:
+        f.write(content)
+    return str(resolved_path)
+
+def copy_file_direct(source: str, destination: str, workspace: Path) -> str:
+    """Copy a file from source to destination.
+    
+    Args:
+        source: Source file path
+        destination: Destination file path
+        workspace: Workspace directory
+        
+    Returns:
+        str: Path to destination file
+    """
+    source_path = resolve_path(workspace, source)
+    dest_path = resolve_path(workspace, destination)
+    ensure_directory(dest_path)
+    shutil.copy2(source_path, dest_path)
+    return str(dest_path)
+
+def move_file_direct(source: str, destination: str, workspace: Path) -> str:
+    """Move a file from source to destination.
+    
+    Args:
+        source: Source file path
+        destination: Destination file path
+        workspace: Workspace directory
+        
+    Returns:
+        str: Path to destination file
+    """
+    source_path = resolve_path(workspace, source)
+    dest_path = resolve_path(workspace, destination)
+    ensure_directory(dest_path)
+    shutil.move(str(source_path), str(dest_path))
+    return str(dest_path)
+
+def delete_file_direct(file_path: str, workspace: Path) -> str:
+    """Delete a file.
+    
+    Args:
+        file_path: Path to the file
+        workspace: Workspace directory
+        
+    Returns:
+        str: Path to deleted file
+    """
+    resolved_path = resolve_path(workspace, file_path)
+    if resolved_path.exists():
+        resolved_path.unlink()
+    return str(resolved_path)
+
+# Task handlers
+
+@register_task("write_file")
+def write_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+    """Task handler for writing files."""
     logger = get_task_logger(workspace, step.get("name", "write_file"))
     log_task_execution(logger, step, context, workspace)
     
@@ -94,8 +151,130 @@ def write_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Pa
         else:
             if not isinstance(content, str):
                 content = str(content)
-            result = write_file(file_path, content, encoding, workspace)
+            result = write_file_direct(file_path, content, workspace, encoding)
             
+        log_task_result(logger, result)
+        return result
+        
+    except Exception as e:
+        log_task_error(logger, e)
+        raise
+
+@register_task("read_file")
+def read_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+    """Task handler for reading files."""
+    logger = get_task_logger(workspace, step.get("name", "read_file"))
+    log_task_execution(logger, step, context, workspace)
+    
+    try:
+        params = step.get("params", {})
+        file_path = params.get("file_path")
+        encoding = params.get("encoding", "utf-8")
+        
+        if not file_path:
+            raise ValueError("file_path parameter is required")
+        
+        if params.get("format") == "json":
+            result = read_json(file_path, workspace)
+        elif params.get("format") == "yaml":
+            result = read_yaml(file_path, workspace)
+        else:
+            result = read_file_direct(file_path, workspace, encoding)
+            
+        log_task_result(logger, result)
+        return result
+        
+    except Exception as e:
+        log_task_error(logger, e)
+        raise
+
+@register_task("append_file")
+def append_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+    """Task handler for appending to files."""
+    logger = get_task_logger(workspace, step.get("name", "append_file"))
+    log_task_execution(logger, step, context, workspace)
+    
+    try:
+        params = step.get("params", {})
+        file_path = params.get("file_path")
+        content = params.get("content")
+        encoding = params.get("encoding", "utf-8")
+        
+        if not file_path:
+            raise ValueError("file_path parameter is required")
+        if content is None:
+            raise ValueError("content parameter is required")
+        
+        result = append_file_direct(file_path, content, workspace, encoding)
+        log_task_result(logger, result)
+        return result
+        
+    except Exception as e:
+        log_task_error(logger, e)
+        raise
+
+@register_task("copy_file")
+def copy_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+    """Task handler for copying files."""
+    logger = get_task_logger(workspace, step.get("name", "copy_file"))
+    log_task_execution(logger, step, context, workspace)
+    
+    try:
+        params = step.get("params", {})
+        source = params.get("source")
+        destination = params.get("destination")
+        
+        if not source:
+            raise ValueError("source parameter is required")
+        if not destination:
+            raise ValueError("destination parameter is required")
+        
+        result = copy_file_direct(source, destination, workspace)
+        log_task_result(logger, result)
+        return result
+        
+    except Exception as e:
+        log_task_error(logger, e)
+        raise
+
+@register_task("move_file")
+def move_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+    """Task handler for moving files."""
+    logger = get_task_logger(workspace, step.get("name", "move_file"))
+    log_task_execution(logger, step, context, workspace)
+    
+    try:
+        params = step.get("params", {})
+        source = params.get("source")
+        destination = params.get("destination")
+        
+        if not source:
+            raise ValueError("source parameter is required")
+        if not destination:
+            raise ValueError("destination parameter is required")
+        
+        result = move_file_direct(source, destination, workspace)
+        log_task_result(logger, result)
+        return result
+        
+    except Exception as e:
+        log_task_error(logger, e)
+        raise
+
+@register_task("delete_file")
+def delete_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+    """Task handler for deleting files."""
+    logger = get_task_logger(workspace, step.get("name", "delete_file"))
+    log_task_execution(logger, step, context, workspace)
+    
+    try:
+        params = step.get("params", {})
+        file_path = params.get("file_path")
+        
+        if not file_path:
+            raise ValueError("file_path parameter is required")
+        
+        result = delete_file_direct(file_path, workspace)
         log_task_result(logger, result)
         return result
         
@@ -221,61 +400,6 @@ def write_yaml_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Pa
     return write_yaml(file_path, processed_data, workspace)
 
 # Helper functions
-def read_file(
-    file_path: str,
-    encoding: str = "utf-8",
-    workspace: Optional[Path] = None
-) -> str:
-    """
-    Read content from a text file.
-    
-    Args:
-        file_path: Path to the file
-        encoding: File encoding (default: utf-8)
-        workspace: Optional workspace directory for relative paths
-    
-    Returns:
-        str: File content
-        
-    Raises:
-        FileNotFoundError: If file does not exist
-        IOError: If file cannot be read
-    """
-    path = resolve_path(workspace, file_path) if workspace else Path(file_path)
-    with path.open("r", encoding=encoding) as f:
-        return f.read()
-
-def write_file(
-    file_path: str,
-    content: str,
-    encoding: str = "utf-8",
-    workspace: Optional[Path] = None
-) -> str:
-    """
-    Write content to a text file.
-    
-    Args:
-        file_path: Path to the file
-        content: Content to write
-        encoding: File encoding (default: utf-8)
-        workspace: Optional workspace directory for relative paths
-    
-    Returns:
-        str: Path to written file
-        
-    Raises:
-        IOError: If file cannot be written
-    """
-    if not file_path:
-        raise ValueError("file_path cannot be empty")
-        
-    path = resolve_path(workspace, file_path) if workspace else Path(file_path)
-    ensure_directory(path)
-    
-    with path.open("w", encoding=encoding) as f:
-        f.write(content)
-    return str(path)
-
 def read_json(
     file_path: str,
     workspace: Optional[Path] = None

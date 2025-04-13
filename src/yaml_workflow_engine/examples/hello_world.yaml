@@ -9,6 +9,11 @@
 name: Hello World
 description: A simple workflow that creates a greeting
 
+params:
+  name:
+    description: Name to include in the greeting
+    default: World
+
 steps:
   - name: create_greeting
     task: template
@@ -31,4 +36,4 @@ steps:
       echo "Workspace: {{ workspace }}"
       echo "------------------------"
       echo "Current directory: $(pwd)"
-      cat output/greeting.txt 
+      cat greeting.txt 

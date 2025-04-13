@@ -64,15 +64,16 @@ def join_strings(*strings: str, separator: str = " ") -> str:
     """
     return separator.join(strings)
 
-def create_greeting(template: str = "Hello, {name}!", **kwargs) -> str:
+def create_greeting(template: str = "Hello, {{ name }}!", **kwargs) -> str:
     """
     Create a greeting using a template and keyword arguments.
     
     Args:
-        template: Template string with placeholders. Defaults to "Hello, {name}!"
+        template: Template string with placeholders. Defaults to "Hello, {{ name }}!"
         **kwargs: Keyword arguments to fill template placeholders
     
     Returns:
         str: Formatted greeting
     """
-    return template.format(**kwargs) 
+    from jinja2 import Template
+    return Template(template).render(**kwargs) 

@@ -108,7 +108,7 @@ def set_environment(env_vars: Dict[str, str]) -> Dict[str, str]:
     return dict(os.environ)
 
 @register_task("shell")
-def run_shell_command(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def shell_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
     """
     Run a shell command.
     
@@ -120,8 +120,10 @@ def run_shell_command(step: Dict[str, Any], context: Dict[str, Any], workspace: 
     Returns:
         str: Command output
     """
-    # Get command
+    # Get command from either direct step or processing_task
     command_template = step.get("command")
+    if not command_template and "processing_task" in step:
+        command_template = step["processing_task"].get("command")
     if not command_template:
         raise ValueError("No command provided")
     

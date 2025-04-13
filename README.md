@@ -86,7 +86,6 @@ sequenceDiagram
 - ⚠️ Comprehensive error handling
 - 🔁 Retry mechanisms
 - ⚡ Parallel processing support
-- 🚦 API rate limiting
 - 📊 Progress tracking and logging
 - 💾 State persistence and resume capability
 - 🔄 Batch processing with chunking
@@ -791,7 +790,7 @@ result = engine.run(
 ```
 
 **Constructor Parameters:**
-- `workflow_file` (str): Path to workflow YAML file
+- `workflow` (str): Path to workflow YAML file or workflow definition dictionary
 - `workspace` (str, optional): Custom workspace directory
 - `state_backend` (str, optional): State persistence backend
 

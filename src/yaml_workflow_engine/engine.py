@@ -79,7 +79,7 @@ class WorkflowEngine:
     
     def __init__(
         self,
-        workflow_file: str,
+        workflow: str | Dict[str, Any],
         workspace: Optional[str] = None,
         base_dir: str = "runs"
     ):
@@ -87,24 +87,37 @@ class WorkflowEngine:
         Initialize the workflow engine.
         
         Args:
-            workflow_file: Path to the workflow YAML file
+            workflow: Path to workflow YAML file or workflow definition dictionary
             workspace: Optional custom workspace directory
             base_dir: Base directory for workflow runs
+            
+        Raises:
+            WorkflowError: If workflow file not found or invalid
         """
-        self.workflow_file = Path(workflow_file)
-        if not self.workflow_file.exists():
-            raise WorkflowError(f"Workflow file not found: {workflow_file}")
-        
         # Load workflow definition
-        with open(workflow_file) as f:
-            self.workflow = yaml.safe_load(f)
+        if isinstance(workflow, dict):
+            self.workflow = workflow
+            self.workflow_file = None
+        else:
+            self.workflow_file = Path(workflow)
+            if not self.workflow_file.exists():
+                raise WorkflowError(f"Workflow file not found: {workflow}")
+                
+            # Load workflow from file
+            with open(self.workflow_file) as f:
+                self.workflow = yaml.safe_load(f)
         
         # Validate workflow structure
         if not isinstance(self.workflow, dict):
             raise WorkflowError("Invalid workflow format: root must be a mapping")
         
         # Get workflow name
-        self.name = self.workflow.get("name", self.workflow_file.stem)
+        self.name = self.workflow.get("name")
+        if not self.name:
+            if self.workflow_file:
+                self.name = self.workflow_file.stem
+            else:
+                self.name = "workflow"
         
         # Create workspace
         self.workspace = create_workspace(self.name, workspace, base_dir)
@@ -121,9 +134,12 @@ class WorkflowEngine:
             "workflow_name": self.name,
             "workspace": str(self.workspace),
             "run_number": self.workspace_info.get("run_number"),
-            "timestamp": datetime.now().isoformat(),
-            "workflow_file": str(self.workflow_file.absolute())
+            "timestamp": datetime.now().isoformat()
         }
+        
+        # Add workflow file path if available
+        if self.workflow_file:
+            self.context["workflow_file"] = str(self.workflow_file.absolute())
         
         # Load default parameter values from workflow file
         params = self.workflow.get("params", {})
@@ -372,6 +388,14 @@ class WorkflowEngine:
             # Run task
             self.logger.info(f"Running step {i}: {name}")
             try:
+                # Call on_step_start callback if defined
+                if hasattr(self, 'on_step_start') and self.on_step_start:
+                    try:
+                        self.on_step_start(name)
+                    except Exception as e:
+                        self.state.mark_step_failed(name, str(e))
+                        raise WorkflowError(f"Error in step {name}: {str(e)}") from e
+                
                 result = handler(step, self.context, self.workspace)
                 results[name] = result
                 # Update context with step result

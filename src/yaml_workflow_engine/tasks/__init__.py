@@ -85,16 +85,40 @@ def create_task_handler(func: Callable[P, R]) -> TaskHandler:
     
     return wrapper
 
-# Import built-in task handlers
-from . import template_tasks
-from . import shell_tasks
-from . import file_tasks
-from . import basic_tasks
+# Import task modules
+from . import (
+    basic_tasks,
+    file_tasks,
+    shell_tasks,
+    template_tasks,
+    python_tasks,
+    batch_processor
+)
 
-# Register basic tasks with proper wrapping
+# Register basic tasks
 register_task("echo")(create_task_handler(basic_tasks.echo))
 register_task("fail")(create_task_handler(basic_tasks.fail))
 register_task("hello_world")(create_task_handler(basic_tasks.hello_world))
 register_task("add_numbers")(create_task_handler(basic_tasks.add_numbers))
 register_task("join_strings")(create_task_handler(basic_tasks.join_strings))
-register_task("create_greeting")(create_task_handler(basic_tasks.create_greeting)) 
+register_task("create_greeting")(create_task_handler(basic_tasks.create_greeting))
+
+# Register file tasks
+register_task("write_file")(file_tasks.write_file_task)
+register_task("read_file")(file_tasks.read_file_task)
+register_task("append_file")(file_tasks.append_file_task)
+register_task("copy_file")(file_tasks.copy_file_task)
+register_task("move_file")(file_tasks.move_file_task)
+register_task("delete_file")(file_tasks.delete_file_task)
+
+# Register shell tasks
+register_task("shell")(shell_tasks.shell_task)
+
+# Register template tasks
+register_task("template")(template_tasks.render_template)
+
+# Register Python tasks
+register_task("python")(python_tasks.python_task)
+
+# Register batch processor
+register_task("batch")(batch_processor.process_batch) 

@@ -4,14 +4,14 @@ Base functionality for task handlers.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
-def get_task_logger(workspace: Path, task_name: str) -> logging.Logger:
+def get_task_logger(workspace: Union[str, Path], task_name: str) -> logging.Logger:
     """
     Get a logger for a task that logs to the workspace logs directory.
     
     Args:
-        workspace: Workspace directory
+        workspace: Workspace directory (can be string or Path)
         task_name: Name of the task
         
     Returns:
@@ -30,16 +30,24 @@ def get_task_logger(workspace: Path, task_name: str) -> logging.Logger:
     )
     
     # Create file handler
-    logs_dir = workspace / "logs"
-    logs_dir.mkdir(exist_ok=True)
+    workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
+    logs_dir = workspace_path / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
     
-    log_file = logs_dir / "tasks.log"
+    # Create task-specific log file
+    log_file = logs_dir / f"{task_name}.log"
     file_handler = logging.FileHandler(log_file)
     file_handler.setFormatter(formatter)
     file_handler.setLevel(logging.DEBUG)
     
-    # Add handler
+    # Create console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    console_handler.setLevel(logging.INFO)
+    
+    # Add handlers
     logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
     logger.setLevel(logging.DEBUG)
     
     return logger
@@ -60,7 +68,7 @@ def log_task_execution(
         workspace: Workspace directory
     """
     task_name = step.get("name", "unnamed_task")
-    task_type = step.get("type", "unknown")
+    task_type = step.get("task", "unknown")  # Changed from "type" to "task"
     
     logger.info(f"Executing task '{task_name}' of type '{task_type}'")
     logger.debug(f"Step configuration: {step}")

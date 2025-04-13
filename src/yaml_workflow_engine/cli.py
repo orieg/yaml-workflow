@@ -2,162 +2,95 @@
 Command-line interface for the workflow engine.
 """
 
-import argparse
 import logging
 import shutil
 import sys
 import importlib.resources
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
+import argparse
 import yaml
 
 from .engine import WorkflowEngine
 from .exceptions import WorkflowError
 from .workspace import get_workspace_info
 
-def create_parser() -> argparse.ArgumentParser:
-    """Create the argument parser."""
-    parser = argparse.ArgumentParser(description="YAML Workflow Engine CLI")
+class WorkflowArgumentParser(argparse.ArgumentParser):
+    """Custom argument parser that handles workflow parameters."""
     
-    # Add subparsers
-    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.workflow_params = []
     
-    # Init command
-    init_parser = subparsers.add_parser("init", help="Initialize a new project with example workflows")
-    init_parser.add_argument("--dir", default="workflows", help="Directory to create workflows in (default: workflows)")
-    init_parser.add_argument("--example", help="Specific example workflow to copy (if not specified, copies all examples)")
+    def error(self, message):
+        """Custom error handling for workflow parameters."""
+        if "unrecognized arguments" in message:
+            # Check if the unrecognized argument is a parameter
+            args = message.split(": ")[-1].split()
+            for arg in args:
+                if '=' in arg:
+                    self.workflow_params.append(arg)
+                else:
+                    # If it's not a parameter, raise an error
+                    print(f"Invalid parameter format: {arg}\nParameters must be in the format: name=value", file=sys.stderr)
+                    sys.exit(1)
+        else:
+            super().error(message)
     
-    # Run command
-    run_parser = subparsers.add_parser("run", help="Run a workflow")
-    run_parser.add_argument("workflow", help="Path to workflow YAML file")
-    run_parser.add_argument("--workspace", help="Custom workspace directory")
-    run_parser.add_argument("--base-dir", default="runs", help="Base directory for workflow runs")
-    run_parser.add_argument("--resume", action="store_true", help="Resume workflow from last failed step")
-    run_parser.add_argument("--start-from", help="Start workflow execution from specified step")
-    run_parser.add_argument("--skip-steps", help="Comma-separated list of steps to skip during execution")
-    run_parser.add_argument("--flow", help="Name of the flow to execute (default: use flow specified in workflow file)")
-    # Add -- before params to handle parameters after flags
-    run_parser.add_argument("params", nargs="*", help="Workflow parameters in key=value format", default=[])
-    
-    # List command
-    list_parser = subparsers.add_parser("list", help="List available workflows")
-    list_parser.add_argument("--base-dir", default="workflows", help="Base directory containing workflows")
-    
-    # Validate command
-    validate_parser = subparsers.add_parser("validate", help="Validate a workflow")
-    validate_parser.add_argument("workflow", help="Path to workflow YAML file")
-    
-    # Workspace commands
-    ws_parser = subparsers.add_parser("workspace", help="Workspace management commands")
-    ws_subparsers = ws_parser.add_subparsers(dest="ws_command", help="Workspace command")
-    
-    # workspace list
-    ws_list = ws_subparsers.add_parser("list", help="List workflow run directories")
-    ws_list.add_argument(
-        "--base-dir",
-        "-b",
-        default="runs",
-        help="Base directory for workflow runs (default: runs)"
-    )
-    ws_list.add_argument(
-        "--workflow",
-        "-w",
-        help="Filter by workflow name"
-    )
-    
-    # workspace clean
-    ws_clean = ws_subparsers.add_parser("clean", help="Clean up old workflow runs")
-    ws_clean.add_argument(
-        "--base-dir",
-        "-b",
-        default="runs",
-        help="Base directory for workflow runs (default: runs)"
-    )
-    ws_clean.add_argument(
-        "--older-than",
-        "-o",
-        type=int,
-        default=30,
-        help="Remove runs older than N days (default: 30)"
-    )
-    ws_clean.add_argument(
-        "--workflow",
-        "-w",
-        help="Clean only runs of this workflow"
-    )
-    ws_clean.add_argument(
-        "--dry-run",
-        "-n",
-        action="store_true",
-        help="Show what would be deleted without actually deleting"
-    )
-    
-    # workspace remove
-    ws_remove = ws_subparsers.add_parser("remove", help="Remove specific workflow runs")
-    ws_remove.add_argument(
-        "runs",
-        nargs="+",
-        help="Run directories to remove (relative to base-dir)"
-    )
-    ws_remove.add_argument(
-        "--base-dir",
-        "-b",
-        default="runs",
-        help="Base directory for workflow runs (default: runs)"
-    )
-    ws_remove.add_argument(
-        "--force",
-        "-f",
-        action="store_true",
-        help="Don't ask for confirmation"
-    )
-    
-    return parser
+    def parse_args(self, args=None, namespace=None):
+        """Parse arguments and collect workflow parameters."""
+        self.workflow_params = []
+        args = super().parse_args(args, namespace)
+        if hasattr(args, 'params'):
+            args.params.extend(self.workflow_params)
+        return args
 
-def parse_params(params: Optional[List[str]]) -> Dict[str, str]:
+def parse_params(args_list: List[str]) -> Dict[str, str]:
     """Parse command line parameters."""
-    if not params:
-        return {}
-        
     result = {}
-    for param in params:
+    for arg in args_list:
         try:
-            name, value = param.split("=", 1)
+            name, value = arg.split("=", 1)
+            # Remove leading '--' if present
+            name = name.lstrip('-')
             result[name.strip()] = value.strip()
         except ValueError:
-            print(f"Invalid parameter format: {param}")
-            print("Parameters must be in the format: name=value")
-            sys.exit(1)
+            raise ValueError(
+                f"Invalid parameter format: {arg}\nParameters must be in the format: name=value"
+            )
     return result
 
-def run_workflow(args: argparse.Namespace) -> None:
+def run_workflow(args):
     """Run a workflow."""
     try:
-        # Parse parameters
-        params = parse_params(args.params)
+        try:
+            param_dict = parse_params(args.params)
+        except ValueError as e:
+            print(str(e), file=sys.stderr)
+            sys.exit(1)
         
         # Create workflow engine
         engine = WorkflowEngine(
-            workflow_file=args.workflow,
+            workflow=args.workflow,
             workspace=args.workspace,
             base_dir=args.base_dir
         )
         
         # Parse skip steps
-        skip_steps = []
+        skip_step_list = []
         if args.skip_steps:
-            skip_steps = [step.strip() for step in args.skip_steps.split(',')]
-            print(f"Skipping steps: {', '.join(skip_steps)}")
+            skip_step_list = [step.strip() for step in args.skip_steps.split(',')]
+            print(f"Skipping steps: {', '.join(skip_step_list)}")
         
         # Handle start-from and resume logic
-        start_from = None
+        start_from_step = None
         resume_from = None
         
         # Check start-from first (takes precedence)
         if args.start_from:
-            start_from = args.start_from
-            print(f"Starting workflow from step: {start_from}")
+            start_from_step = args.start_from
+            print(f"Starting workflow from step: {start_from_step}")
         # Check resume flag - only if workflow is in failed state
         elif args.resume:
             try:
@@ -168,24 +101,22 @@ def run_workflow(args: argparse.Namespace) -> None:
                         resume_from = failed_step['step_name']
                         print(f"Resuming workflow from failed step: {resume_from}")
                     else:
-                        print("No failed step found to resume from.")
-                        sys.exit(1)
+                        raise ValueError("No failed step found to resume from.")
                 elif state.metadata['execution_state']['status'] == 'completed':
-                    print("Cannot resume: Workflow is already completed. Use --start-from to run from a specific step.")
-                    sys.exit(1)
+                    raise ValueError(
+                        "Cannot resume: Workflow is already completed. Use --start-from to run from a specific step."
+                    )
                 else:
-                    print("Cannot resume: No failed workflow found.")
-                    sys.exit(1)
+                    raise ValueError("Cannot resume: No failed workflow found.")
             except Exception as e:
-                print(f"Cannot resume: Could not determine workflow state: {e}")
-                sys.exit(1)
+                raise ValueError(f"Cannot resume: Could not determine workflow state: {e}")
         
         # Run workflow with appropriate parameters
         results = engine.run(
-            params,
+            param_dict,
             resume_from=resume_from,
-            start_from=start_from,
-            skip_steps=skip_steps,
+            start_from=start_from_step,
+            skip_steps=skip_step_list,
             flow=args.flow
         )
         
@@ -193,13 +124,13 @@ def run_workflow(args: argparse.Namespace) -> None:
         print("\n=== Workflow Status ===")
         if resume_from:
             print(f"✓ Workflow resumed from '{resume_from}' and completed successfully")
-        elif start_from:
-            print(f"✓ Workflow started from '{start_from}' and completed successfully")
+        elif start_from_step:
+            print(f"✓ Workflow started from '{start_from_step}' and completed successfully")
         else:
             print("✓ Workflow completed successfully")
             
-        if skip_steps:
-            print(f"• Skipped steps: {', '.join(skip_steps)}")
+        if skip_step_list:
+            print(f"• Skipped steps: {', '.join(skip_step_list)}")
         if args.flow:
             print(f"• Flow executed: {args.flow}")
             
@@ -225,17 +156,17 @@ def run_workflow(args: argparse.Namespace) -> None:
         print(f"• Run number: {run_number}")
         
     except WorkflowError as e:
-        print(f"Workflow error: {str(e)}")
+        print(f"Workflow error: {str(e)}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"Unexpected error: {str(e)}")
+        print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
-def list_workflows(args: argparse.Namespace) -> None:
-    """List available workflows in the specified directory."""
+def list_workflows(args):
+    """List available workflows."""
     workflow_dir = Path(args.base_dir)
     if not workflow_dir.exists():
-        print(f"Error: Directory not found: {workflow_dir}")
+        print(f"Directory not found: {workflow_dir}", file=sys.stderr)
         sys.exit(1)
         
     print("\nAvailable workflows:")
@@ -261,7 +192,7 @@ def list_workflows(args: argparse.Namespace) -> None:
                         print(f"  Description: {desc}")
                         found = True
                         
-        except Exception as e:
+        except Exception:
             # Skip files that can't be parsed as YAML
             continue
     
@@ -271,28 +202,28 @@ def list_workflows(args: argparse.Namespace) -> None:
         print("You can specify a different directory with --base-dir option.")
     print()
 
-def validate_workflow(args: argparse.Namespace) -> None:
+def validate_workflow(args):
     """Validate a workflow file."""
     try:
         # Just try to create the engine, which will validate the workflow
         WorkflowEngine(args.workflow)
-        print(f"Workflow is valid: {args.workflow}")
+        print("Workflow validation successful")
     except Exception as e:
-        print(f"Validation failed: {e}")
+        print(f"Validation failed: {e}", file=sys.stderr)
         sys.exit(1)
 
-def list_workspaces(args: argparse.Namespace) -> None:
+def list_workspaces(args):
     """List workflow run directories."""
-    base_dir = Path(args.base_dir)
-    if not base_dir.exists():
-        print(f"Error: Base directory not found: {base_dir}")
+    base_dir_path = Path(args.base_dir)
+    if not base_dir_path.exists():
+        print(f"Base directory not found: {base_dir_path}", file=sys.stderr)
         sys.exit(1)
     
     # Get all run directories
     runs = []
     pattern = f"*_run_*" if not args.workflow else f"{args.workflow}_run_*"
     
-    for run_dir in base_dir.glob(pattern):
+    for run_dir in base_dir_path.glob(pattern):
         if run_dir.is_dir():
             try:
                 info = get_workspace_info(run_dir)
@@ -322,18 +253,18 @@ def list_workspaces(args: argparse.Namespace) -> None:
         print(f"  Files: {run['files']}")
     print()
 
-def clean_workspaces(args: argparse.Namespace) -> None:
+def clean_workspaces(args):
     """Clean up old workflow runs."""
-    base_dir = Path(args.base_dir)
-    if not base_dir.exists():
-        print(f"Error: Base directory not found: {base_dir}")
+    base_dir_path = Path(args.base_dir)
+    if not base_dir_path.exists():
+        print(f"Base directory not found: {base_dir_path}", file=sys.stderr)
         sys.exit(1)
     
     cutoff = datetime.now() - timedelta(days=args.older_than)
     pattern = f"*_run_*" if not args.workflow else f"{args.workflow}_run_*"
     
     to_delete = []
-    for run_dir in base_dir.glob(pattern):
+    for run_dir in base_dir_path.glob(pattern):
         if run_dir.is_dir():
             try:
                 info = get_workspace_info(run_dir)
@@ -370,16 +301,16 @@ def clean_workspaces(args: argparse.Namespace) -> None:
     else:
         print("\nDry run - no files were deleted")
 
-def remove_workspaces(args: argparse.Namespace) -> None:
+def remove_workspaces(args):
     """Remove specific workflow runs."""
-    base_dir = Path(args.base_dir)
-    if not base_dir.exists():
-        print(f"Error: Base directory not found: {base_dir}")
+    base_dir_path = Path(args.base_dir)
+    if not base_dir_path.exists():
+        print(f"Base directory not found: {base_dir_path}", file=sys.stderr)
         sys.exit(1)
     
     to_remove = []
     for run_name in args.runs:
-        run_dir = base_dir / run_name
+        run_dir = base_dir_path / run_name
         if not run_dir.exists():
             print(f"Warning: Run directory not found: {run_dir}")
             continue
@@ -409,8 +340,8 @@ def remove_workspaces(args: argparse.Namespace) -> None:
     print(f"\nTotal space to be freed: {total_size_mb:.1f} MB")
     
     if not args.force:
-        confirm = input("\nAre you sure you want to remove these runs? [y/N] ")
-        if confirm.lower() != 'y':
+        response = input("\nAre you sure you want to remove these runs? [y/N] ")
+        if response.lower() != 'y':
             print("Operation cancelled.")
             return
     
@@ -421,7 +352,7 @@ def remove_workspaces(args: argparse.Namespace) -> None:
         except Exception as e:
             print(f"Error removing {run_dir}: {e}")
 
-def init_project(args: argparse.Namespace) -> None:
+def init_project(args):
     """Initialize a new project with example workflows."""
     target_dir = Path(args.dir)
     target_dir.mkdir(exist_ok=True)
@@ -432,10 +363,9 @@ def init_project(args: argparse.Namespace) -> None:
             # Copy specific example
             example_file = examples_dir / f"{args.example}.yaml"
             if not example_file.exists():
-                print(f"Error: Example workflow '{args.example}' not found")
-                print("Available examples:")
-                for yaml_file in examples_dir.glob("*.yaml"):
-                    print(f"  {yaml_file.stem}")
+                available = [f.stem for f in examples_dir.glob("*.yaml")]
+                print(f"Example workflow '{args.example}' not found", file=sys.stderr)
+                print(f"Available examples: {', '.join(available)}", file=sys.stderr)
                 sys.exit(1)
             shutil.copy2(example_file, target_dir)
             print(f"Copied example workflow '{args.example}' to {target_dir}")
@@ -451,67 +381,98 @@ def init_project(args: argparse.Namespace) -> None:
     print("\nTo run a workflow:")
     print(f"  yaml-workflow run {target_dir}/hello_world.yaml")
 
-def main() -> None:
+def main():
     """Main entry point for the CLI."""
-    parser = create_parser()
+    parser = WorkflowArgumentParser(description="YAML Workflow Engine CLI")
+    parser.formatter_class = argparse.RawDescriptionHelpFormatter
+    parser.description = """YAML Workflow Engine CLI
+
+Commands:
+  run                 Run a workflow
+  list               List available workflows
+  validate           Validate a workflow file
+  workspace          Workspace management commands
+  init               Initialize a new project with example workflows
+"""
+    
+    subparsers = parser.add_subparsers(dest='command', help='Commands')
+    
+    # Run command
+    run_parser = subparsers.add_parser('run', help='Run a workflow', add_help=True)
+    run_parser.add_argument('workflow', help='Path to workflow file')
+    run_parser.add_argument('--workspace', help='Custom workspace directory')
+    run_parser.add_argument('--base-dir', default='runs', help='Base directory for workflow runs')
+    run_parser.add_argument('--resume', action='store_true', help='Resume workflow from last failed step')
+    run_parser.add_argument('--start-from', help='Start workflow execution from specified step')
+    run_parser.add_argument('--skip-steps', help='Comma-separated list of steps to skip during execution')
+    run_parser.add_argument('--flow', help='Name of the flow to execute (default: use flow specified in workflow file)')
+    run_parser.add_argument('params', nargs='*', help='Parameters in the format name=value or --name=value')
+    
+    # List command
+    list_parser = subparsers.add_parser('list', help='List available workflows')
+    list_parser.add_argument('--base-dir', default='workflows', help='Base directory containing workflows')
+    
+    # Validate command
+    validate_parser = subparsers.add_parser('validate', help='Validate a workflow file')
+    validate_parser.add_argument('workflow', help='Path to workflow file')
+    
+    # Workspace commands
+    workspace_parser = subparsers.add_parser('workspace', help='Workspace management commands')
+    workspace_subparsers = workspace_parser.add_subparsers(dest='workspace_command', help='Workspace commands')
+    
+    # Workspace list command
+    workspace_list_parser = workspace_subparsers.add_parser('list', help='List workflow run directories')
+    workspace_list_parser.add_argument('--base-dir', '-b', default='runs', help='Base directory for workflow runs')
+    workspace_list_parser.add_argument('--workflow', '-w', help='Filter by workflow name')
+    
+    # Workspace clean command
+    workspace_clean_parser = workspace_subparsers.add_parser('clean', help='Clean up old workflow runs')
+    workspace_clean_parser.add_argument('--base-dir', '-b', default='runs', help='Base directory for workflow runs')
+    workspace_clean_parser.add_argument('--older-than', '-o', type=int, default=30, help='Remove runs older than N days')
+    workspace_clean_parser.add_argument('--workflow', '-w', help='Clean only runs of this workflow')
+    workspace_clean_parser.add_argument('--dry-run', '-n', action='store_true', help='Show what would be deleted without actually deleting')
+    
+    # Workspace remove command
+    workspace_remove_parser = workspace_subparsers.add_parser('remove', help='Remove specific workflow runs')
+    workspace_remove_parser.add_argument('runs', nargs='+', help='Names of runs to remove')
+    workspace_remove_parser.add_argument('--base-dir', '-b', default='runs', help='Base directory for workflow runs')
+    workspace_remove_parser.add_argument('--force', '-f', action='store_true', help='Don\'t ask for confirmation')
+    
+    # Init command
+    init_parser = subparsers.add_parser('init', help='Initialize a new project with example workflows')
+    init_parser.add_argument('--dir', default='workflows', help='Directory to create workflows in')
+    init_parser.add_argument('--example', help='Specific example workflow to copy')
+    
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        sys.exit(1)
     
     try:
-        # First try to parse with standard format (params before flags)
-        try:
-            args = parser.parse_args()
-        except SystemExit as e:
-            if e.code == 2:
-                # If that fails, try to parse with -- format
-                argv = sys.argv[1:]
-                try:
-                    split_idx = argv.index('--')
-                    # Parse everything before --
-                    args = parser.parse_args(argv[:split_idx])
-                    # Get parameters after --
-                    if args.command == "run":
-                        args.params = argv[split_idx + 1:]
-                except ValueError:
-                    # If no -- found, show helpful error message
-                    cmd_line = ' '.join(sys.argv)
-                    if any('=' in arg for arg in sys.argv) and any(arg.startswith('--') for arg in sys.argv):
-                        print("\nError: Parameters must either:")
-                        print("  1. Come before flags:")
-                        print("     yaml-workflow run workflow.yaml param1=value1 param2=value2 --resume")
-                        print("\n  2. Or be separated with --:")
-                        print("     yaml-workflow run workflow.yaml --resume -- param1=value1 param2=value2")
-                        print("\nYour command:")
-                        print(f"  {cmd_line}")
-                        print("\nPlease use one of the formats above.")
-                    sys.exit(2)
-            else:
-                raise
-        
-        if args.command == "run":
+        if args.command == 'run':
             run_workflow(args)
-        elif args.command == "list":
+        elif args.command == 'list':
             list_workflows(args)
-        elif args.command == "validate":
+        elif args.command == 'validate':
             validate_workflow(args)
-        elif args.command == "workspace":
-            if args.ws_command == "list":
+        elif args.command == 'workspace':
+            if args.workspace_command == 'list':
                 list_workspaces(args)
-            elif args.ws_command == "clean":
+            elif args.workspace_command == 'clean':
                 clean_workspaces(args)
-            elif args.ws_command == "remove":
+            elif args.workspace_command == 'remove':
                 remove_workspaces(args)
             else:
-                print("Error: No workspace command specified")
-                print("Use 'workspace --help' for usage information")
+                workspace_parser.print_help()
                 sys.exit(1)
-        elif args.command == "init":
+        elif args.command == 'init':
             init_project(args)
-        else:
-            print("Error: No command specified")
-            print("Use --help for usage information")
-            sys.exit(1)
-            
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user", file=sys.stderr)
+        sys.exit(1)
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
 if __name__ == "__main__":

@@ -1,7 +1,155 @@
 import os
 import sys
+import pytest
+import tempfile
+import shutil
 from pathlib import Path
 
 # Add the src directory to Python path
 src_dir = Path(__file__).parent.parent / "src"
-sys.path.insert(0, str(src_dir)) 
+sys.path.insert(0, str(src_dir))
+
+@pytest.fixture
+def temp_workspace():
+    """Create a temporary workspace directory for tests."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        old_cwd = os.getcwd()
+        os.chdir(temp_dir)
+        yield Path(temp_dir)
+        os.chdir(old_cwd)
+
+@pytest.fixture
+def sample_workflow_file(temp_workspace):
+    """Create a sample workflow file for testing."""
+    content = """
+name: test_workflow
+description: A test workflow
+
+params:
+  input_value:
+    description: Test input
+    type: string
+    default: test
+
+steps:
+  - name: step1
+    task: template
+    template: "Value is {{ input_value }}"
+    output: output.txt
+
+  - name: step2
+    task: shell
+    command: "echo 'Processing {{ input_value }}'"
+"""
+    workflow_file = temp_workspace / "workflow.yaml"
+    workflow_file.write_text(content)
+    return workflow_file
+
+@pytest.fixture
+def sample_batch_workflow(temp_workspace):
+    """Create a sample batch processing workflow."""
+    content = """
+name: batch_workflow
+description: A batch processing workflow
+
+params:
+  batch_size:
+    description: Number of items per batch
+    type: integer
+    default: 2
+
+steps:
+  - name: generate_items
+    task: python
+    code: |
+      items = [f"item_{i}" for i in range(10)]
+      return {"items": items}
+
+  - name: process_batch
+    task: batch
+    input: "{{ steps.generate_items.output.items }}"
+    batch_size: "{{ batch_size }}"
+    task:
+      type: shell
+      command: "echo 'Processing {{ item }}'"
+"""
+    workflow_file = temp_workspace / "batch_workflow.yaml"
+    workflow_file.write_text(content)
+    return workflow_file
+
+@pytest.fixture
+def sample_parallel_workflow(temp_workspace):
+    """Create a sample parallel execution workflow."""
+    content = """
+name: parallel_workflow
+description: A parallel execution workflow
+
+settings:
+  max_workers: 3
+
+steps:
+  - name: parallel_tasks
+    task: parallel
+    tasks:
+      - name: task1
+        task: shell
+        command: "sleep 1 && echo 'Task 1'"
+      - name: task2
+        task: shell
+        command: "sleep 1 && echo 'Task 2'"
+      - name: task3
+        task: shell
+        command: "sleep 1 && echo 'Task 3'"
+"""
+    workflow_file = temp_workspace / "parallel_workflow.yaml"
+    workflow_file.write_text(content)
+    return workflow_file
+
+@pytest.fixture
+def rate_limited_workflow(temp_workspace):
+    """Create a sample rate-limited workflow."""
+    content = """
+name: rate_limited_workflow
+description: A rate-limited workflow
+
+settings:
+  rate_limit:
+    requests_per_second: 2
+    burst: 3
+
+steps:
+  - name: rate_limited_tasks
+    task: batch
+    input: ["1", "2", "3", "4", "5"]
+    task:
+      type: http
+      url: "https://api.example.com/endpoint/{{ item }}"
+      method: GET
+"""
+    workflow_file = temp_workspace / "rate_limited_workflow.yaml"
+    workflow_file.write_text(content)
+    return workflow_file
+
+@pytest.fixture
+def custom_task_module(temp_workspace):
+    """Create a sample custom task module."""
+    module_dir = temp_workspace / "custom_tasks"
+    module_dir.mkdir()
+    
+    init_file = module_dir / "__init__.py"
+    init_file.write_text("")
+    
+    task_file = module_dir / "my_task.py"
+    task_file.write_text("""
+from yaml_workflow_engine import TaskRunner
+
+class MyCustomTask(TaskRunner):
+    def run(self, inputs):
+        message = inputs.get('message', 'Hello')
+        return {'result': f"{message} from custom task!"}
+        
+    def validate(self, inputs):
+        return 'message' in inputs
+""")
+    
+    return module_dir 
