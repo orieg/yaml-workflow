@@ -5,6 +5,7 @@ Command-line interface for the workflow engine.
 import logging
 import shutil
 import sys
+import json
 import importlib.resources
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -70,6 +71,33 @@ def run_workflow(args):
             print(str(e), file=sys.stderr)
             sys.exit(1)
         
+        # If resuming, check the existing workspace first
+        if args.resume and args.workspace:
+            workspace_path = Path(args.workspace)
+            if workspace_path.exists():
+                metadata_path = workspace_path / ".workflow_metadata.json"
+                if metadata_path.exists():
+                    try:
+                        with open(metadata_path) as f:
+                            metadata = json.load(f)
+                    except json.JSONDecodeError as e:
+                        raise ValueError(f"Cannot resume: Invalid metadata file format - {str(e)}")
+                    except Exception as e:
+                        raise ValueError(f"Cannot resume: Failed to read metadata file - {str(e)}")
+
+                    if metadata.get('execution_state', {}).get('status') == 'failed':
+                        failed_step = metadata['execution_state'].get('failed_step')
+                        if failed_step:
+                            print(f"Found failed workflow state, resuming from step: {failed_step['step_name']}")
+                        else:
+                            raise ValueError("No failed step found to resume from.")
+                    else:
+                        raise ValueError("Cannot resume: workflow is not in failed state")
+                else:
+                    raise ValueError("Cannot resume: No workflow metadata found")
+            else:
+                raise ValueError("Cannot resume: Workspace directory not found")
+        
         # Create workflow engine
         engine = WorkflowEngine(
             workflow=args.workflow,
@@ -93,23 +121,16 @@ def run_workflow(args):
             print(f"Starting workflow from step: {start_from_step}")
         # Check resume flag - only if workflow is in failed state
         elif args.resume:
-            try:
-                state = engine.state
-                if state.metadata['execution_state']['status'] == 'failed':
-                    failed_step = state.metadata['execution_state']['failed_step']
-                    if failed_step:
-                        resume_from = failed_step['step_name']
-                        print(f"Resuming workflow from failed step: {resume_from}")
-                    else:
-                        raise ValueError("No failed step found to resume from.")
-                elif state.metadata['execution_state']['status'] == 'completed':
-                    raise ValueError(
-                        "Cannot resume: Workflow is already completed. Use --start-from to run from a specific step."
-                    )
+            state = engine.state
+            if state.metadata['execution_state']['status'] == 'failed':
+                failed_step = state.metadata['execution_state']['failed_step']
+                if failed_step:
+                    resume_from = failed_step['step_name']
+                    print(f"Resuming workflow from failed step: {resume_from}")
                 else:
-                    raise ValueError("Cannot resume: No failed workflow found.")
-            except Exception as e:
-                raise ValueError(f"Cannot resume: Could not determine workflow state: {e}")
+                    raise ValueError("No failed step found to resume from.")
+            else:
+                raise ValueError("Cannot resume: workflow is not in failed state")
         
         # Run workflow with appropriate parameters
         results = engine.run(
@@ -143,7 +164,6 @@ def run_workflow(args):
                     continue
                 print(f"\n• {step_name}:")
                 if isinstance(output, (dict, list)):
-                    import json
                     formatted_output = json.dumps(output, indent=2)
                     print("  " + formatted_output.replace("\n", "\n  "))
                 else:

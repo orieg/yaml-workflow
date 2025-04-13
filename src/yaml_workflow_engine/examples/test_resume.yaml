@@ -29,6 +29,9 @@ steps:
         exit 1
       fi
       echo "required_param is {{ required_param }}"
+      echo "{{ required_param }}" > "output/check_result.txt"
+    outputs:
+      check_result: "{{ required_param }}"
 
   # Step 2: Process the data
   # Creates a file with the parameter value
@@ -36,7 +39,9 @@ steps:
     task: shell
     command: |
       echo "Processing data with {{ required_param }}"
-      echo "{{ required_param }}" > "{{ workspace }}/output/result.txt"
+      echo "{{ required_param }}" > "output/result.txt"
+    outputs:
+      process_result: "{{ required_param }}"
 
   # Step 3: Final verification
   # Reads and displays the processed result
@@ -44,4 +49,6 @@ steps:
     task: shell
     command: |
       echo "Final step - reading result"
-      cat "{{ workspace }}/output/result.txt" 
+      cat "output/result.txt"
+    outputs:
+      final_result: "$(cat output/result.txt)" 

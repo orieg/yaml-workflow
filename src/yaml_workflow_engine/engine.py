@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, List
 
 import yaml
+from jinja2 import Template
 
 from .exceptions import (
     WorkflowError,
@@ -375,6 +376,18 @@ class WorkflowEngine:
                 if name != start_from and not results:
                     self.logger.info(f"Skipping step before start point: {name}")
                     continue
+            
+            # Check if step has a condition and evaluate it
+            if "condition" in step:
+                try:
+                    template = Template(step["condition"])
+                    condition_result = template.render(**self.context)
+                    # Evaluate the rendered condition
+                    if not eval(condition_result):
+                        self.logger.info(f"Skipping step {name}: condition not met")
+                        continue
+                except Exception as e:
+                    raise WorkflowError(f"Error evaluating condition in step {name}: {str(e)}")
             
             task_type = step.get("task")
             if not task_type:

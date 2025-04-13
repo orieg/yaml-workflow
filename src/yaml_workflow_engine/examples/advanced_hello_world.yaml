@@ -29,15 +29,15 @@ steps:
   - name: validate_input
     task: shell
     command: |
-      mkdir -p "{{ workspace }}/output"
+      mkdir -p "output/"
       if [ -z "{{ name|default('') }}" ]; then
-        echo "Error: Name parameter is required" > "{{ workspace }}/output/validation_result.txt"
+        echo "Error: Name parameter is required" > "output/validation_result.txt"
       elif [ "{{ name|length }}" -lt 2 ]; then
-        echo "Error: Name must be at least 2 characters long" > "{{ workspace }}/output/validation_result.txt"
+        echo "Error: Name must be at least 2 characters long" > "output/validation_result.txt"
       elif [ "{{ name|length }}" -gt 50 ]; then
-        echo "Error: Name must not exceed 50 characters" > "{{ workspace }}/output/validation_result.txt"
+        echo "Error: Name must not exceed 50 characters" > "output/validation_result.txt"
       else
-        echo "Valid: {{ name }}" > "{{ workspace }}/output/validation_result.txt"
+        echo "Valid: {{ name }}" > "output/validation_result.txt"
       fi
 
   # Step 2: Read the validation result file
@@ -47,23 +47,41 @@ steps:
     task: read_file
     module: yaml_workflow_engine.tasks.file_tasks
     params:
-      file_path: "validation_result.txt"
+      file_path: "output/validation_result.txt"
       encoding: "utf-8"
-    output_var: validation_content
+    outputs: validation_content
 
   # Step 3: Process the validation result
   # Creates a boolean flag file (validation_passed.txt) that will control conditional execution
   - name: process_validation
     task: shell
     command: |
-      if echo "{{ validation_content }}" | grep -q "^Error:"; then
-        echo "Validation failed:"
-        echo "{{ validation_content }}"
-        echo "false" > "{{ workspace }}/output/validation_passed.txt"
+      if grep -q "^Error:" "output/validation_result.txt"; then
+        echo "Validation failed:" >&2
+        cat "output/validation_result.txt" >&2
+        echo "false" > "output/validation_passed.txt"
       else
         echo "Validation passed"
-        echo "true" > "{{ workspace }}/output/validation_passed.txt"
+        echo "true" > "output/validation_passed.txt"
       fi
+
+  # Step 3b: Read validation result
+  - name: read_validation
+    task: read_file
+    module: yaml_workflow_engine.tasks.file_tasks
+    params:
+      file_path: "output/validation_passed.txt"
+      encoding: "utf-8"
+
+  # Debug step to print validation result
+  - name: debug_validation
+    task: shell
+    command: |
+      echo "=== Debug Info ==="
+      echo "Validation Result File Content:"
+      cat "output/validation_passed.txt"
+      echo "Validation Passed: {{ read_validation.content }}"
+      echo "=== End Debug ==="
 
   # Step 4: Get current timestamp
   # Only runs if validation passed (condition checks validation_passed.txt)
@@ -71,8 +89,8 @@ steps:
   - name: get_timestamp
     task: shell
     command: date -u +"%Y-%m-%dT%H:%M:%SZ"
-    output_var: current_timestamp
-    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "true"
+    outputs: current_timestamp
+    condition: "'{{read_validation.content.strip()}}' == 'true'"
 
   # Step 5: Create JSON greeting
   # Only runs if validation passed
@@ -81,14 +99,14 @@ steps:
     task: write_json
     module: yaml_workflow_engine.tasks.file_tasks
     params:
-      file_path: "greeting.json"
+      file_path: "output/greeting.json"
       data: 
         greeting: "Hello, {{ name }}!"
         timestamp: "{{ current_timestamp }}"
         run_number: "{{ run_number }}"
         language: "en"
       indent: 2
-    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "true"
+    condition: "'{{read_validation.content.strip()}}' == 'true'"
 
   # Step 6: Create multi-language greetings
   # Only runs if validation passed
@@ -97,7 +115,7 @@ steps:
     task: write_yaml
     module: yaml_workflow_engine.tasks.file_tasks
     params:
-      file_path: "greetings.yaml"
+      file_path: "output/greetings.yaml"
       data:
         English: "Hello, {{ name }}!"
         Spanish: "¡Hola, {{ name }}!"
@@ -105,7 +123,7 @@ steps:
         German: "Hallo, {{ name }}!"
         Italian: "Ciao, {{ name }}!"
         Japanese: "こんにちは、{{ name }}さん！"
-    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "true"
+    condition: "'{{read_validation.content.strip()}}' == 'true'"
 
   # Step 7: Format and display results
   # Only runs if validation passed
@@ -113,19 +131,19 @@ steps:
   - name: format_output
     task: shell
     command: |
-      if [ -f "{{ workspace }}/output/greeting.json" ]; then
+      if [ -f "output/greeting.json" ]; then
         echo "=== Workflow Results ==="
         echo "Run #{{ run_number }} at {{ current_timestamp }}"
         echo
         echo "JSON Greeting:"
-        cat "{{ workspace }}/output/greeting.json"
+        cat "output/greeting.json"
         echo
         echo "Multiple Languages:"
-        cat "{{ workspace }}/output/greetings.yaml"
+        cat "output/greetings.yaml"
         echo
         echo "=== End of Results ==="
       fi
-    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "true"
+    condition: "'{{read_validation.content.strip()}}' == 'true'"
 
   # Step 8: Handle validation errors
   # Only runs if validation failed
@@ -134,7 +152,7 @@ steps:
     task: write_file
     module: yaml_workflow_engine.tasks.file_tasks
     params:
-      file_path: "error_report.txt"
+      file_path: "output/error_report.txt"
       content: |
         Workflow encountered an error:
         Input validation failed{% if name %} for name: {{ name }}{% else %}: name parameter not provided{% endif %}
@@ -145,7 +163,7 @@ steps:
         - Name must be provided
         - Name must be between 2 and 50 characters
         - Name must not contain special characters
-    condition: $(cat "{{ workspace }}/output/validation_passed.txt") == "false"
+    condition: "'{{read_validation.content.strip()}}' == 'false'"
 
   # Step 9: Final status notification
   # Always runs (no condition)
@@ -153,7 +171,7 @@ steps:
   - name: notify_status
     task: shell
     command: |
-      if [ "$(cat {{ workspace }}/output/validation_passed.txt)" = "true" ]; then
+      if [ "$(cat output/validation_passed.txt)" = "true" ]; then
         echo "Workflow completed successfully!"
         echo "Check the output files for detailed results:"
         echo "- greeting.json: JSON formatted greeting"
@@ -162,5 +180,5 @@ steps:
       else
         echo "Workflow failed due to validation errors."
         echo "Check error_report.txt for details."
-        cat "{{ workspace }}/output/error_report.txt"
+        cat "output/error_report.txt"
       fi 

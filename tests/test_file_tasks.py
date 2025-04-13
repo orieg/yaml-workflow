@@ -41,8 +41,8 @@ def write_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -
     log_task_execution(logger, step, context, workspace)
     
     try:
-        path = workspace / step["path"]
-        content = step["content"]
+        path = workspace / step["params"]["file_path"]
+        content = step["params"]["content"]
         mode = step.get("mode", "w")
         
         os.makedirs(path.parent, exist_ok=True)
@@ -63,7 +63,7 @@ def read_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) ->
     log_task_execution(logger, step, context, workspace)
     
     try:
-        path = workspace / step["path"]
+        path = workspace / step["params"]["file_path"]
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
             
