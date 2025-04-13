@@ -50,22 +50,6 @@ yaml-workflow validate workflows/hello_world.yaml
 yaml-workflow run workflows/hello_world.yaml --resume
 ```
 
-Want to create your own workflow? Here's a simple example (`workflows/hello_world.yaml`):
-```yaml
-name: Hello World
-description: A simple workflow that creates a greeting
-
-steps:
-  - name: create_greeting
-    task: template
-    template: |
-      Hello, {{ name }}!
-      
-      This is run #{{ run_number }} of the {{ workflow_name }} workflow.
-      Created at: {{ timestamp }}
-    output: greeting.txt
-```
-
 ## Documentation
 
 - [Task Types](docs/tasks.md) - Available task types and how to use them

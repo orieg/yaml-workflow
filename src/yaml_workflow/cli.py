@@ -391,32 +391,31 @@ def remove_workspaces(args):
 
 def init_project(args):
     """Initialize a new project with example workflows."""
-    target_dir = Path(args.dir)
-    target_dir.mkdir(exist_ok=True)
+    try:
+        # Create target directory if it doesn't exist
+        target_dir = Path(args.dir)
+        target_dir.mkdir(parents=True, exist_ok=True)
 
-    # Get example workflows from package
-    with importlib.resources.path("yaml_workflow_engine.examples", "") as examples_dir:
+        # Get examples directory from package
+        examples_dir = Path(__file__).parent / "examples"
+
         if args.example:
             # Copy specific example
             example_file = examples_dir / f"{args.example}.yaml"
             if not example_file.exists():
-                available = [f.stem for f in examples_dir.glob("*.yaml")]
-                print(f"Example workflow '{args.example}' not found", file=sys.stderr)
-                print(f"Available examples: {', '.join(available)}", file=sys.stderr)
+                print(f"Example '{args.example}' not found", file=sys.stderr)
                 sys.exit(1)
             shutil.copy2(example_file, target_dir)
-            print(f"Copied example workflow '{args.example}' to {target_dir}")
+            print(f"Initialized project with example: {args.example}")
         else:
             # Copy all examples
-            for yaml_file in examples_dir.glob("*.yaml"):
-                shutil.copy2(yaml_file, target_dir)
-            print(f"Copied example workflows to {target_dir}")
-            print("\nAvailable workflows:")
-            for yaml_file in target_dir.glob("*.yaml"):
-                print(f"  {yaml_file.name}")
+            for example in examples_dir.glob("*.yaml"):
+                shutil.copy2(example, target_dir)
+            print(f"Initialized project with examples in: {target_dir}")
 
-    print("\nTo run a workflow:")
-    print(f"  yaml-workflow run {target_dir}/hello_world.yaml")
+    except Exception as e:
+        print(f"Error initializing project: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def main():
