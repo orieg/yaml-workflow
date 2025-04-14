@@ -38,6 +38,11 @@ compare_versions() {
     version1=${version1%-dev}
     version2=${version2%-dev}
     
+    # For minor releases, we want to allow releasing the current dev version
+    if [ "$3" = "minor" ]; then
+        return 0
+    fi
+    
     # Convert versions to comparable numbers
     local v1=$(echo "$version1" | awk -F. '{ printf("%d%03d%03d", $1,$2,$3); }')
     local v2=$(echo "$version2" | awk -F. '{ printf("%d%03d%03d", $1,$2,$3); }')
@@ -74,7 +79,7 @@ get_next_dev_version() {
             ;;
         minor)
             minor=$((minor + 1))
-            patch=0
+            patch=0  # Reset patch version for minor bump
             ;;
         patch)
             patch=$((patch + 1))
@@ -186,7 +191,7 @@ release_version=${current_version%-dev}
 
 # Validate release version format and ensure it's greater than the last release
 validate_version "$release_version"
-compare_versions "$release_version" "$current_version"
+compare_versions "$release_version" "$current_version" "minor"
 
 # Update to release version
 echo "Updating version to $release_version"
