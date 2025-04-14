@@ -4,6 +4,8 @@ Core workflow engine implementation.
 
 import logging
 import logging.handlers
+import importlib
+import inspect
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
@@ -17,9 +19,12 @@ from .exceptions import (
     InvalidFlowDefinitionError,
     StepNotInFlowError,
     WorkflowError,
+    FunctionNotFoundError,
+    StepExecutionError,
 )
+from .state import WorkflowState
 from .tasks import get_task_handler
-from .workspace import WorkflowState, create_workspace, get_workspace_info
+from .workspace import create_workspace, get_workspace_info
 
 
 def setup_logging(workspace: Path, name: str) -> logging.Logger:
@@ -207,47 +212,32 @@ class WorkflowEngine:
             raise FlowNotFoundError(default_flow)
 
     def _get_flow_steps(self, flow_name: Optional[str] = None) -> List[Dict[str, Any]]:
-        """
-        Get the list of steps for a given flow.
-
-        Args:
-            flow_name: Name of the flow to get steps for. If None, uses default flow.
-
-        Returns:
-            List[Dict[str, Any]]: List of step configurations in the flow order
-        """
+        """Get ordered list of steps for a flow."""
         all_steps = self.workflow.get("steps", [])
-        flows = self.workflow.get("flows", {})
+        if not all_steps:
+            raise WorkflowError("No steps defined in workflow")
 
-        # If no flows defined, only allow "all" flow
-        if not flows:
-            if flow_name and flow_name != "all":
-                raise FlowNotFoundError(flow_name)
+        # If no flows defined or flow is "all", return all steps
+        flows = self.workflow.get("flows", {})
+        if not flows or flow_name == "all":
             return all_steps
 
-        # Get flow name to use
+        # Get flow definition
         flow_to_use = flow_name or flows.get("default", "all")
-
-        # Special case: "all" flow always returns all steps
         if flow_to_use == "all":
             return all_steps
 
-        # Find the flow definition
+        # Find flow steps in definitions
         flow_steps = None
-        defined_flows = set()
+        defined_flows: Set[str] = set()
         for flow_def in flows.get("definitions", []):
-            if not isinstance(flow_def, dict):
-                continue
-            for name, steps in flow_def.items():
-                defined_flows.add(name)
-                if name == flow_to_use:
-                    flow_steps = steps
+            if isinstance(flow_def, dict):
+                defined_flows.update(flow_def.keys())
+                if flow_to_use in flow_def:
+                    flow_steps = flow_def[flow_to_use]
                     break
-            if flow_steps is not None:
-                break
 
-        # Validate flow exists
-        if flow_to_use not in defined_flows:
+        if not flow_steps:
             raise FlowNotFoundError(flow_to_use)
 
         # Map step names to step configurations
@@ -295,7 +285,7 @@ class WorkflowEngine:
         if resume_from:
             # When resuming, use the flow from the previous execution
             saved_flow = self.state.get_flow()
-            if saved_flow and flow and flow != saved_flow:
+            if saved_flow and flow and saved_flow != flow:
                 raise WorkflowError(
                     f"Cannot resume with different flow. Previous flow was '{saved_flow}', "
                     f"requested flow is '{flow}'"
@@ -308,7 +298,7 @@ class WorkflowEngine:
             # Validate flow exists if specified
             if flow and flows:
                 # Check if flow exists in definitions
-                defined_flows = set()
+                defined_flows: Set[str] = set()
                 for flow_def in flows.get("definitions", []):
                     if isinstance(flow_def, dict):
                         defined_flows.update(flow_def.keys())
@@ -451,14 +441,15 @@ class WorkflowEngine:
         """
         # Get workflow name from usage section or file name
         workflow_name = (
-            self.workflow_def.get("usage", {}).get("name") or self.workflow_file.stem
+            self.workflow.get("usage", {}).get("name")
+            or (self.workflow_file.stem if self.workflow_file else "unnamed_workflow")
         )
 
         # Create workspace
         self.workspace = create_workspace(
             workflow_name=workflow_name,
-            custom_dir=self.workspace_dir,
-            base_dir=self.base_dir,
+            custom_dir=getattr(self, "workspace_dir", None),
+            base_dir=getattr(self, "base_dir", "runs"),
         )
 
         # Initialize workspace info in context
@@ -469,7 +460,7 @@ class WorkflowEngine:
                 "run_number": int(self.workspace.name.split("_run_")[-1]),
                 "timestamp": datetime.now().isoformat(),
                 "workflow_name": workflow_name,
-                "workflow_file": str(self.workflow_file.absolute()),
+                "workflow_file": str(self.workflow_file.absolute() if self.workflow_file else ""),
             }
         )
 
@@ -504,7 +495,7 @@ class WorkflowEngine:
         Returns:
             Dict[str, Any]: Resolved inputs
         """
-        resolved = {}
+        resolved: Dict[str, Any] = {}
         for key, value in inputs.items():
             if isinstance(value, dict):
                 resolved[key] = self.resolve_inputs(value)
@@ -553,12 +544,15 @@ class WorkflowEngine:
             raise StepExecutionError(name, e) from e
 
         # Store outputs in context
-        outputs = step.get("outputs", [])
-        if isinstance(outputs, list):
-            if len(outputs) == 1:
-                self.context[outputs[0]] = result
-            elif len(outputs) > 1 and isinstance(result, (list, tuple)):
-                for output, value in zip(outputs, result):
-                    self.context[output] = value
+        outputs: Union[List[str], str, None] = step.get("outputs")
+        if outputs is not None:
+            if isinstance(outputs, str):
+                self.context[outputs] = result
+            elif isinstance(outputs, list):
+                if len(outputs) == 1:
+                    self.context[outputs[0]] = result
+                elif len(outputs) > 1 and isinstance(result, (list, tuple)):
+                    for output, value in zip(outputs, result):
+                        self.context[output] = value
 
         self.logger.info(f"Step '{name}' completed. Outputs: {self.context}")

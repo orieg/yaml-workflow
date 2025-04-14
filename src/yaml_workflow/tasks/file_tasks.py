@@ -182,7 +182,11 @@ def write_file_task(
 def read_file_task(
     step: Dict[str, Any], context: Dict[str, Any], workspace: Path
 ) -> Union[Dict[str, Any], List[Any], str]:
-    """Task handler for reading files."""
+    """Task handler for reading files.
+
+    Returns:
+        Union[Dict[str, Any], List[Any], str]: File contents, either as string, JSON, or YAML
+    """
     logger = get_task_logger(workspace, step.get("name", "read_file"))
     log_task_execution(logger, step, context, workspace)
 
@@ -195,7 +199,7 @@ def read_file_task(
             raise ValueError("file_path parameter is required")
 
         if params.get("format") == "json":
-            content = read_json(file_path, workspace)
+            content: Union[Dict[str, Any], List[Any], str] = read_json(file_path, workspace)
         elif params.get("format") == "yaml":
             content = read_yaml(file_path, workspace)
         else:

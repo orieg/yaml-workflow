@@ -201,7 +201,7 @@ class BatchProcessor:
             }
 
             # Execute task
-            result = task_handler(step, batch_context, str(self.workspace))
+            result = task_handler(step, batch_context, self.workspace)
 
             # Call progress callback if provided
             if progress_callback:
@@ -224,7 +224,7 @@ class BatchProcessor:
         chunk_size: int = 10,
         max_workers: Optional[int] = None,
         resume_state: bool = False,
-        progress_callback: Optional[Callable[[str, float], None]] = None,
+        progress_callback: Optional[Callable[[Any, float], None]] = None,
         error_handler: Optional[Callable[[str, Any, Exception], None]] = None,
         aggregator: Optional[Callable[[List[Any]], Any]] = None,
     ) -> Dict[str, Any]:
