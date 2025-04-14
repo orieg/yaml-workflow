@@ -4,10 +4,17 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*-test'  # Match test release tags
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.release.prerelease == false && 'pypi' || 'testpypi' }}
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       
@@ -31,8 +38,11 @@ jobs:
           
       - name: Publish to PyPI
         if: github.event_name == 'release' && github.event.release.prerelease == false
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          twine upload dist/* 
+        uses: pypa/gh-action-pypi-publish@release/v1
+        
+      - name: Publish to TestPyPI
+        if: github.ref_type == 'tag' && contains(github.ref, '-test')
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true 
