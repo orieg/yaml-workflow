@@ -39,4 +39,4 @@ Thumbs.db
 
 runs/
 .coverage
-workflows
+/workflows/
