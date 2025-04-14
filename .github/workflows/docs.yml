@@ -16,8 +16,9 @@ on:
       - 'scripts/gen_ref_nav.py'
   workflow_dispatch:  # Allow manual trigger
 
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -25,13 +26,14 @@ permissions:
 env:
   PYTHON_VERSION: '3.10'
 
-jobs:
-  docs:
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
 
+jobs:
+  build:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,9 +59,6 @@ jobs:
         run: |
           python scripts/gen_ref_nav.py
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v4
-
       - name: Build documentation
         run: |
           mkdocs build
@@ -69,8 +68,22 @@ jobs:
         with:
           path: 'site'
 
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v4
+        with:
+          enablement: true  # Enable GitHub Pages during configuration
+
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+        uses: actions/deploy-pages@v4 
