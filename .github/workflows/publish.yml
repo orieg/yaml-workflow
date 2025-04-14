@@ -6,12 +6,13 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*.*.*-test'  # Match test release tags
+      - 'v*.*.*'        # Match all version tags
+      - 'v*.*.*-test'   # Match test release tags
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.release.prerelease == false && 'pypi' || 'testpypi' }}
+    environment: ${{ contains(github.ref, '-test') && 'testpypi' || 'pypi' }}
     permissions:
       id-token: write
       contents: read
@@ -37,11 +38,11 @@ jobs:
           pytest
           
       - name: Publish to PyPI
-        if: github.event_name == 'release' && github.event.release.prerelease == false
+        if: "!contains(github.ref, '-test')"
         uses: pypa/gh-action-pypi-publish@release/v1
         
       - name: Publish to TestPyPI
-        if: github.ref_type == 'tag' && contains(github.ref, '-test')
+        if: contains(github.ref, '-test')
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
