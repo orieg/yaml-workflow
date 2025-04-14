@@ -181,7 +181,7 @@ def write_file_task(
 @register_task("read_file")
 def read_file_task(
     step: Dict[str, Any], context: Dict[str, Any], workspace: Path
-) -> Dict[str, Any]:
+) -> Union[Dict[str, Any], List[Any], str]:
     """Task handler for reading files."""
     logger = get_task_logger(workspace, step.get("name", "read_file"))
     log_task_execution(logger, step, context, workspace)
@@ -202,23 +202,7 @@ def read_file_task(
             content = read_file_direct(file_path, workspace, encoding)
 
         log_task_result(logger, content)
-
-        # Handle outputs field which can be either a string or a list
-        outputs = step.get("outputs")
-        if outputs:
-            if isinstance(outputs, str):
-                # Single output name as string
-                context[outputs] = content
-                return {outputs: content}
-            elif isinstance(outputs, list):
-                # List of output names
-                for output_name in outputs:
-                    context[output_name] = content
-                return {outputs[0]: content} if outputs else {"content": content}
-
-        # Default behavior - store as 'content'
-        context["content"] = content
-        return {"content": content}
+        return content
 
     except Exception as e:
         log_task_error(logger, e)

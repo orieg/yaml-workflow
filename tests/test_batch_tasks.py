@@ -159,7 +159,7 @@ def test_batch_with_progress_tracking(temp_workspace, sample_items):
 
 def test_batch_with_state_persistence(temp_workspace, sample_items):
     """Test batch processing with state persistence."""
-    state_file = temp_workspace / "batch_state.json"
+    state_file = temp_workspace / ".batch_state" / "test_state_state.json"
 
     task = BatchProcessor(workspace=temp_workspace, name="test_state")
     result = process_batch(
@@ -239,7 +239,7 @@ def test_batch_validation(temp_workspace):
             {
                 "name": "test_validation",
                 "iterate_over": [1, 2, 3],
-                "parallel_settings": {"chunk_size": 0},
+                "chunk_size": 0,
                 "processing_task": {"task": "shell", "command": "echo {{ item }}"},
             },
             {},
