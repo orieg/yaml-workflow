@@ -5,7 +5,7 @@ Python task implementations for executing Python functions.
 import inspect
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Callable
+from typing import Any, Callable, Dict, List, Optional, Union
 
 from . import register_task
 from .base import get_task_logger, log_task_error, log_task_execution, log_task_result
