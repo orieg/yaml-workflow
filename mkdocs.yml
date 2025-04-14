@@ -1,0 +1,95 @@
+site_name: YAML Workflow Engine
+site_description: A lightweight, powerful, and flexible workflow engine that executes tasks defined in YAML configuration files
+site_author: Nicolas Brousse
+repo_url: https://github.com/orieg/yaml-workflow
+repo_name: orieg/yaml-workflow
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            show_if_no_docstring: false
+            filters: ["!^_"]
+            heading_level: 2
+            show_signature_annotations: true
+  - gen-files:
+      scripts:
+        - scripts/gen_ref_nav.py
+  - literate-nav
+  - section-index
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - footnotes
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Guide:
+      - Getting Started: guide/getting-started.md
+      - Core Concepts: guide/concepts.md
+      - Configuration: guide/configuration.md
+      - Tasks:
+          - Overview: guide/tasks/index.md
+          - File Operations: guide/tasks/file-operations.md
+          - Data Processing: guide/tasks/data-processing.md
+          - HTTP Tasks: guide/tasks/http-tasks.md
+  - Examples:
+      - Basic Workflow: examples/basic-workflow.md
+      - Hello World: examples/hello-world.md
+      - Advanced Hello World: examples/advanced-hello-world.md
+      - Resume Testing: examples/test-resume.md
+  - API Reference:
+      - Overview: api/index.md
+      - Core API: api/core.md
+      - Engine: api/engine.md
+      - CLI: api/cli.md
+  - Contributing:
+      - Development Guide: development.md
+      - Coding Standards: contributing/coding-standards.md
+      - Pull Requests: contributing/pull-requests.md 
