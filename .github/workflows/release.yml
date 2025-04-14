@@ -1,0 +1,87 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Push events to matching v*, i.e. v1.0, v20.15.10
+      - 'test-v*'  # Test releases
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write  # Required for PyPI trusted publishing
+      contents: write  # Required for creating GitHub releases
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Required for tag verification
+    
+    - name: Set variables
+      id: vars
+      run: |
+        TAG=${GITHUB_REF#refs/tags/}
+        if [[ $TAG == test-v* ]]; then
+          echo "is_test=true" >> $GITHUB_OUTPUT
+          echo "version=${TAG#test-v}" >> $GITHUB_OUTPUT
+        else
+          echo "is_test=false" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Verify tag version matches package version
+      if: ${{ !steps.vars.outputs.is_test }}
+      run: |
+        PACKAGE_VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d '"' -f 2)
+        if [ "${{ steps.vars.outputs.version }}" != "$PACKAGE_VERSION" ]; then
+          echo "Tag version (${{ steps.vars.outputs.version }}) does not match package version ($PACKAGE_VERSION)"
+          exit 1
+        fi
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+        
+    - name: Build package
+      run: python -m build
+      
+    - name: Check distribution
+      run: twine check dist/*
+      
+    - name: Create GitHub Release
+      if: ${{ !steps.vars.outputs.is_test }}
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/*
+        generate_release_notes: true
+      
+    - name: Create GitHub Pre-release
+      if: ${{ steps.vars.outputs.is_test }}
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/*
+        prerelease: true
+        generate_release_notes: true
+      
+    - name: Publish to PyPI
+      if: ${{ !steps.vars.outputs.is_test }}
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+      run: twine upload dist/*
+      
+    - name: Publish to TestPyPI
+      if: ${{ steps.vars.outputs.is_test }}
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
+      run: twine upload dist/* 
