@@ -7,7 +7,7 @@ Each module provides specific functionality that can be referenced in workflow Y
 
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, ParamSpec, TypeVar
+from typing import Any, Callable, Dict, Optional, ParamSpec, TypeVar, cast
 
 from jinja2 import Template, UndefinedError
 
@@ -53,7 +53,7 @@ def get_task_handler(task_type: str) -> Optional[TaskHandler]:
     return _task_handlers.get(task_type)
 
 
-def create_task_handler(func: Callable[P, R]) -> TaskHandler:
+def create_task_handler(func: Callable[..., R]) -> TaskHandler:
     """
     Create a task handler that wraps a basic function.
 
@@ -90,7 +90,7 @@ def create_task_handler(func: Callable[P, R]) -> TaskHandler:
         # Call the function with processed inputs
         return func(**processed_inputs)
 
-    return wrapper
+    return cast(TaskHandler, wrapper)
 
 
 # Import task modules
