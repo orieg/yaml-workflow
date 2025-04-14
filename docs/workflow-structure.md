@@ -1,5 +1,24 @@
 # Workflow Structure
 
+## Component Overview
+
+```mermaid
+graph TD
+    A[Workflow] --> B[Settings]
+    A --> C[Environment]
+    A --> D[Parameters]
+    A --> E[Flows]
+    A --> F[Steps]
+    E --> G[Flow Definitions]
+    F --> H[Task Configuration]
+    F --> I[Error Handling]
+    F --> J[State Management]
+    H --> K[Inputs/Outputs]
+    H --> L[Retry Logic]
+    I --> M[Error Actions]
+    J --> N[Progress Tracking]
+```
+
 ## Basic Structure
 ```yaml
 name: My Workflow
@@ -49,6 +68,25 @@ steps:
       # ... step parameters ...
 ```
 
+## Workflow Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Initialize: Load Workflow
+    Initialize --> Validate: Parse YAML
+    Validate --> PrepareEnv: Validation OK
+    Validate --> [*]: Invalid Config
+    PrepareEnv --> ExecuteSteps: Environment Ready
+    ExecuteSteps --> StepExecution: For Each Step
+    StepExecution --> ErrorHandling: Step Failed
+    StepExecution --> StepExecution: Next Step
+    ErrorHandling --> RetryStep: Can Retry
+    ErrorHandling --> StepExecution: Skip Step
+    ErrorHandling --> [*]: Fail Workflow
+    RetryStep --> StepExecution: Retry
+    StepExecution --> [*]: All Steps Complete
+```
+
 ## Flow Control
 
 The workflow engine supports defining multiple flows within a single workflow. Each flow represents a specific sequence of steps to execute. This allows you to:
@@ -58,7 +96,23 @@ The workflow engine supports defining multiple flows within a single workflow. E
 - Switch between flows via command line
 - Resume failed flows from the last failed step
 
-### Flow Configuration
+### Flow Configuration Example
+
+```mermaid
+graph LR
+    subgraph "Process Flow"
+    A[step1] --> B[step3]
+    B --> C[step4]
+    end
+    
+    subgraph "Data Collection Flow"
+    D[step2] --> E[step5]
+    end
+    
+    subgraph "Validation Flow"
+    F[step1] --> G[step2]
+    end
+```
 
 ```yaml
 flows:
@@ -76,6 +130,23 @@ flows:
 ## Error Handling
 
 The workflow engine provides comprehensive error handling:
+
+```mermaid
+stateDiagram-v2
+    [*] --> StepStart: Execute Step
+    StepStart --> StepSuccess: Success
+    StepStart --> StepFailed: Failure
+    StepFailed --> CheckRetry: Check Retry Policy
+    CheckRetry --> RetryStep: Can Retry
+    CheckRetry --> ErrorAction: Max Retries Exceeded
+    RetryStep --> StepStart: Wait and Retry
+    ErrorAction --> FailWorkflow: action: fail
+    ErrorAction --> SkipStep: action: skip
+    ErrorAction --> RetryStep: action: retry
+    StepSuccess --> [*]: Continue Workflow
+    FailWorkflow --> [*]: Stop Workflow
+    SkipStep --> [*]: Next Step
+```
 
 ```yaml
 steps:
@@ -95,9 +166,19 @@ steps:
 
 The workflow engine maintains state for each workflow run, allowing for:
 
-- Progress tracking
-- Resume capability
-- Output persistence
-- Error handling
+```mermaid
+graph TD
+    A[Workflow State] --> B[Progress Tracking]
+    A --> C[Step Outputs]
+    A --> D[Error States]
+    B --> E[Completed Steps]
+    B --> F[Current Step]
+    B --> G[Remaining Steps]
+    C --> H[Step Results]
+    C --> I[Artifacts]
+    D --> J[Failed Steps]
+    D --> K[Retry Counts]
+    D --> L[Error Messages]
+```
 
 State is stored in a `.workflow_metadata.json` file in the workspace directory. 

@@ -1,25 +1,164 @@
 # Shell Tasks
 
-Shell tasks allow you to execute commands in a shell environment with full control over execution context and output handling.
+Shell tasks allow you to execute commands in a shell environment with variable substitution and output capture capabilities.
 
 ## Basic Usage
 
 ```yaml
 steps:
-  list_files:
-    type: shell
-    inputs:
-      command: ls -la
-      working_dir: /path/to/directory
+  - name: list_files
+    task: shell
+    command: ls -la
 
-  build_project:
-    type: shell
-    inputs:
-      command: make build
-      env:
-        BUILD_ENV: production
-        DEBUG: "false"
+  - name: build_project
+    task: shell
+    command: make build
 ```
+
+## Configuration
+
+### Basic Configuration
+
+```yaml
+steps:
+  - name: shell_task
+    task: shell
+    description: "Execute a shell command"
+    command: string           # Required: Command to execute
+```
+
+### Command Execution
+
+The shell task supports:
+- Command string execution
+- Variable substitution using Jinja2 templates
+- Working directory set to workflow workspace
+- Output capture (stdout)
+- Error handling with subprocess
+
+Example with variable substitution:
+```yaml
+steps:
+  - name: greet
+    task: shell
+    command: echo "Hello, {{ user }}"
+```
+
+### Error Handling
+
+The shell task will:
+- Raise an error if no command is provided
+- Raise subprocess.CalledProcessError if command returns non-zero exit code
+- Capture both stdout and stderr
+- Support standard workflow error handling:
+
+```yaml
+steps:
+  - name: risky_command
+    task: shell
+    command: some_command
+    on_error:
+      action: continue
+      message: "Command failed: {{ error }}"
+```
+
+### Output Capture
+
+The task captures command output:
+- stdout is returned as the task result
+- stderr is captured but not returned
+- Output is captured as text with UTF-8 encoding
+
+Example capturing output:
+```yaml
+steps:
+  - name: get_version
+    task: shell
+    command: git describe --tags
+    outputs: version
+
+  - name: use_version
+    task: shell
+    command: echo "Version is {{ steps.get_version.output }}"
+```
+
+## Implementation Details
+
+The shell task:
+1. Accepts a command string
+2. Renders the command using Jinja2 template with workflow context
+3. Executes the command using subprocess.run with:
+   - shell=True
+   - cwd=workspace
+   - capture_output=True
+   - text=True
+   - check=True
+4. Returns the command's stdout as the result
+
+## Examples
+
+### Basic Command
+```yaml
+steps:
+  - name: simple_command
+    task: shell
+    command: echo "Hello World"
+```
+
+### Using Variables
+```yaml
+steps:
+  - name: parameterized_command
+    task: shell
+    command: echo "Building {{ app_name }} version {{ version }}"
+```
+
+### Capturing Output
+```yaml
+steps:
+  - name: get_status
+    task: shell
+    command: git status --porcelain
+    outputs: status
+
+  - name: show_status
+    task: shell
+    command: echo "Git status: {{ steps.get_status.output }}"
+```
+
+### Error Handling
+```yaml
+steps:
+  - name: may_fail
+    task: shell
+    command: risky_command
+    on_error:
+      action: continue
+      message: "Command failed with: {{ error }}"
+      next: cleanup
+```
+
+## Best Practices
+
+1. **Command Construction**
+   - Use clear, readable command strings
+   - Break long commands across lines with YAML block scalars
+   - Quote variable substitutions appropriately
+
+2. **Error Handling**
+   - Add appropriate error handling for commands that may fail
+   - Use workflow error handling rather than shell error handling
+   - Capture and log error output when needed
+
+3. **Output Management**
+   - Capture output only when needed
+   - Process captured output in subsequent steps
+   - Consider output encoding for special characters
+
+4. **Security**
+   - Avoid embedding sensitive data in commands
+   - Use environment variables or secure parameters
+   - Validate and sanitize input variables
 
 ## Configuration Options
 
