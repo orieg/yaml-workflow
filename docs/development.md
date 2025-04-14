@@ -74,6 +74,94 @@ pytest tests/
 pytest tests/ --cov=yaml_workflow
 ```
 
+## Testing Releases
+
+### Method 1: Local Build Testing
+
+1. Install development dependencies (includes build tools):
+```bash
+# This will install all development dependencies including build and twine
+pip install -e ".[dev]"
+```
+
+2. Clean previous builds:
+```bash
+rm -rf dist/ build/ *.egg-info
+```
+
+3. Build the package:
+```bash
+python -m build
+```
+
+4. Check the distribution files:
+```bash
+twine check dist/*
+```
+
+5. Install the built package locally:
+```bash
+# Create a new virtual environment for testing
+python -m venv test-venv
+source test-venv/bin/activate  # On Unix/macOS
+# On Windows use: test-venv\Scripts\activate
+
+# Install and test the package
+pip install dist/*.whl
+yaml-workflow init --example hello_world
+yaml-workflow run workflows/hello_world.yaml name=Test
+```
+
+### Method 2: Using TestPyPI
+
+1. Register an account on TestPyPI:
+   - Go to https://test.pypi.org/account/register/
+   - Create an account
+   - Generate an API token
+
+2. Create a `.pypirc` file in your home directory:
+```ini
+[distutils]
+index-servers =
+    testpypi
+
+[testpypi]
+repository = https://test.pypi.org/legacy/
+username = __token__
+password = your-test-pypi-token
+```
+
+3. Build and upload to TestPyPI:
+```bash
+# Clean previous builds
+rm -rf dist/ build/ *.egg-info
+
+# Build the package
+python -m build
+
+# Upload to TestPyPI
+twine upload --repository testpypi dist/*
+```
+
+4. Test installation from TestPyPI:
+```bash
+# Create a new virtual environment for testing
+python -m venv test-venv
+source test-venv/bin/activate  # On Unix/macOS
+# On Windows use: test-venv\Scripts\activate
+
+# Install from TestPyPI
+pip install --index-url https://test.pypi.org/simple/ \
+    --extra-index-url https://pypi.org/simple/ \
+    yaml-workflow
+
+# Test the package
+yaml-workflow init --example hello_world
+yaml-workflow run workflows/hello_world.yaml name=Test
+```
+
+Note: The `--extra-index-url` is needed because TestPyPI doesn't have all the dependencies.
+
 ## Contributing
 
 1. Fork the repository

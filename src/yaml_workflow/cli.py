@@ -17,6 +17,7 @@ import yaml
 from .engine import WorkflowEngine
 from .exceptions import WorkflowError
 from .workspace import get_workspace_info
+from . import __version__  # Import version
 
 
 class WorkflowArgumentParser(argparse.ArgumentParser):
@@ -32,6 +33,10 @@ class WorkflowArgumentParser(argparse.ArgumentParser):
             # Check if the unrecognized argument is a parameter
             args = message.split(": ")[-1].split()
             for arg in args:
+                # Skip standard flags like --version, --help
+                if arg in ["--version", "--help"]:
+                    super().error(message)
+                    return
                 if "=" in arg:
                     self.workflow_params.append(arg)
                 else:
@@ -422,7 +427,7 @@ def main():
     """Main entry point for the CLI."""
     parser = WorkflowArgumentParser(description="YAML Workflow Engine CLI")
     parser.formatter_class = argparse.RawDescriptionHelpFormatter
-    parser.description = """YAML Workflow Engine CLI
+    parser.description = f"""YAML Workflow Engine CLI v{__version__}
 
 Commands:
   run                 Run a workflow
@@ -431,6 +436,8 @@ Commands:
   workspace          Workspace management commands
   init               Initialize a new project with example workflows
 """
+    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}',
+                       help='Show program version and exit')
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
