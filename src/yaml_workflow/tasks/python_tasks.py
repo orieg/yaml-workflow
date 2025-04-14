@@ -31,54 +31,54 @@ def execute_code(code: str, inputs: Dict[str, Any], context: Dict[str, Any]) -> 
     # Create a clean namespace for code execution
     namespace = {
         # Add builtins that are safe to use
-        'str': str,
-        'int': int,
-        'float': float,
-        'bool': bool,
-        'list': list,
-        'dict': dict,
-        'set': set,
-        'tuple': tuple,
-        'len': len,
-        'range': range,
-        'enumerate': enumerate,
-        'zip': zip,
-        'min': min,
-        'max': max,
-        'sum': sum,
-        'abs': abs,
-        'round': round,
+        "str": str,
+        "int": int,
+        "float": float,
+        "bool": bool,
+        "list": list,
+        "dict": dict,
+        "set": set,
+        "tuple": tuple,
+        "len": len,
+        "range": range,
+        "enumerate": enumerate,
+        "zip": zip,
+        "min": min,
+        "max": max,
+        "sum": sum,
+        "abs": abs,
+        "round": round,
         # Add standard library modules that are safe to use
-        'json': __import__('json'),
-        'datetime': __import__('datetime'),
-        'math': __import__('math'),
-        'random': __import__('random'),
-        'uuid': __import__('uuid'),
-        'base64': __import__('base64'),
-        'hashlib': __import__('hashlib'),
-        're': __import__('re'),
-        'csv': __import__('csv'),
-        'io': __import__('io'),
-        'pathlib': __import__('pathlib'),
+        "json": __import__("json"),
+        "datetime": __import__("datetime"),
+        "math": __import__("math"),
+        "random": __import__("random"),
+        "uuid": __import__("uuid"),
+        "base64": __import__("base64"),
+        "hashlib": __import__("hashlib"),
+        "re": __import__("re"),
+        "csv": __import__("csv"),
+        "io": __import__("io"),
+        "pathlib": __import__("pathlib"),
         # Add inputs and context
         **inputs,
-        'context': context,
+        "context": context,
     }
 
     # Execute the code
     exec(code + "\nresult = None", namespace)
-    
+
     # Get the result
-    result = namespace.get('result')
+    result = namespace.get("result")
     if result is None:
         # If no result was set, try to get the last expression's value
-        lines = code.strip().split('\n')
+        lines = code.strip().split("\n")
         if lines:
             last_line = lines[-1].strip()
-            if last_line and not last_line.startswith(('#', '"', "'")):
+            if last_line and not last_line.startswith(("#", '"', "'")):
                 # Re-execute with just the last line assigned to result
                 exec(code + f"\nresult = {last_line}", namespace)
-                result = namespace.get('result')
+                result = namespace.get("result")
 
     return result
 
@@ -160,7 +160,9 @@ def python_task(
         operation = inputs.get("operation")
 
         if not operation:
-            raise ValueError("Either code or operation must be specified for Python task")
+            raise ValueError(
+                "Either code or operation must be specified for Python task"
+            )
 
         if operation == "multiply":
             # Get numbers from inputs or context
