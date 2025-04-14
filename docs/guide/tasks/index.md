@@ -11,9 +11,7 @@ steps:
   - name: task_name          # Required: Unique name for the task
     task: task_type         # Required: Type of task to execute
     description: string     # Optional: Description of what the task does
-    inputs: {}             # Optional: Task-specific input parameters
-    outputs: string/object  # Optional: Where to store task results
-    condition: string      # Optional: Condition for task execution
+    params: {}             # Required: Task-specific parameters
     retry:                 # Optional: Retry configuration
       max_attempts: int    # Number of retry attempts
       delay: int          # Delay between retries in seconds
@@ -33,7 +31,7 @@ Simple utility tasks for common operations:
 - `echo`: Print a message to the console
   ```yaml
   task: echo
-  inputs:
+  params:
     message: string       # Required: Message to print
     level: string        # Optional: Log level (info, warning, error)
   ```
@@ -41,7 +39,7 @@ Simple utility tasks for common operations:
 - `fail`: Deliberately fail a workflow (useful for testing)
   ```yaml
   task: fail
-  inputs:
+  params:
     message: string      # Optional: Custom failure message
     code: int           # Optional: Exit code (default: 1)
   ```
@@ -229,21 +227,6 @@ Writes data as YAML to a file.
   params:
     file_path: "output/config.yaml"
     data: "{{ config_data }}"
-```
-
-## HTTP Operations
-
-### `http_request`
-Makes HTTP requests.
-
-```yaml
-- name: fetch_data
-  task: http_request
-  params:
-    url: "https://api.example.com/data"
-    method: GET
-    headers:
-      Authorization: "Bearer {{ api_token }}"
 ```
 
 ## Creating Custom Tasks
