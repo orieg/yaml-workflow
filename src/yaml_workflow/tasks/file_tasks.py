@@ -199,7 +199,9 @@ def read_file_task(
             raise ValueError("file_path parameter is required")
 
         if params.get("format") == "json":
-            content: Union[Dict[str, Any], List[Any], str] = read_json(file_path, workspace)
+            content: Union[Dict[str, Any], List[Any], str] = read_json(
+                file_path, workspace
+            )
         elif params.get("format") == "yaml":
             content = read_yaml(file_path, workspace)
         else:

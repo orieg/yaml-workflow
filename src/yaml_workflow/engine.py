@@ -2,10 +2,10 @@
 Core workflow engine implementation.
 """
 
-import logging
-import logging.handlers
 import importlib
 import inspect
+import logging
+import logging.handlers
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
@@ -16,11 +16,11 @@ from jinja2 import Template
 from .exceptions import (
     FlowError,
     FlowNotFoundError,
+    FunctionNotFoundError,
     InvalidFlowDefinitionError,
+    StepExecutionError,
     StepNotInFlowError,
     WorkflowError,
-    FunctionNotFoundError,
-    StepExecutionError,
 )
 from .state import WorkflowState
 from .tasks import get_task_handler
@@ -440,9 +440,8 @@ class WorkflowEngine:
             Path: Path to the workspace directory
         """
         # Get workflow name from usage section or file name
-        workflow_name = (
-            self.workflow.get("usage", {}).get("name")
-            or (self.workflow_file.stem if self.workflow_file else "unnamed_workflow")
+        workflow_name = self.workflow.get("usage", {}).get("name") or (
+            self.workflow_file.stem if self.workflow_file else "unnamed_workflow"
         )
 
         # Create workspace
@@ -460,7 +459,9 @@ class WorkflowEngine:
                 "run_number": int(self.workspace.name.split("_run_")[-1]),
                 "timestamp": datetime.now().isoformat(),
                 "workflow_name": workflow_name,
-                "workflow_file": str(self.workflow_file.absolute() if self.workflow_file else ""),
+                "workflow_file": str(
+                    self.workflow_file.absolute() if self.workflow_file else ""
+                ),
             }
         )
 

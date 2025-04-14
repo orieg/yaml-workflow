@@ -7,4 +7,4 @@ including step completion, failures, and output tracking.
 
 from .workspace import WorkflowState
 
-__all__ = ['WorkflowState'] 
+__all__ = ["WorkflowState"]
