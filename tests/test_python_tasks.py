@@ -85,7 +85,9 @@ def test_unknown_operation(context, workspace):
 
 def test_missing_operation(context, workspace):
     step = {"name": "missing_op", "inputs": {}}
-    with pytest.raises(ValueError, match="Either code or operation must be specified for Python task"):
+    with pytest.raises(
+        ValueError, match="Either code or operation must be specified for Python task"
+    ):
         python_task(step, context, workspace)
 
 
@@ -97,7 +99,7 @@ x = 5
 y = 3
 result = x * y
 """,
-        "inputs": {}
+        "inputs": {},
     }
     result = python_task(step, context, workspace)
     assert result["result"] == 15
@@ -111,10 +113,7 @@ x = x if 'x' in locals() else 0
 y = y if 'y' in locals() else 0
 result = x + y
 """,
-        "inputs": {
-            "x": 10,
-            "y": 20
-        }
+        "inputs": {"x": 10, "y": 20},
     }
     result = python_task(step, context, workspace)
     assert result["result"] == 30
@@ -128,7 +127,7 @@ def test_python_code_with_context(context, workspace):
 value = context['data']['value']
 result = value * 2
 """,
-        "inputs": {}
+        "inputs": {},
     }
     result = python_task(step, context, workspace)
     assert result["result"] == 84
@@ -141,9 +140,12 @@ def test_python_code_execution_error(context, workspace):
 # This will raise a NameError
 result = undefined_variable
 """,
-        "inputs": {}
+        "inputs": {},
     }
-    with pytest.raises(ValueError, match="Code execution failed: name 'undefined_variable' is not defined"):
+    with pytest.raises(
+        ValueError,
+        match="Code execution failed: name 'undefined_variable' is not defined",
+    ):
         python_task(step, context, workspace)
 
 
@@ -155,7 +157,7 @@ def test_python_code_syntax_error(context, workspace):
 if True
     result = 42
 """,
-        "inputs": {}
+        "inputs": {},
     }
     with pytest.raises(ValueError, match="Code execution failed: expected ':'"):
         python_task(step, context, workspace)
@@ -163,11 +165,8 @@ if True
 
 def test_python_multiply_with_params(context, workspace):
     # Set up parameters in context
-    context["params"] = {
-        "value_x": "5.5",
-        "value_y": "2.0"
-    }
-    
+    context["params"] = {"value_x": "5.5", "value_y": "2.0"}
+
     step = {
         "name": "calculate",
         "task": "python",
@@ -178,8 +177,8 @@ result = x * y  # Use result assignment instead of return
 """,
         "inputs": {
             "x": context["params"]["value_x"],  # Direct value instead of template
-            "y": context["params"]["value_y"]   # Direct value instead of template
-        }
+            "y": context["params"]["value_y"],  # Direct value instead of template
+        },
     }
     result = python_task(step, context, workspace)
     assert result["result"] == 11.0  # 5.5 * 2.0 = 11.0
@@ -195,20 +194,14 @@ import math
 radius = float(radius)
 result = math.pi * radius * radius  # Calculate circle area
 """,
-        "inputs": {
-            "radius": "5.0"
-        }
+        "inputs": {"radius": "5.0"},
     }
     result1 = python_task(step1, context, workspace)
     assert result1["result"] == pytest.approx(78.53981633974483)  # pi * 5^2
-    
+
     # Add the result to context as the workflow engine would
-    context["execution_state"] = {
-        "step_outputs": {
-            "calculate_area": result1
-        }
-    }
-    
+    context["execution_state"] = {"step_outputs": {"calculate_area": result1}}
+
     # Second task: Use the area to calculate cost (area * cost_per_unit)
     step2 = {
         "name": "calculate_cost",
@@ -218,9 +211,7 @@ area = context['execution_state']['step_outputs']['calculate_area']['result']
 cost_per_unit = float(cost_per_unit)
 result = area * cost_per_unit  # Calculate total cost
 """,
-        "inputs": {
-            "cost_per_unit": "10.0"
-        }
+        "inputs": {"cost_per_unit": "10.0"},
     }
     result2 = python_task(step2, context, workspace)
     assert result2["result"] == pytest.approx(785.3981633974483)  # area * 10
@@ -236,7 +227,7 @@ x = 5
 y = 3
 z = x * y  # No result assignment
 """,
-        "inputs": {}
+        "inputs": {},
     }
     result = python_task(step, context, workspace)
     # Should try to use last expression
@@ -253,7 +244,7 @@ result = 5
 result = 10
 result = 15  # Final value should be stored
 """,
-        "inputs": {}
+        "inputs": {},
     }
     result = python_task(step, context, workspace)
     assert result["result"] == 15
@@ -270,7 +261,7 @@ x = 5  # Assignment isn't considered a result
 y = 3  # Another assignment
 # Final line is a comment
 """,
-        "inputs": {}
+        "inputs": {},
     }
     result = python_task(step, context, workspace)
     assert result["result"] is None  # Should be None when no result is available
@@ -287,7 +278,7 @@ y = 3
 if x > y:
     result = x * y  # Result set in conditional
 """,
-        "inputs": {}
+        "inputs": {},
     }
     result = python_task(step, context, workspace)
     assert result["result"] == 15  # Condition was true, so result was set
