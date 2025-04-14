@@ -114,7 +114,7 @@ def python_task(
                     result = handler(inputs["item"], *args, **kwargs)
                 else:
                     result = handler(*args, **kwargs)
-                
+
                 if isinstance(result, Exception):
                     raise result
                 return {"result": result}
