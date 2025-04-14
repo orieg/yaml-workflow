@@ -278,7 +278,9 @@ class BatchProcessor:
         processed_count = 0
 
         # Process items in chunks
-        for chunk_index, chunk in enumerate(chunk_iterator(remaining_items, chunk_size)):
+        for chunk_index, chunk in enumerate(
+            chunk_iterator(remaining_items, chunk_size)
+        ):
             self.logger.info(f"Processing chunk {chunk_index + 1}")
 
             # Update task config with batch information
@@ -289,7 +291,11 @@ class BatchProcessor:
                 with ThreadPoolExecutor(max_workers=max_workers) as executor:
                     futures = {
                         executor.submit(
-                            self.process_item, item, batch_config, context, progress_callback
+                            self.process_item,
+                            item,
+                            batch_config,
+                            context,
+                            progress_callback,
                         ): item
                         for item in chunk
                     }
@@ -303,7 +309,9 @@ class BatchProcessor:
                                 results[str(item)] = result
                                 processed_count += 1
                                 if progress_callback:
-                                    progress_callback(str(item), processed_count / total_items)
+                                    progress_callback(
+                                        str(item), processed_count / total_items
+                                    )
                             else:
                                 failed_items.add(str(item))
                                 if error_handler:
@@ -402,7 +410,9 @@ def process_batch(
         raise ValueError("'chunk_size' must be a positive integer")
 
     max_workers = parallel_settings.get("max_workers")
-    if max_workers is not None and (not isinstance(max_workers, int) or max_workers < 1):
+    if max_workers is not None and (
+        not isinstance(max_workers, int) or max_workers < 1
+    ):
         raise ValueError("'max_workers' must be a positive integer or None")
 
     resume = step.get("resume_state", False)

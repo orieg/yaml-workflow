@@ -156,7 +156,9 @@ def test_advanced_hello_world_success(run_cli, example_workflows_dir, workspace_
     assert "Check the output files for detailed results:" in out
 
 
-def test_advanced_hello_world_validation_errors(run_cli, example_workflows_dir, workspace_dir):
+def test_advanced_hello_world_validation_errors(
+    run_cli, example_workflows_dir, workspace_dir
+):
     """Test the advanced hello world example workflow with invalid inputs."""
     workflow_file = example_workflows_dir / "advanced_hello_world.yaml"
 
@@ -196,7 +198,9 @@ def test_advanced_hello_world_validation_errors(run_cli, example_workflows_dir, 
 
     assert exit_code == 0
     validation_file = workspace_dir_2 / "output" / "validation_result.txt"
-    assert "Error: Name must be at least 2 characters long" in validation_file.read_text()
+    assert (
+        "Error: Name must be at least 2 characters long" in validation_file.read_text()
+    )
 
     # Test case 3: Name too long (51 characters)
     workspace_dir_3 = workspace_dir.parent / "workspace3"
@@ -228,7 +232,9 @@ def test_advanced_hello_world_validation_errors(run_cli, example_workflows_dir, 
         assert "Requirements:" in report_content
 
 
-def test_advanced_hello_world_conditional_execution(run_cli, example_workflows_dir, workspace_dir):
+def test_advanced_hello_world_conditional_execution(
+    run_cli, example_workflows_dir, workspace_dir
+):
     """Test that steps are conditionally executed based on validation results."""
     workflow_file = example_workflows_dir / "advanced_hello_world.yaml"
 
@@ -250,7 +256,9 @@ def test_advanced_hello_world_conditional_execution(run_cli, example_workflows_d
     # Check that validation failed
     validation_file = workspace_dir / "output" / "validation_result.txt"
     assert validation_file.exists()
-    assert "Error: Name must be at least 2 characters long" in validation_file.read_text()
+    assert (
+        "Error: Name must be at least 2 characters long" in validation_file.read_text()
+    )
 
     # Verify greeting files were not created
     greeting_json = workspace_dir / "output" / "greeting.json"
@@ -279,7 +287,9 @@ def test_resume_workflow(run_cli, example_workflows_dir, workspace_dir):
         ]
     )
 
-    assert exit_code != 0, "Workflow should fail on first run due to missing required_param"
+    assert (
+        exit_code != 0
+    ), "Workflow should fail on first run due to missing required_param"
     assert "Error: required_param is required" in err
 
     print("\n=== First run output ===")

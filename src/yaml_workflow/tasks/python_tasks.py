@@ -14,7 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 @register_task("python")
-def python_task(step: Dict[str, Any], context: Dict[str, Any], workspace: str) -> Dict[str, Any]:
+def python_task(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: str
+) -> Dict[str, Any]:
     """Execute a Python task with the given operation and inputs.
 
     Args:
@@ -45,7 +47,9 @@ def python_task(step: Dict[str, Any], context: Dict[str, Any], workspace: str) -
                 elif isinstance(item, list):
                     numbers = [float(x) for x in item]
                 else:
-                    raise ValueError(f"Item must be a number or list of numbers, got {type(item)}")
+                    raise ValueError(
+                        f"Item must be a number or list of numbers, got {type(item)}"
+                    )
             if not numbers:
                 raise ValueError("Numbers must be a non-empty list")
 

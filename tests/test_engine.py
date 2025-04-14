@@ -4,7 +4,11 @@ from pathlib import Path
 import pytest
 
 from yaml_workflow.engine import WorkflowEngine
-from yaml_workflow.exceptions import InvalidFlowDefinitionError, StepNotInFlowError, WorkflowError
+from yaml_workflow.exceptions import (
+    InvalidFlowDefinitionError,
+    StepNotInFlowError,
+    WorkflowError,
+)
 
 
 @pytest.fixture
@@ -139,7 +143,9 @@ def test_workflow_resume(failed_workflow_file):
     assert state["steps"]["step1"]["status"] == "completed"
 
     # Now try to resume from step2 with a modified workflow
-    engine.workflow["steps"][1]["task"] = "echo"  # Change step2 to use echo instead of fail
+    engine.workflow["steps"][1][
+        "task"
+    ] = "echo"  # Change step2 to use echo instead of fail
     result = engine.run(resume_from="step2")
     assert result["status"] == "completed"
 

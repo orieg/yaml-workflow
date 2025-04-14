@@ -97,8 +97,14 @@ def test_workflow_step_failure(workflow_state):
 
     assert state["steps"]["step2"]["status"] == "failed"
     assert workflow_state.metadata["execution_state"]["status"] == "failed"
-    assert workflow_state.metadata["execution_state"]["failed_step"]["step_name"] == "step2"
-    assert workflow_state.metadata["execution_state"]["failed_step"]["error"] == "Test error"
+    assert (
+        workflow_state.metadata["execution_state"]["failed_step"]["step_name"]
+        == "step2"
+    )
+    assert (
+        workflow_state.metadata["execution_state"]["failed_step"]["error"]
+        == "Test error"
+    )
 
 
 def test_workflow_completion(workflow_state):
@@ -120,7 +126,9 @@ def test_workflow_state_persistence(temp_workspace, workflow_state):
     # Create new state instance and verify persistence
     new_state = WorkflowState(temp_workspace)
     assert new_state.metadata["execution_state"]["completed_steps"] == ["step1"]
-    assert new_state.metadata["execution_state"]["step_outputs"]["step1"] == {"step1": "output1"}
+    assert new_state.metadata["execution_state"]["step_outputs"]["step1"] == {
+        "step1": "output1"
+    }
 
 
 def test_workflow_resume_capability(temp_workspace, failing_workflow):
@@ -140,8 +148,12 @@ def test_workflow_resume_capability(temp_workspace, failing_workflow):
     assert state["execution_state"]["failed_step"]["step_name"] == "step2"
 
     # Modify workflow to make step2 succeed
-    engine.workflow["steps"][1]["task"] = "echo"  # Change step2 to use echo instead of fail
-    engine.workflow["steps"][1]["inputs"] = {"message": "Step 2"}  # Update inputs for echo task
+    engine.workflow["steps"][1][
+        "task"
+    ] = "echo"  # Change step2 to use echo instead of fail
+    engine.workflow["steps"][1]["inputs"] = {
+        "message": "Step 2"
+    }  # Update inputs for echo task
     result = engine.run(resume_from="step2")
 
     # Verify completion
@@ -149,7 +161,8 @@ def test_workflow_resume_capability(temp_workspace, failing_workflow):
     state = engine.state.get_state()
     assert state["execution_state"]["status"] == "completed"
     assert all(
-        step in state["execution_state"]["completed_steps"] for step in ["step1", "step2", "step3"]
+        step in state["execution_state"]["completed_steps"]
+        for step in ["step1", "step2", "step3"]
     )
 
 

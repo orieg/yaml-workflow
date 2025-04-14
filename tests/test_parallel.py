@@ -63,7 +63,10 @@ def test_batch_processing_results(temp_workspace):
         "parallel": True,
         "iterate_over": [1, 2, 3],
         "parallel_settings": {"max_workers": 3, "chunk_size": 3},
-        "processing_task": {"task": "python", "inputs": {"operation": "multiply", "factor": 2}},
+        "processing_task": {
+            "task": "python",
+            "inputs": {"operation": "multiply", "factor": 2},
+        },
     }
 
     result = process_batch(step, {}, temp_workspace)
@@ -78,7 +81,10 @@ def test_batch_error_handling(temp_workspace):
         "parallel": True,
         "iterate_over": [1, 2, 0, 4],  # 0 will cause division error
         "parallel_settings": {"max_workers": 2, "chunk_size": 2},
-        "processing_task": {"task": "python", "inputs": {"operation": "divide", "divisor": 10}},
+        "processing_task": {
+            "task": "python",
+            "inputs": {"operation": "divide", "divisor": 10},
+        },
     }
 
     result = process_batch(step, {}, temp_workspace)
@@ -94,7 +100,10 @@ def test_batch_resume(temp_workspace):
         "iterate_over": list(range(5)),
         "resume_state": True,
         "parallel_settings": {"max_workers": 2, "chunk_size": 2},
-        "processing_task": {"task": "python", "inputs": {"operation": "multiply", "factor": 2}},
+        "processing_task": {
+            "task": "python",
+            "inputs": {"operation": "multiply", "factor": 2},
+        },
     }
 
     # First run

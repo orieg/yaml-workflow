@@ -41,7 +41,9 @@ def sample_data():
 
 
 @register_task("write_file")
-def write_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, Any]:
+def write_file(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> Dict[str, Any]:
     """Write content to a file."""
     logger = get_task_logger(workspace, step.get("name", "write_file"))
     log_task_execution(logger, step, context, workspace)
@@ -64,7 +66,9 @@ def write_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -
 
 
 @register_task("read_file")
-def read_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, Any]:
+def read_file(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> Dict[str, Any]:
     """Read content from a file."""
     logger = get_task_logger(workspace, step.get("name", "read_file"))
     log_task_execution(logger, step, context, workspace)
@@ -86,7 +90,9 @@ def read_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) ->
 
 
 @register_task("copy_file")
-def copy_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, Any]:
+def copy_file(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> Dict[str, Any]:
     """Copy a file from source to destination."""
     logger = get_task_logger(workspace, step.get("name", "copy_file"))
     log_task_execution(logger, step, context, workspace)
@@ -110,7 +116,9 @@ def copy_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) ->
 
 
 @register_task("move_file")
-def move_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, Any]:
+def move_file(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> Dict[str, Any]:
     """Move a file from source to destination."""
     logger = get_task_logger(workspace, step.get("name", "move_file"))
     log_task_execution(logger, step, context, workspace)
@@ -134,7 +142,9 @@ def move_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) ->
 
 
 @register_task("delete_file")
-def delete_file(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, Any]:
+def delete_file(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> Dict[str, Any]:
     """Delete a file."""
     logger = get_task_logger(workspace, step.get("name", "delete_file"))
     log_task_execution(logger, step, context, workspace)
@@ -252,7 +262,11 @@ def test_delete_file(tmp_path):
 
 def test_write_csv_file(tmp_path):
     """Test writing CSV file."""
-    data = [["Name", "Age", "City"], ["Alice", "25", "New York"], ["Bob", "30", "London"]]
+    data = [
+        ["Name", "Age", "City"],
+        ["Alice", "25", "New York"],
+        ["Bob", "30", "London"],
+    ]
     file_path = os.path.join(tmp_path, "data.csv")
     csv_content = "\n".join([",".join(row) for row in data])
     result = write_file_direct(file_path, csv_content, tmp_path)

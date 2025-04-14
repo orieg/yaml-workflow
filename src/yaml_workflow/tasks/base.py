@@ -26,7 +26,9 @@ def get_task_logger(workspace: Union[str, Path], task_name: str) -> logging.Logg
         return logger
 
     # Create formatters
-    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
 
     # Create file handler
     workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
@@ -53,7 +55,10 @@ def get_task_logger(workspace: Union[str, Path], task_name: str) -> logging.Logg
 
 
 def log_task_execution(
-    logger: logging.Logger, step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+    logger: logging.Logger,
+    step: Dict[str, Any],
+    context: Dict[str, Any],
+    workspace: Path,
 ) -> None:
     """
     Log task execution details.

@@ -36,7 +36,13 @@ def run_command(
         command = command.split()
 
     result = subprocess.run(
-        command, cwd=cwd, env=env, shell=shell, capture_output=True, text=True, timeout=timeout
+        command,
+        cwd=cwd,
+        env=env,
+        shell=shell,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
     )
 
     return result.returncode, result.stdout, result.stderr

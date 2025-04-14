@@ -78,7 +78,9 @@ class WorkflowTimeoutError(WorkflowError):
     """Raised when a workflow exceeds its timeout limit."""
 
     def __init__(self, timeout_seconds: float):
-        super().__init__(f"Workflow execution exceeded timeout of {timeout_seconds} seconds")
+        super().__init__(
+            f"Workflow execution exceeded timeout of {timeout_seconds} seconds"
+        )
 
 
 class WorkflowDefinitionError(WorkflowError):

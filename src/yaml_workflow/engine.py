@@ -42,7 +42,9 @@ def setup_logging(workspace: Path, name: str) -> logging.Logger:
     log_file = logs_dir / f"{name}_{timestamp}.log"
 
     # Create formatters
-    file_formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    file_formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
     console_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
     # Create file handler
@@ -178,7 +180,9 @@ class WorkflowEngine:
         defined_flows = set()
         for flow_def in flows["definitions"]:
             if not isinstance(flow_def, dict):
-                raise InvalidFlowDefinitionError("unknown", "flow definition must be a mapping")
+                raise InvalidFlowDefinitionError(
+                    "unknown", "flow definition must be a mapping"
+                )
 
             for flow_name, steps in flow_def.items():
                 if not isinstance(steps, list):
@@ -190,7 +194,9 @@ class WorkflowEngine:
                 defined_flows.add(flow_name)
 
                 # Validate step references
-                workflow_steps = {step.get("name") for step in self.workflow.get("steps", [])}
+                workflow_steps = {
+                    step.get("name") for step in self.workflow.get("steps", [])
+                }
                 for step in steps:
                     if step not in workflow_steps:
                         raise StepNotInFlowError(step, flow_name)
@@ -332,7 +338,9 @@ class WorkflowEngine:
             if self.state.metadata["execution_state"]["status"] != "failed":
                 raise WorkflowError("Cannot resume: workflow is not in failed state")
             if not any(step.get("name") == resume_from for step in steps):
-                raise WorkflowError(f"Cannot resume: step '{resume_from}' not found in workflow")
+                raise WorkflowError(
+                    f"Cannot resume: step '{resume_from}' not found in workflow"
+                )
 
             # Restore outputs from completed steps
             self.context.update(self.state.get_completed_outputs())
@@ -388,7 +396,9 @@ class WorkflowEngine:
                         self.logger.info(f"Skipping step {name}: condition not met")
                         continue
                 except Exception as e:
-                    raise WorkflowError(f"Error evaluating condition in step {name}: {str(e)}")
+                    raise WorkflowError(
+                        f"Error evaluating condition in step {name}: {str(e)}"
+                    )
 
             task_type = step.get("task")
             if not task_type:
@@ -440,11 +450,15 @@ class WorkflowEngine:
             Path: Path to the workspace directory
         """
         # Get workflow name from usage section or file name
-        workflow_name = self.workflow_def.get("usage", {}).get("name") or self.workflow_file.stem
+        workflow_name = (
+            self.workflow_def.get("usage", {}).get("name") or self.workflow_file.stem
+        )
 
         # Create workspace
         self.workspace = create_workspace(
-            workflow_name=workflow_name, custom_dir=self.workspace_dir, base_dir=self.base_dir
+            workflow_name=workflow_name,
+            custom_dir=self.workspace_dir,
+            base_dir=self.base_dir,
         )
 
         # Initialize workspace info in context

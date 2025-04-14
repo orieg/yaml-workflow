@@ -143,7 +143,9 @@ def delete_file_direct(file_path: str, workspace: Path) -> str:
 
 
 @register_task("write_file")
-def write_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def write_file_task(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> str:
     """Task handler for writing files."""
     logger = get_task_logger(workspace, step.get("name", "write_file"))
     log_task_execution(logger, step, context, workspace)
@@ -224,7 +226,9 @@ def read_file_task(
 
 
 @register_task("append_file")
-def append_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def append_file_task(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> str:
     """Task handler for appending to files."""
     logger = get_task_logger(workspace, step.get("name", "append_file"))
     log_task_execution(logger, step, context, workspace)
@@ -250,7 +254,9 @@ def append_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: P
 
 
 @register_task("copy_file")
-def copy_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def copy_file_task(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> str:
     """Task handler for copying files."""
     logger = get_task_logger(workspace, step.get("name", "copy_file"))
     log_task_execution(logger, step, context, workspace)
@@ -275,7 +281,9 @@ def copy_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Pat
 
 
 @register_task("move_file")
-def move_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def move_file_task(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> str:
     """Task handler for moving files."""
     logger = get_task_logger(workspace, step.get("name", "move_file"))
     log_task_execution(logger, step, context, workspace)
@@ -300,7 +308,9 @@ def move_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Pat
 
 
 @register_task("delete_file")
-def delete_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def delete_file_task(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> str:
     """Task handler for deleting files."""
     logger = get_task_logger(workspace, step.get("name", "delete_file"))
     log_task_execution(logger, step, context, workspace)
@@ -346,7 +356,9 @@ def read_json_task(
 
 
 @register_task("write_json")
-def write_json_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def write_json_task(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> str:
     """
     Task handler for writing a JSON file.
 
@@ -420,7 +432,9 @@ def process_templates(data: Any, context: Dict[str, Any]) -> Any:
 
 
 @register_task("write_yaml")
-def write_yaml_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def write_yaml_task(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> str:
     """
     Task handler for writing a YAML file.
 
@@ -448,7 +462,9 @@ def write_yaml_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Pa
 
 
 # Helper functions
-def read_json(file_path: str, workspace: Optional[Path] = None) -> Union[Dict[str, Any], List[Any]]:
+def read_json(
+    file_path: str, workspace: Optional[Path] = None
+) -> Union[Dict[str, Any], List[Any]]:
     """
     Read content from a JSON file.
 
@@ -521,7 +537,9 @@ def read_yaml(file_path: str, workspace: Optional[Path] = None) -> Dict[str, Any
         return yaml.safe_load(f)
 
 
-def write_yaml(file_path: str, data: Dict[str, Any], workspace: Optional[Path] = None) -> str:
+def write_yaml(
+    file_path: str, data: Dict[str, Any], workspace: Optional[Path] = None
+) -> str:
     """
     Write content to a YAML file.
 

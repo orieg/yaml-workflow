@@ -10,7 +10,9 @@ from . import register_task
 
 
 @register_task("template")
-def render_template(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def render_template(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
+) -> str:
     """
     Render a template and save it to a file.
 

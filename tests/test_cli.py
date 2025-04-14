@@ -64,7 +64,11 @@ def sample_workflow_file(tmp_path):
         "name": "test_workflow",
         "description": "A test workflow",
         "steps": [
-            {"name": "step1", "task": "echo", "inputs": {"message": "Hello, {{ name }}!"}},
+            {
+                "name": "step1",
+                "task": "echo",
+                "inputs": {"message": "Hello, {{ name }}!"},
+            },
             {"name": "step2", "task": "echo", "inputs": {"message": "Done!"}},
         ],
     }
@@ -89,7 +93,11 @@ def workspace_setup(tmp_path):
         "created_at": datetime.now().isoformat(),
         "workflow": "test_workflow",
         "status": "pending",
-        "execution_state": {"status": "pending", "current_step": None, "failed_step": None},
+        "execution_state": {
+            "status": "pending",
+            "current_step": None,
+            "failed_step": None,
+        },
         "run_number": 1,
     }
     (workspace_dir / ".workflow_metadata.json").write_text(json.dumps(metadata))
@@ -129,7 +137,11 @@ def test_cli_run_with_custom_workspace(run_cli, sample_workflow_file, tmp_path):
         "created_at": datetime.now().isoformat(),
         "workflow": "test_workflow",
         "status": "pending",
-        "execution_state": {"status": "pending", "current_step": None, "failed_step": None},
+        "execution_state": {
+            "status": "pending",
+            "current_step": None,
+            "failed_step": None,
+        },
         "run_number": 1,
     }
     (workspace_dir / ".workflow_metadata.json").write_text(json.dumps(metadata))
@@ -250,7 +262,15 @@ def test_cli_workspace_clean(run_cli, tmp_path):
 
     # Test dry run first
     exit_code, out, err = run_cli(
-        ["workspace", "clean", "--base-dir", str(runs_dir), "--older-than", "30", "--dry-run"]
+        [
+            "workspace",
+            "clean",
+            "--base-dir",
+            str(runs_dir),
+            "--older-than",
+            "30",
+            "--dry-run",
+        ]
     )
     assert exit_code == 0
     assert run1_dir.name in out

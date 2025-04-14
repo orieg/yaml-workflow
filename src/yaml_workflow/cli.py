@@ -14,10 +14,10 @@ from typing import Dict, List, Optional, Tuple
 
 import yaml
 
+from . import __version__  # Import version
 from .engine import WorkflowEngine
 from .exceptions import WorkflowError
 from .workspace import get_workspace_info
-from . import __version__  # Import version
 
 
 class WorkflowArgumentParser(argparse.ArgumentParser):
@@ -93,9 +93,13 @@ def run_workflow(args):
                         with open(metadata_path) as f:
                             metadata = json.load(f)
                     except json.JSONDecodeError as e:
-                        raise ValueError(f"Cannot resume: Invalid metadata file format - {str(e)}")
+                        raise ValueError(
+                            f"Cannot resume: Invalid metadata file format - {str(e)}"
+                        )
                     except Exception as e:
-                        raise ValueError(f"Cannot resume: Failed to read metadata file - {str(e)}")
+                        raise ValueError(
+                            f"Cannot resume: Failed to read metadata file - {str(e)}"
+                        )
 
                     if metadata.get("execution_state", {}).get("status") == "failed":
                         failed_step = metadata["execution_state"].get("failed_step")
@@ -106,7 +110,9 @@ def run_workflow(args):
                         else:
                             raise ValueError("No failed step found to resume from.")
                     else:
-                        raise ValueError("Cannot resume: workflow is not in failed state")
+                        raise ValueError(
+                            "Cannot resume: workflow is not in failed state"
+                        )
                 else:
                     raise ValueError("Cannot resume: No workflow metadata found")
             else:
@@ -158,7 +164,9 @@ def run_workflow(args):
         if resume_from:
             print(f"✓ Workflow resumed from '{resume_from}' and completed successfully")
         elif start_from_step:
-            print(f"✓ Workflow started from '{start_from_step}' and completed successfully")
+            print(
+                f"✓ Workflow started from '{start_from_step}' and completed successfully"
+            )
         else:
             print("✓ Workflow completed successfully")
 
@@ -232,8 +240,12 @@ def list_workflows(args):
             continue
 
     if not found:
-        print("No workflow files found. Workflows should be YAML files containing 'steps' section.")
-        print(f"\nMake sure you have workflow YAML files in the '{workflow_dir}' directory.")
+        print(
+            "No workflow files found. Workflows should be YAML files containing 'steps' section."
+        )
+        print(
+            f"\nMake sure you have workflow YAML files in the '{workflow_dir}' directory."
+        )
         print("You can specify a different directory with --base-dir option.")
     print()
 
@@ -436,8 +448,12 @@ Commands:
   workspace          Workspace management commands
   init               Initialize a new project with example workflows
 """
-    parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}',
-                       help='Show program version and exit')
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
+        help="Show program version and exit",
+    )
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
@@ -445,16 +461,21 @@ Commands:
     run_parser = subparsers.add_parser("run", help="Run a workflow", add_help=True)
     run_parser.add_argument("workflow", help="Path to workflow file")
     run_parser.add_argument("--workspace", help="Custom workspace directory")
-    run_parser.add_argument("--base-dir", default="runs", help="Base directory for workflow runs")
+    run_parser.add_argument(
+        "--base-dir", default="runs", help="Base directory for workflow runs"
+    )
     run_parser.add_argument(
         "--resume", action="store_true", help="Resume workflow from last failed step"
     )
-    run_parser.add_argument("--start-from", help="Start workflow execution from specified step")
+    run_parser.add_argument(
+        "--start-from", help="Start workflow execution from specified step"
+    )
     run_parser.add_argument(
         "--skip-steps", help="Comma-separated list of steps to skip during execution"
     )
     run_parser.add_argument(
-        "--flow", help="Name of the flow to execute (default: use flow specified in workflow file)"
+        "--flow",
+        help="Name of the flow to execute (default: use flow specified in workflow file)",
     )
     run_parser.add_argument(
         "params", nargs="*", help="Parameters in the format name=value or --name=value"
@@ -471,7 +492,9 @@ Commands:
     validate_parser.add_argument("workflow", help="Path to workflow file")
 
     # Workspace commands
-    workspace_parser = subparsers.add_parser("workspace", help="Workspace management commands")
+    workspace_parser = subparsers.add_parser(
+        "workspace", help="Workspace management commands"
+    )
     workspace_subparsers = workspace_parser.add_subparsers(
         dest="workspace_command", help="Workspace commands"
     )
@@ -483,7 +506,9 @@ Commands:
     workspace_list_parser.add_argument(
         "--base-dir", "-b", default="runs", help="Base directory for workflow runs"
     )
-    workspace_list_parser.add_argument("--workflow", "-w", help="Filter by workflow name")
+    workspace_list_parser.add_argument(
+        "--workflow", "-w", help="Filter by workflow name"
+    )
 
     # Workspace clean command
     workspace_clean_parser = workspace_subparsers.add_parser(
@@ -495,7 +520,9 @@ Commands:
     workspace_clean_parser.add_argument(
         "--older-than", "-o", type=int, default=30, help="Remove runs older than N days"
     )
-    workspace_clean_parser.add_argument("--workflow", "-w", help="Clean only runs of this workflow")
+    workspace_clean_parser.add_argument(
+        "--workflow", "-w", help="Clean only runs of this workflow"
+    )
     workspace_clean_parser.add_argument(
         "--dry-run",
         "-n",
@@ -507,7 +534,9 @@ Commands:
     workspace_remove_parser = workspace_subparsers.add_parser(
         "remove", help="Remove specific workflow runs"
     )
-    workspace_remove_parser.add_argument("runs", nargs="+", help="Names of runs to remove")
+    workspace_remove_parser.add_argument(
+        "runs", nargs="+", help="Names of runs to remove"
+    )
     workspace_remove_parser.add_argument(
         "--base-dir", "-b", default="runs", help="Base directory for workflow runs"
     )
@@ -519,7 +548,9 @@ Commands:
     init_parser = subparsers.add_parser(
         "init", help="Initialize a new project with example workflows"
     )
-    init_parser.add_argument("--dir", default="workflows", help="Directory to create workflows in")
+    init_parser.add_argument(
+        "--dir", default="workflows", help="Directory to create workflows in"
+    )
     init_parser.add_argument("--example", help="Specific example workflow to copy")
 
     args = parser.parse_args()

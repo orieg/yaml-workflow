@@ -94,7 +94,14 @@ def create_task_handler(func: Callable[P, R]) -> TaskHandler:
 
 
 # Import task modules
-from . import basic_tasks, batch_processor, file_tasks, python_tasks, shell_tasks, template_tasks
+from . import (
+    basic_tasks,
+    batch_processor,
+    file_tasks,
+    python_tasks,
+    shell_tasks,
+    template_tasks,
+)
 
 # Register basic tasks
 register_task("echo")(create_task_handler(basic_tasks.echo))

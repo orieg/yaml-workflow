@@ -61,9 +61,12 @@ class WorkflowState:
                     if step in self.metadata["execution_state"]["completed_steps"]
                     else "failed"
                     if self.metadata["execution_state"]["failed_step"]
-                    and self.metadata["execution_state"]["failed_step"]["step_name"] == step
+                    and self.metadata["execution_state"]["failed_step"]["step_name"]
+                    == step
                     else "not_started",
-                    "outputs": self.metadata["execution_state"]["step_outputs"].get(step, {}),
+                    "outputs": self.metadata["execution_state"]["step_outputs"].get(
+                        step, {}
+                    ),
                 }
                 for step in set(
                     self.metadata["execution_state"]["completed_steps"]
@@ -341,4 +344,9 @@ def get_workspace_info(workspace: Path) -> Dict[str, Any]:
             total_size += file_path.stat().st_size
             file_count += 1
 
-    return {**metadata, "path": str(workspace.absolute()), "size": total_size, "files": file_count}
+    return {
+        **metadata,
+        "path": str(workspace.absolute()),
+        "size": total_size,
+        "files": file_count,
+    }

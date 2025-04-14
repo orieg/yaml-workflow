@@ -85,7 +85,9 @@ def test_template_filters(temp_workspace):
     }
 
     result = render_template(
-        step, {"name": "Alice", "items": ["a", "b", "c"], "number": 3.14159}, temp_workspace
+        step,
+        {"name": "Alice", "items": ["a", "b", "c"], "number": 3.14159},
+        temp_workspace,
     )
 
     output_file = temp_workspace / "filtered.txt"
@@ -162,7 +164,9 @@ Content for {{ user }}""",
         "include_path": str(include_dir),
     }
 
-    result = render_template(step, {"app_name": "My App", "user": "Alice"}, temp_workspace)
+    result = render_template(
+        step, {"app_name": "My App", "user": "Alice"}, temp_workspace
+    )
 
     output_file = temp_workspace / "page.txt"
     assert output_file.exists()

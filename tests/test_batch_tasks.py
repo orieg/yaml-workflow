@@ -25,7 +25,10 @@ def test_basic_batch_processing(temp_workspace, sample_items):
         {
             "name": "test_basic",
             "iterate_over": sample_items,
-            "processing_task": {"task": "shell", "command": "echo 'Processing {{ item }}'"},
+            "processing_task": {
+                "task": "shell",
+                "command": "echo 'Processing {{ item }}'",
+            },
         },
         {},
         temp_workspace,
@@ -141,7 +144,10 @@ def test_batch_with_progress_tracking(temp_workspace, sample_items):
             "name": "test_progress",
             "iterate_over": sample_items,
             "progress_callback": progress_callback,
-            "processing_task": {"task": "shell", "command": "echo 'Processing {{ item }}'"},
+            "processing_task": {
+                "task": "shell",
+                "command": "echo 'Processing {{ item }}'",
+            },
         },
         {},
         temp_workspace,
@@ -161,7 +167,10 @@ def test_batch_with_state_persistence(temp_workspace, sample_items):
             "name": "test_state",
             "iterate_over": sample_items,
             "resume_state": True,
-            "processing_task": {"task": "shell", "command": "echo 'Processing {{ item }}'"},
+            "processing_task": {
+                "task": "shell",
+                "command": "echo 'Processing {{ item }}'",
+            },
         },
         {},
         temp_workspace,
@@ -184,7 +193,10 @@ def test_batch_with_custom_aggregator(temp_workspace):
                 "task": "python",
                 "function": "process_item",
                 "inputs": {"operation": "multiply", "factor": 2},
-                "aggregator": lambda results: {"sum": sum(results), "count": len(results)},
+                "aggregator": lambda results: {
+                    "sum": sum(results),
+                    "count": len(results),
+                },
             },
         },
         {},

@@ -70,7 +70,11 @@ def test_custom_task_in_workflow(custom_task_module, temp_workspace):
     workflow = {
         "name": "test_workflow",
         "steps": [
-            {"name": "custom_step", "task": "custom", "inputs": {"message": "Workflow message"}}
+            {
+                "name": "custom_step",
+                "task": "custom",
+                "inputs": {"message": "Workflow message"},
+            }
         ],
     }
 
@@ -79,7 +83,10 @@ def test_custom_task_in_workflow(custom_task_module, temp_workspace):
 
     assert result["status"] == "completed"
     assert result["outputs"]["custom_step"]["success"]
-    assert "Custom task executed: Workflow message" in result["outputs"]["custom_step"]["output"]
+    assert (
+        "Custom task executed: Workflow message"
+        in result["outputs"]["custom_step"]["output"]
+    )
 
 
 def test_custom_task_with_progress(temp_workspace):
@@ -95,7 +102,9 @@ def test_custom_task_with_progress(temp_workspace):
         return {"success": True, "output": "Progress task completed"}
 
     result = progress_task(
-        {"inputs": {"total": 10}}, {"progress_callback": progress_updates.append}, temp_workspace
+        {"inputs": {"total": 10}},
+        {"progress_callback": progress_updates.append},
+        temp_workspace,
     )
 
     assert len(progress_updates) == 10
