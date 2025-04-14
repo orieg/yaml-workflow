@@ -20,18 +20,34 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
-.env
-.venv
-env/
-venv/
-ENV/
+# Virtual Environments
+.venv*/
+venv*/
+env*/
+virtualenv*/
 
-# IDE
+# Test coverage and cache
+.coverage
+.coverage.*
+.pytest_cache/
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# IDE directories
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+
+# Environment files
+.env
+.env.*
+!.env.example
 
 # OS
 .DS_Store
