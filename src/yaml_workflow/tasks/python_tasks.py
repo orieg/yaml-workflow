@@ -13,6 +13,76 @@ from .base import get_task_logger, log_task_error, log_task_execution, log_task_
 logger = logging.getLogger(__name__)
 
 
+def execute_code(code: str, inputs: Dict[str, Any], context: Dict[str, Any]) -> Any:
+    """
+    Execute Python code string with given inputs and context.
+
+    Args:
+        code: Python code to execute
+        inputs: Input variables for the code
+        context: Workflow context
+
+    Returns:
+        Any: Result of code execution
+
+    Raises:
+        Exception: If code execution fails
+    """
+    # Create a clean namespace for code execution
+    namespace = {
+        # Add builtins that are safe to use
+        'str': str,
+        'int': int,
+        'float': float,
+        'bool': bool,
+        'list': list,
+        'dict': dict,
+        'set': set,
+        'tuple': tuple,
+        'len': len,
+        'range': range,
+        'enumerate': enumerate,
+        'zip': zip,
+        'min': min,
+        'max': max,
+        'sum': sum,
+        'abs': abs,
+        'round': round,
+        # Add standard library modules that are safe to use
+        'json': __import__('json'),
+        'datetime': __import__('datetime'),
+        'math': __import__('math'),
+        'random': __import__('random'),
+        'uuid': __import__('uuid'),
+        'base64': __import__('base64'),
+        'hashlib': __import__('hashlib'),
+        're': __import__('re'),
+        'csv': __import__('csv'),
+        'io': __import__('io'),
+        'pathlib': __import__('pathlib'),
+        # Add inputs and context
+        **inputs,
+        'context': context,
+    }
+
+    # Execute the code
+    exec(code + "\nresult = None", namespace)
+    
+    # Get the result
+    result = namespace.get('result')
+    if result is None:
+        # If no result was set, try to get the last expression's value
+        lines = code.strip().split('\n')
+        if lines:
+            last_line = lines[-1].strip()
+            if last_line and not last_line.startswith(('#', '"', "'")):
+                # Re-execute with just the last line assigned to result
+                exec(code + f"\nresult = {last_line}", namespace)
+                result = namespace.get('result')
+
+    return result
+
+
 @register_task("print_vars")
 def print_vars_task(
     step: Dict[str, Any], context: Dict[str, Any], workspace: Union[str, Path]
@@ -57,24 +127,40 @@ def python_task(
 ) -> Dict[str, Any]:
     """Execute a Python task with the given operation and inputs.
 
+    The task supports two modes:
+    1. Operation mode: Execute predefined operations (multiply, divide, custom)
+    2. Code mode: Execute arbitrary Python code
+
     Args:
-        step: The step configuration containing the operation and inputs
+        step: The step configuration containing the operation/code and inputs
         context: The execution context
         workspace: The workspace path
 
     Returns:
-        Dict containing the result of the operation
+        Dict containing the result of the operation/code
     """
     try:
         logger = get_task_logger(workspace, step.get("name", "python"))
         workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
         log_task_execution(logger, step, context, workspace_path)
 
+        # Check for code execution mode
+        if "code" in step:
+            code = step["code"]
+            inputs = step.get("inputs", {})
+            try:
+                result = execute_code(code, inputs, context)
+                return {"result": result}
+            except Exception as e:
+                log_task_error(logger, e)
+                raise ValueError(f"Code execution failed: {str(e)}")
+
+        # Operation mode
         inputs = step.get("inputs", {})
         operation = inputs.get("operation")
 
         if not operation:
-            raise ValueError("Operation must be specified for Python task")
+            raise ValueError("Either code or operation must be specified for Python task")
 
         if operation == "multiply":
             # Get numbers from inputs or context

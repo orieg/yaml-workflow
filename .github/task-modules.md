@@ -112,12 +112,42 @@
 - `local.mock` - Mock services
 - `local.profile` - Performance profiling
 
-## Data Processing (`data.*`)
-- `data.etl` - ETL operations
-- `data.validate` - Data validation
-- `data.transform` - Data transformation
-- `data.analyze` - Data analysis
-- `data.visualize` - Data visualization
+## Data Processing (`data.*`) [Planned]
+- `data.etl`
+  - Extract data from various sources (files, databases, APIs)
+  - Transform data with custom functions
+  - Load data to target destinations
+  - Handle large datasets with chunking
+  - Track processing progress
+  - Resume interrupted operations
+- `data.validate`
+  - Schema validation
+  - Data quality checks
+  - Custom validation rules
+  - Validation reporting
+  - Error handling and logging
+- `data.transform`
+  - Data type conversions
+  - Format standardization
+  - Data enrichment
+  - Custom transformations
+  - Batch processing support
+- `data.analyze`
+  - Statistical analysis
+  - Pattern detection
+  - Data profiling
+  - Summary generation
+  - Custom analytics functions
+- `data.visualize`
+  - Generate charts and graphs
+  - Export visualizations
+  - Interactive dashboards
+  - Custom visualization types
+- `data.stream`
+  - Stream processing capabilities
+  - Real-time transformations
+  - Event-based processing
+  - Error handling and recovery
 
 ## API Tasks (`api.*`)
 - `api.test` - Test endpoints
@@ -125,6 +155,33 @@
 - `api.doc` - Generate documentation
 - `api.validate` - Validate responses
 - `api.monitor` - Monitor endpoints
+
+## HTTP Tasks (`http.*`)
+- `http.request`
+  - Make HTTP requests (GET, POST, PUT, DELETE)
+  - Handle authentication (Basic, Bearer, OAuth)
+  - Manage headers and query parameters
+  - Process request/response bodies
+  - Upload files
+  - Retry logic and error handling
+  - SSL verification options
+  - Timeout configuration
+  - Response validation
+- `http.graphql`
+  - Execute GraphQL queries
+  - Handle variables and fragments
+  - Manage authentication
+  - Process responses
+- `http.websocket`
+  - Establish WebSocket connections
+  - Send/receive messages
+  - Handle connection lifecycle
+  - Implement heartbeat
+- `http.webhook`
+  - Create webhook endpoints
+  - Process incoming requests
+  - Validate signatures
+  - Handle rate limiting
 
 ## Deployment Tasks (`deploy.*`)
 - `deploy.package` - Package applications
