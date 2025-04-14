@@ -73,12 +73,16 @@ nav:
   - Guide:
       - Getting Started: guide/getting-started.md
       - Core Concepts: guide/concepts.md
+      - Workflow Structure: workflow-structure.md
       - Configuration: guide/configuration.md
       - Tasks:
           - Overview: guide/tasks/index.md
+          - Basic Tasks: guide/tasks/basic-tasks.md
           - File Operations: guide/tasks/file-operations.md
-          - Data Processing: guide/tasks/data-processing.md
-          - HTTP Tasks: guide/tasks/http-tasks.md
+          - Shell Tasks: guide/tasks/shell-tasks.md
+          - Python Tasks: guide/tasks/python-tasks.md
+          - Batch Tasks: guide/tasks/batch-tasks.md
+          - Template Tasks: guide/tasks/template-tasks.md
   - Examples:
       - Basic Workflow: examples/basic-workflow.md
       - Hello World: examples/hello-world.md

@@ -1,22 +1,153 @@
 # Batch Processing Tasks
 
-The YAML Workflow Engine provides batch processing capabilities through the `batch` task, allowing you to process collections of items efficiently.
+## Overview
+
+```mermaid
+graph TD
+    A[Input Data] --> B[Split into Batches]
+    B --> C[Process Batches]
+    C --> D[Parallel Processing]
+    C --> E[Sequential Processing]
+    D --> F[Batch Results]
+    E --> F
+    F --> G[Aggregate Results]
+    
+    subgraph "Batch Processing Features"
+    H[Progress Tracking]
+    I[State Management]
+    J[Error Handling]
+    K[Resume Capability]
+    end
+```
+
+## Batch Processing Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> PrepareData: Initialize
+    PrepareData --> CreateBatches: Split Data
+    CreateBatches --> ProcessBatch: For Each Batch
+    ProcessBatch --> CheckParallel: Check Config
+    CheckParallel --> ParallelExecution: Max Workers > 1
+    CheckParallel --> SequentialExecution: Max Workers = 1
+    ParallelExecution --> TrackProgress: Process Items
+    SequentialExecution --> TrackProgress: Process Items
+    TrackProgress --> ProcessBatch: More Batches
+    TrackProgress --> AggregateResults: All Complete
+    AggregateResults --> [*]: Done
+    
+    ProcessBatch --> ErrorHandling: Batch Failed
+    ErrorHandling --> RetryBatch: Can Retry
+    ErrorHandling --> SkipBatch: Skip Failed
+    RetryBatch --> ProcessBatch: Retry
+    SkipBatch --> ProcessBatch: Next Batch
+```
 
 ## Basic Usage
 
 ```yaml
 steps:
-  - name: process_items
-    task: batch
+  split_into_batches:
+    type: python
     inputs:
-      items: ["item1", "item2", "item3", "item4"]
-      batch_size: 2
-      parallel: true
-      task:
-        type: shell
-        command: "process_item.sh {{ item }}"
-    outputs: batch_results
+      code: |
+        numbers = params['numbers']
+        batch_size = params['batch_size']
+        batches = [numbers[i:i + batch_size] for i in range(0, len(numbers), batch_size)]
+        result = batches
+
+  process_batches:
+    type: python
+    for_each: "{{ steps.split_into_batches.result }}"
+    inputs:
+      operation: multiply
+      item: "{{ item }}"
+      factor: 2
+    retry:
+      max_attempts: 3
+      delay: 5
 ```
+
+## Parallel Processing Architecture
+
+```mermaid
+graph TD
+    A[Input Batches] --> B[Worker Pool]
+    B --> C[Worker 1]
+    B --> D[Worker 2]
+    B --> E[Worker 3]
+    B --> F[Worker N]
+    C --> G[Results Queue]
+    D --> G
+    E --> G
+    F --> G
+    G --> H[Aggregate Results]
+    
+    subgraph "Worker Management"
+    I[Max Workers]
+    J[Queue Size]
+    K[Timeout]
+    end
+```
+
+## State Management
+
+```mermaid
+graph TD
+    A[Batch State] --> B[Processed Items]
+    A --> C[Failed Items]
+    A --> D[Progress]
+    B --> E[Success Count]
+    B --> F[Success Results]
+    C --> G[Error Count]
+    C --> H[Error Details]
+    D --> I[Total Items]
+    D --> J[Current Item]
+    D --> K[Completion %]
+```
+
+## Error Handling and Recovery
+
+```mermaid
+stateDiagram-v2
+    [*] --> ProcessItem: Next Item
+    ProcessItem --> Success: Item Processed
+    ProcessItem --> Failure: Item Failed
+    Failure --> RetryItem: Can Retry
+    Failure --> SkipItem: Max Retries
+    RetryItem --> ProcessItem: Retry
+    SkipItem --> SaveError: Log Error
+    Success --> UpdateProgress: Track Progress
+    SaveError --> UpdateProgress: Track Error
+    UpdateProgress --> [*]: Next Item
+```
+
+## Best Practices
+
+1. **Chunk Size**: Choose appropriate chunk sizes based on:
+   - Available memory
+   - Processing complexity
+   - Required processing time
+   
+2. **State Management**:
+   - Store progress information in the context
+   - Use checkpoints for long-running operations
+   - Implement resume capabilities
+
+3. **Error Handling**:
+   - Implement retry mechanisms
+   - Log failed items
+   - Provide cleanup steps
+
+4. **Performance**:
+   - Use parallel processing when appropriate
+   - Monitor resource usage
+   - Optimize batch sizes based on performance metrics
+
+5. **Monitoring**:
+   - Track progress regularly
+   - Log important metrics
+   - Implement alerting for failures
 
 ## Features
 

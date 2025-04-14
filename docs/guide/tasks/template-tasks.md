@@ -1,5 +1,44 @@
 # Template Tasks
 
+## Overview
+
+```mermaid
+graph TD
+    A[Template Source] --> B[Template Engine]
+    C[Variables] --> B
+    D[Context] --> B
+    B --> E[Rendered Output]
+    
+    subgraph "Template Features"
+    F[Variable Substitution]
+    G[Control Structures]
+    H[Filters]
+    I[Error Handling]
+    end
+    
+    subgraph "Variable Sources"
+    J[Step Inputs]
+    K[Environment]
+    L[Parameters]
+    M[Step Outputs]
+    end
+```
+
+## Template Processing Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> LoadTemplate: Read Template
+    LoadTemplate --> ParseTemplate: Jinja2 Parser
+    ParseTemplate --> ValidateVars: Check Variables
+    ValidateVars --> RenderTemplate: All Vars Present
+    ValidateVars --> ErrorHandling: Missing Vars
+    RenderTemplate --> WriteOutput: Success
+    RenderTemplate --> ErrorHandling: Render Error
+    WriteOutput --> [*]: Complete
+    ErrorHandling --> [*]: Failed
+```
+
 Template tasks provide powerful templating capabilities using Jinja2, allowing you to generate files and content with variable substitution and complex logic.
 
 ## Basic Usage
