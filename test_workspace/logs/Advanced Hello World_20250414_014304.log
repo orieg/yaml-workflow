@@ -1,0 +1,61 @@
+2025-04-14 01:43:04,460 - workflow - INFO - Logging to: test_workspace/logs/Advanced Hello World_20250414_014304.log
+2025-04-14 01:43:04,460 - workflow - INFO - Initialized workflow: Advanced Hello World
+2025-04-14 01:43:04,461 - workflow - INFO - Workspace: test_workspace
+2025-04-14 01:43:04,461 - workflow - INFO - Run number: 1
+2025-04-14 01:43:04,461 - workflow - INFO - Default parameters loaded:
+2025-04-14 01:43:04,461 - workflow - INFO -   name: World
+2025-04-14 01:43:04,461 - workflow - INFO - Parameters provided:
+2025-04-14 01:43:04,461 - workflow - INFO -   name: Alice
+2025-04-14 01:43:04,461 - workflow - INFO - Running step 1: validate_input
+2025-04-14 01:43:04,472 - workflow - INFO - Running step 2: check_validation
+2025-04-14 01:43:04,472 - task.check_validation - INFO - Executing task 'check_validation' of type 'read_file'
+2025-04-14 01:43:04,472 - task.check_validation - DEBUG - Step configuration: {'name': 'check_validation', 'task': 'read_file', 'module': 'yaml_workflow_engine.tasks.file_tasks', 'params': {'file_path': 'output/validation_result.txt', 'encoding': 'utf-8'}, 'outputs': 'validation_content'}
+2025-04-14 01:43:04,472 - task.check_validation - DEBUG - Context: {'workflow_name': 'Advanced Hello World', 'workspace': 'test_workspace', 'run_number': 1, 'timestamp': '2025-04-14T01:43:04.460962', 'workflow_file': '/Users/nicolas/Documents/git/orieg/yaml-workflow/src/yaml_workflow/examples/advanced_hello_world.yaml', 'name': 'Alice', 'validate_input': ''}
+2025-04-14 01:43:04,472 - task.check_validation - DEBUG - Workspace: test_workspace
+2025-04-14 01:43:04,472 - task.check_validation - INFO - Task completed successfully
+2025-04-14 01:43:04,473 - task.check_validation - DEBUG - Result: Valid: Alice
+
+2025-04-14 01:43:04,473 - workflow - INFO - Running step 3: process_validation
+2025-04-14 01:43:04,480 - workflow - INFO - Running step 4: read_validation
+2025-04-14 01:43:04,480 - task.read_validation - INFO - Executing task 'read_validation' of type 'read_file'
+2025-04-14 01:43:04,480 - task.read_validation - DEBUG - Step configuration: {'name': 'read_validation', 'task': 'read_file', 'module': 'yaml_workflow_engine.tasks.file_tasks', 'params': {'file_path': 'output/validation_passed.txt', 'encoding': 'utf-8'}}
+2025-04-14 01:43:04,480 - task.read_validation - DEBUG - Context: {'workflow_name': 'Advanced Hello World', 'workspace': 'test_workspace', 'run_number': 1, 'timestamp': '2025-04-14T01:43:04.460962', 'workflow_file': '/Users/nicolas/Documents/git/orieg/yaml-workflow/src/yaml_workflow/examples/advanced_hello_world.yaml', 'name': 'Alice', 'validate_input': '', 'check_validation': 'Valid: Alice\n', 'process_validation': 'Validation passed\n'}
+2025-04-14 01:43:04,480 - task.read_validation - DEBUG - Workspace: test_workspace
+2025-04-14 01:43:04,481 - task.read_validation - INFO - Task completed successfully
+2025-04-14 01:43:04,481 - task.read_validation - DEBUG - Result: true
+
+2025-04-14 01:43:04,481 - workflow - INFO - Running step 5: debug_vars
+2025-04-14 01:43:04,481 - task.debug_vars - INFO - Executing task 'debug_vars' of type 'print_vars'
+2025-04-14 01:43:04,481 - task.debug_vars - DEBUG - Step configuration: {'name': 'debug_vars', 'task': 'print_vars', 'module': 'yaml_workflow_engine.tasks.python_tasks', 'params': {'message': 'Available variables'}}
+2025-04-14 01:43:04,481 - task.debug_vars - DEBUG - Context: {'workflow_name': 'Advanced Hello World', 'workspace': 'test_workspace', 'run_number': 1, 'timestamp': '2025-04-14T01:43:04.460962', 'workflow_file': '/Users/nicolas/Documents/git/orieg/yaml-workflow/src/yaml_workflow/examples/advanced_hello_world.yaml', 'name': 'Alice', 'validate_input': '', 'check_validation': 'Valid: Alice\n', 'process_validation': 'Validation passed\n', 'read_validation': 'true\n'}
+2025-04-14 01:43:04,481 - task.debug_vars - DEBUG - Workspace: test_workspace
+2025-04-14 01:43:04,481 - workflow - INFO - Running step 6: debug_validation
+2025-04-14 01:43:04,490 - workflow - INFO - Skipping step get_timestamp: condition not met
+2025-04-14 01:43:04,490 - workflow - INFO - Skipping step create_greeting: condition not met
+2025-04-14 01:43:04,490 - workflow - INFO - Skipping step translate_greeting: condition not met
+2025-04-14 01:43:04,491 - workflow - INFO - Skipping step format_output: condition not met
+2025-04-14 01:43:04,491 - workflow - INFO - Skipping step handle_error: condition not met
+2025-04-14 01:43:04,491 - workflow - INFO - Running step 12: notify_status
+2025-04-14 01:43:04,498 - workflow - INFO - Workflow completed successfully.
+2025-04-14 01:43:04,498 - workflow - INFO - Final workflow outputs:
+2025-04-14 01:43:04,498 - workflow - INFO -   validate_input: 
+2025-04-14 01:43:04,498 - workflow - INFO -   check_validation: Valid: Alice
+
+2025-04-14 01:43:04,498 - workflow - INFO -   process_validation: Validation passed
+
+2025-04-14 01:43:04,498 - workflow - INFO -   read_validation: true
+
+2025-04-14 01:43:04,498 - workflow - INFO -   debug_vars: {'success': True}
+2025-04-14 01:43:04,498 - workflow - INFO -   debug_validation: === Debug Info ===
+Validation Result File Content:
+true
+Validation Passed: true
+
+=== End Debug ===
+
+2025-04-14 01:43:04,498 - workflow - INFO -   notify_status: Workflow completed successfully!
+Check the output files for detailed results:
+- greeting.json: JSON formatted greeting
+- greetings.yaml: Multi-language greetings
+- validation_result.txt: Input validation details
+

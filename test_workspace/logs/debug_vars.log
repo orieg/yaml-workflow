@@ -1,0 +1,4 @@
+2025-04-14 01:43:04,481 - task.debug_vars - INFO - Executing task 'debug_vars' of type 'print_vars'
+2025-04-14 01:43:04,481 - task.debug_vars - DEBUG - Step configuration: {'name': 'debug_vars', 'task': 'print_vars', 'module': 'yaml_workflow_engine.tasks.python_tasks', 'params': {'message': 'Available variables'}}
+2025-04-14 01:43:04,481 - task.debug_vars - DEBUG - Context: {'workflow_name': 'Advanced Hello World', 'workspace': 'test_workspace', 'run_number': 1, 'timestamp': '2025-04-14T01:43:04.460962', 'workflow_file': '/Users/nicolas/Documents/git/orieg/yaml-workflow/src/yaml_workflow/examples/advanced_hello_world.yaml', 'name': 'Alice', 'validate_input': '', 'check_validation': 'Valid: Alice\n', 'process_validation': 'Validation passed\n', 'read_validation': 'true\n'}
+2025-04-14 01:43:04,481 - task.debug_vars - DEBUG - Workspace: test_workspace

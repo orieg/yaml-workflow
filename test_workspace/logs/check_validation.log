@@ -1,0 +1,7 @@
+2025-04-14 01:43:04,472 - task.check_validation - INFO - Executing task 'check_validation' of type 'read_file'
+2025-04-14 01:43:04,472 - task.check_validation - DEBUG - Step configuration: {'name': 'check_validation', 'task': 'read_file', 'module': 'yaml_workflow_engine.tasks.file_tasks', 'params': {'file_path': 'output/validation_result.txt', 'encoding': 'utf-8'}, 'outputs': 'validation_content'}
+2025-04-14 01:43:04,472 - task.check_validation - DEBUG - Context: {'workflow_name': 'Advanced Hello World', 'workspace': 'test_workspace', 'run_number': 1, 'timestamp': '2025-04-14T01:43:04.460962', 'workflow_file': '/Users/nicolas/Documents/git/orieg/yaml-workflow/src/yaml_workflow/examples/advanced_hello_world.yaml', 'name': 'Alice', 'validate_input': ''}
+2025-04-14 01:43:04,472 - task.check_validation - DEBUG - Workspace: test_workspace
+2025-04-14 01:43:04,472 - task.check_validation - INFO - Task completed successfully
+2025-04-14 01:43:04,473 - task.check_validation - DEBUG - Result: Valid: Alice
+

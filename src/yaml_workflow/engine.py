@@ -411,7 +411,9 @@ class WorkflowEngine:
                         raise WorkflowError(f"Error in step {name}: {str(e)}") from e
 
                 result = handler(step, self.context, self.workspace)
-                self.logger.debug(f"Task returned result of type {type(result)}: {result}")
+                self.logger.debug(
+                    f"Task returned result of type {type(result)}: {result}"
+                )
                 results[name] = result
                 # Update context with step result
                 self.context[name] = result
@@ -424,32 +426,46 @@ class WorkflowEngine:
             # Store outputs in context
             outputs: Union[List[str], str, None] = step.get("outputs")
             if outputs is not None:
-                self.logger.debug(f"Storing outputs in context. Current context before: {self.context}")
+                self.logger.debug(
+                    f"Storing outputs in context. Current context before: {self.context}"
+                )
                 self.logger.debug(f"Task result type: {type(result)}, value: {result}")
                 if isinstance(outputs, str):
                     # Ensure we store raw strings for template variables
                     if isinstance(result, dict) and "content" in result:
-                        self.logger.warning(f"Task '{name}' returned a dict with 'content' property - using raw content value")
+                        self.logger.warning(
+                            f"Task '{name}' returned a dict with 'content' property - using raw content value"
+                        )
                         self.context[outputs] = result["content"]
                     else:
                         self.context[outputs] = result
-                    self.logger.debug(f"Stored single output '{outputs}' = {self.context[outputs]}")
+                    self.logger.debug(
+                        f"Stored single output '{outputs}' = {self.context[outputs]}"
+                    )
                 elif isinstance(outputs, list):
                     if len(outputs) == 1:
                         if isinstance(result, dict) and "content" in result:
-                            self.logger.warning(f"Task '{name}' returned a dict with 'content' property - using raw content value")
+                            self.logger.warning(
+                                f"Task '{name}' returned a dict with 'content' property - using raw content value"
+                            )
                             self.context[outputs[0]] = result["content"]
                         else:
                             self.context[outputs[0]] = result
-                        self.logger.debug(f"Stored single output from list '{outputs[0]}' = {self.context[outputs[0]]}")
+                        self.logger.debug(
+                            f"Stored single output from list '{outputs[0]}' = {self.context[outputs[0]]}"
+                        )
                     elif len(outputs) > 1 and isinstance(result, (list, tuple)):
                         for output, value in zip(outputs, result):
                             if isinstance(value, dict) and "content" in value:
-                                self.logger.warning(f"Task '{name}' returned a dict with 'content' property - using raw content value")
+                                self.logger.warning(
+                                    f"Task '{name}' returned a dict with 'content' property - using raw content value"
+                                )
                                 self.context[output] = value["content"]
                             else:
                                 self.context[output] = value
-                            self.logger.debug(f"Stored multiple output '{output}' = {self.context[output]}")
+                            self.logger.debug(
+                                f"Stored multiple output '{output}' = {self.context[output]}"
+                            )
 
             self.logger.debug(f"Final context after step '{name}': {self.context}")
             self.logger.info(f"Step '{name}' completed. Outputs: {self.context}")
@@ -582,32 +598,46 @@ class WorkflowEngine:
         # Store outputs in context
         outputs: Union[List[str], str, None] = step.get("outputs")
         if outputs is not None:
-            self.logger.debug(f"Storing outputs in context. Current context before: {self.context}")
+            self.logger.debug(
+                f"Storing outputs in context. Current context before: {self.context}"
+            )
             self.logger.debug(f"Task result type: {type(result)}, value: {result}")
             if isinstance(outputs, str):
                 # Ensure we store raw strings for template variables
                 if isinstance(result, dict) and "content" in result:
-                    self.logger.warning(f"Task '{name}' returned a dict with 'content' property - using raw content value")
+                    self.logger.warning(
+                        f"Task '{name}' returned a dict with 'content' property - using raw content value"
+                    )
                     self.context[outputs] = result["content"]
                 else:
                     self.context[outputs] = result
-                self.logger.debug(f"Stored single output '{outputs}' = {self.context[outputs]}")
+                self.logger.debug(
+                    f"Stored single output '{outputs}' = {self.context[outputs]}"
+                )
             elif isinstance(outputs, list):
                 if len(outputs) == 1:
                     if isinstance(result, dict) and "content" in result:
-                        self.logger.warning(f"Task '{name}' returned a dict with 'content' property - using raw content value")
+                        self.logger.warning(
+                            f"Task '{name}' returned a dict with 'content' property - using raw content value"
+                        )
                         self.context[outputs[0]] = result["content"]
                     else:
                         self.context[outputs[0]] = result
-                    self.logger.debug(f"Stored single output from list '{outputs[0]}' = {self.context[outputs[0]]}")
+                    self.logger.debug(
+                        f"Stored single output from list '{outputs[0]}' = {self.context[outputs[0]]}"
+                    )
                 elif len(outputs) > 1 and isinstance(result, (list, tuple)):
                     for output, value in zip(outputs, result):
                         if isinstance(value, dict) and "content" in value:
-                            self.logger.warning(f"Task '{name}' returned a dict with 'content' property - using raw content value")
+                            self.logger.warning(
+                                f"Task '{name}' returned a dict with 'content' property - using raw content value"
+                            )
                             self.context[output] = value["content"]
                         else:
                             self.context[output] = value
-                        self.logger.debug(f"Stored multiple output '{output}' = {self.context[output]}")
+                        self.logger.debug(
+                            f"Stored multiple output '{output}' = {self.context[output]}"
+                        )
 
         self.logger.debug(f"Final context after step '{name}': {self.context}")
         self.logger.info(f"Step '{name}' completed. Outputs: {self.context}")
