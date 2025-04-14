@@ -3,6 +3,7 @@ Batch processing tasks for handling multiple items in parallel with resume capab
 """
 
 import json
+import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -26,27 +27,30 @@ def chunk_iterator(items: List[Any], chunk_size: int) -> Iterator[List[Any]]:
     Returns:
         Iterator[List[Any]]: Iterator yielding chunks of items
     """
+    if chunk_size <= 0:
+        raise ValueError("Chunk size must be greater than 0")
     for i in range(0, len(items), chunk_size):
         yield items[i : i + chunk_size]
 
 
 class BatchProcessor:
-    """Handles batch processing of items with resume capability."""
+    """Handles batch processing of items with state management."""
 
     def __init__(self, workspace: Union[str, Path], name: str):
-        """
-        Initialize the batch processor.
+        """Initialize batch processor.
 
         Args:
-            workspace: Workspace directory (str or Path)
-            name: Name of the processing task
+            workspace: Path to workspace directory
+            name: Name of the batch processor (used for state files)
         """
         self.workspace = Path(workspace) if isinstance(workspace, str) else workspace
         self.name = name
-        self.logger = get_task_logger(self.workspace, name)
+        self.logger = logging.getLogger(__name__)
+        self.state_dir = self.workspace / ".batch_state"
+        self.state_file = self.state_dir / f"{name}_state.json"
 
-        # State file path in workspace root
-        self.state_file = self.workspace / "batch_state.json"
+        # Ensure state directory exists
+        self.state_dir.mkdir(parents=True, exist_ok=True)
 
     def load_state(self) -> Tuple[Set[str], Set[str]]:
         """
@@ -101,7 +105,7 @@ class BatchProcessor:
         item: Any,
         task_config: Dict[str, Any],
         context: Dict[str, Any],
-        progress_callback: Optional[Callable[[str, float], None]] = None,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> Tuple[bool, Any]:
         """
         Process a single item using the specified task.
@@ -197,17 +201,19 @@ class BatchProcessor:
             }
 
             # Execute task
-            result = task_handler(step, batch_context, str(self.workspace))
+            result = task_handler(step, batch_context, self.workspace)
 
             # Call progress callback if provided
             if progress_callback:
-                progress_callback(str(item), result)
+                current = task_config.get("batch_index", 0) + 1
+                total = len(task_config.get("batch", []))
+                progress_callback(current, total)
 
             self.logger.info(f"Successfully processed: {item}")
             return True, result
 
         except Exception as e:
-            self.logger.error(f"Failed to process {item}: {str(e)}")
+            self.logger.error(f"Failed to process item {item}: {str(e)}")
             return False, str(e)
 
     def process_batch(
@@ -218,7 +224,7 @@ class BatchProcessor:
         chunk_size: int = 10,
         max_workers: Optional[int] = None,
         resume_state: bool = False,
-        progress_callback: Optional[Callable[[str, float], None]] = None,
+        progress_callback: Optional[Callable[[Any, float], None]] = None,
         error_handler: Optional[Callable[[str, Any, Exception], None]] = None,
         aggregator: Optional[Callable[[List[Any]], Any]] = None,
     ) -> Dict[str, Any]:
@@ -274,8 +280,8 @@ class BatchProcessor:
             }
 
         self.logger.info(f"Processing {len(remaining_items)} remaining items")
-        total_items = len(remaining_items)
-        processed_count = 0
+        total_items = len(items)
+        processed_count = len(processed_items)
 
         # Process items in chunks
         for chunk_index, chunk in enumerate(
@@ -310,7 +316,7 @@ class BatchProcessor:
                                 processed_count += 1
                                 if progress_callback:
                                     progress_callback(
-                                        str(item), processed_count / total_items
+                                        str(item), processed_count / total_items * 100
                                     )
                             else:
                                 failed_items.add(str(item))
@@ -331,7 +337,9 @@ class BatchProcessor:
                         results[str(item)] = result
                         processed_count += 1
                         if progress_callback:
-                            progress_callback(str(item), processed_count / total_items)
+                            progress_callback(
+                                str(item), processed_count / total_items * 100
+                            )
                     else:
                         failed_items.add(str(item))
                         if error_handler:
@@ -387,56 +395,34 @@ def process_batch(
 
     Raises:
         ValueError: If required configuration is missing or invalid
-        RuntimeError: If batch processing fails
     """
-    # Validate inputs
-    items = step.get("iterate_over")
-    if not items:
-        raise ValueError("'iterate_over' is required in step configuration")
+    # Convert workspace to Path if it's a string
+    workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
 
-    processing_task = step.get("processing_task")
-    if not processing_task:
-        raise ValueError("'processing_task' is required in step configuration")
-    if not isinstance(processing_task, dict):
-        raise ValueError("'processing_task' must be a dictionary")
+    # Create processor instance
+    processor = BatchProcessor(workspace_path, step.get("name", "batch_processor"))
 
-    # Get configuration with defaults
-    parallel_settings = step.get("parallel_settings", {})
-    if not isinstance(parallel_settings, dict):
-        raise ValueError("'parallel_settings' must be a dictionary")
-
-    chunk_size = parallel_settings.get("chunk_size", 10)
-    if not isinstance(chunk_size, int) or chunk_size < 1:
-        raise ValueError("'chunk_size' must be a positive integer")
-
-    max_workers = parallel_settings.get("max_workers")
-    if max_workers is not None and (
-        not isinstance(max_workers, int) or max_workers < 1
-    ):
-        raise ValueError("'max_workers' must be a positive integer or None")
-
-    resume = step.get("resume_state", False)
-    if not isinstance(resume, bool):
-        raise ValueError("'resume_state' must be a boolean")
-
-    # Get progress callback and error handler
+    # Get configuration
+    items = step.get("iterate_over", [])
+    processing_task = step.get("processing_task", {})
+    chunk_size = step.get("chunk_size", 10)
+    max_workers = step.get("max_workers")
+    resume_state = step.get("resume_state", False)
     progress_callback = step.get("progress_callback")
     error_handler = step.get("error_handler")
-    aggregator = step.get("aggregator")
 
-    # Create processor and process batch
-    try:
-        processor = BatchProcessor(workspace, step.get("name", "batch_task"))
-        return processor.process_batch(
-            items=items,
-            task_config=processing_task,
-            context=context,
-            chunk_size=chunk_size,
-            max_workers=max_workers,
-            resume_state=resume,
-            progress_callback=progress_callback,
-            error_handler=error_handler,
-            aggregator=aggregator,
-        )
-    except Exception as e:
-        raise RuntimeError(f"Batch processing failed: {str(e)}")
+    # Validate chunk size
+    if chunk_size <= 0:
+        raise ValueError("Chunk size must be greater than 0")
+
+    # Process batch
+    return processor.process_batch(
+        items=items,
+        task_config=processing_task,
+        context=context,
+        chunk_size=chunk_size,
+        max_workers=max_workers,
+        resume_state=resume_state,
+        progress_callback=progress_callback,
+        error_handler=error_handler,
+    )

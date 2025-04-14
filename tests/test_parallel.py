@@ -17,21 +17,18 @@ def sample_items():
 @pytest.fixture
 def parallel_workflow(temp_workspace):
     """Create a workflow file with parallel tasks."""
-    workflow_content = """
-name: parallel_test
+    workflow_content = """name: parallel_test
 description: Test parallel execution
 
 steps:
   - name: parallel_step
     task: batch_processor
-    parallel: true
     iterate_over:
       - item1
       - item2
       - item3
-    parallel_settings:
-      max_workers: 3
-      chunk_size: 3
+    max_workers: 3
+    chunk_size: 3
     processing_task:
       task: shell
       command: "sleep 0.5 && echo 'Processing {{ item }}'"

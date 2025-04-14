@@ -14,7 +14,7 @@ from .base import get_task_logger
 @register_task("file_utils")
 def list_files(
     step: Dict[str, Any], context: Dict[str, Any], workspace: Path
-) -> Tuple[List[str], int]:
+) -> Dict[str, Any]:
     """
     List files in a directory matching a pattern.
 
@@ -24,7 +24,9 @@ def list_files(
         workspace: Workspace directory
 
     Returns:
-        Tuple[List[str], int]: List of file paths and total count
+        Dict[str, Any]: Dictionary containing:
+            - file_list: List of matching file paths
+            - total_files: Total number of files found
     """
     logger = get_task_logger(workspace, step.get("name", "list_files"))
 
