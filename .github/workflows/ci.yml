@@ -5,9 +5,9 @@ permissions:
   
 on:
   push:
-    branches-ignore: ['main']  # Prevent direct pushes to main
+    branches: ['main']  # Run on pushes to main
   pull_request:
-    branches: ['main']  # Only run on PRs targeting main
+    branches: ['main']  # Run on PRs targeting main
 
 jobs:
   test:
