@@ -52,9 +52,9 @@ yaml-workflow run workflows/hello_world.yaml --resume
 
 ## Documentation
 
-- [Task Types](docs/tasks.md) - Available task types and how to use them
-- [Workflow Structure](docs/workflow-structure.md) - Detailed workflow configuration
-- [Development Guide](docs/development.md) - Setup, building, and contributing
+- [Task Types](https://github.com/orieg/yaml-workflow/blob/main/docs/tasks.md) - Available task types and how to use them
+- [Workflow Structure](https://github.com/orieg/yaml-workflow/blob/main/docs/workflow-structure.md) - Detailed workflow configuration
+- [Development Guide](https://github.com/orieg/yaml-workflow/blob/main/docs/development.md) - Setup, building, and contributing
 
 ## License
 
