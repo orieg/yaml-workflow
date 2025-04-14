@@ -144,12 +144,13 @@ update_version "$release_version"
 # Commit release version
 git add pyproject.toml
 git commit -m "Release version $release_version"
+git push origin main
 
 # Create and push tag
 tag="v$release_version"
 echo "Creating and pushing tag $tag"
 git tag -a "$tag" -m "Release version $release_version"
-git push origin main "$tag"
+git push origin "$tag"
 
 # Wait for release workflow
 wait_for_workflow "$tag"
