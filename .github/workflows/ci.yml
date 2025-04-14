@@ -17,7 +17,7 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         
@@ -41,7 +41,7 @@ jobs:
         
     - name: Upload coverage to Codecov (Attempt 1)
       id: codecov1
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       continue-on-error: true
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -53,7 +53,7 @@ jobs:
     - name: Upload coverage to Codecov (Attempt 2)
       id: codecov2
       if: steps.codecov1.outcome == 'failure'
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       continue-on-error: true
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -64,7 +64,7 @@ jobs:
 
     - name: Upload coverage to Codecov (Final Attempt)
       if: steps.codecov2.outcome == 'failure'
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v5
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       with:
