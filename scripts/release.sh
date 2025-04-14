@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+# Configuration
+WORKFLOW_TIMEOUT=${WORKFLOW_TIMEOUT:-600}  # 10 minutes default
+WORKFLOW_CHECK_INTERVAL=${WORKFLOW_CHECK_INTERVAL:-20}
+MAX_ATTEMPTS=$((WORKFLOW_TIMEOUT / WORKFLOW_CHECK_INTERVAL))
+
 # Function to show usage
 show_usage() {
     echo "Usage: $0 [major|minor|patch]"
@@ -13,6 +18,34 @@ show_usage() {
 # Function to extract current version from pyproject.toml
 get_current_version() {
     grep -m 1 'version = ' pyproject.toml | cut -d '"' -f 2
+}
+
+# Function to validate version format
+validate_version() {
+    local version=$1
+    if ! echo "$version" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-dev)?$'; then
+        echo "Error: Invalid version format: $version"
+        exit 1
+    fi
+}
+
+# Function to compare versions
+compare_versions() {
+    local version1=$1
+    local version2=$2
+    
+    # Remove -dev suffix for comparison
+    version1=${version1%-dev}
+    version2=${version2%-dev}
+    
+    # Convert versions to comparable numbers
+    local v1=$(echo "$version1" | awk -F. '{ printf("%d%03d%03d", $1,$2,$3); }')
+    local v2=$(echo "$version2" | awk -F. '{ printf("%d%03d%03d", $1,$2,$3); }')
+    
+    if [ "$v1" -le "$v2" ]; then
+        echo "Error: New version ($version1) must be greater than current version ($version2)"
+        exit 1
+    fi
 }
 
 # Function to update version in pyproject.toml
@@ -66,24 +99,38 @@ check_working_directory() {
 # Function to wait for GitHub workflow to complete
 wait_for_workflow() {
     local tag=$1
-    local max_attempts=30
     local attempt=1
-    local sleep_time=20
 
     echo "Waiting for release workflow to complete..."
-    while [ $attempt -le $max_attempts ]; do
+    echo "Timeout set to ${WORKFLOW_TIMEOUT}s (checking every ${WORKFLOW_CHECK_INTERVAL}s)"
+    
+    while [ $attempt -le $MAX_ATTEMPTS ]; do
         # Check if release exists
         if gh release view $tag &> /dev/null; then
             echo "Release $tag has been created successfully!"
             return 0
         fi
-        echo "Attempt $attempt/$max_attempts: Release not ready yet, waiting ${sleep_time}s..."
-        sleep $sleep_time
+        echo "Attempt $attempt/$MAX_ATTEMPTS: Release not ready yet, waiting ${WORKFLOW_CHECK_INTERVAL}s..."
+        sleep $WORKFLOW_CHECK_INTERVAL
         attempt=$((attempt + 1))
     done
 
-    echo "Error: Timeout waiting for release to be created"
+    echo "Error: Timeout waiting for release to be created after ${WORKFLOW_TIMEOUT}s"
     exit 1
+}
+
+# Function to validate GitHub token and permissions
+check_github_token() {
+    if ! gh auth status &> /dev/null; then
+        echo "Error: GitHub authentication failed. Please check your token."
+        exit 1
+    fi
+    
+    # Check if token has necessary permissions
+    if ! gh auth status | grep -q "read:org"; then
+        echo "Warning: GitHub token may not have all required permissions."
+        echo "Please ensure the token has: repo, read:org, and workflow permissions."
+    fi
 }
 
 # Main script
@@ -112,10 +159,7 @@ if ! command -v gh &> /dev/null; then
 fi
 
 # Check if gh is authenticated
-if ! gh auth status &> /dev/null; then
-    echo "Error: GitHub CLI is not authenticated. Please run 'gh auth login' first."
-    exit 1
-fi
+check_github_token
 
 # Ensure we're in the repository root
 if [ ! -f "pyproject.toml" ]; then
@@ -129,6 +173,9 @@ check_working_directory
 # Get current version
 current_version=$(get_current_version)
 
+# Validate current version format
+validate_version "$current_version"
+
 if [[ $current_version != *"-dev"* ]]; then
     echo "Error: Current version ($current_version) is not a dev version"
     exit 1
@@ -136,6 +183,10 @@ fi
 
 # Remove -dev suffix for release
 release_version=${current_version%-dev}
+
+# Validate release version format and ensure it's greater than the last release
+validate_version "$release_version"
+compare_versions "$release_version" "$current_version"
 
 # Update to release version
 echo "Updating version to $release_version"
