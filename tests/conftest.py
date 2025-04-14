@@ -117,32 +117,6 @@ steps:
 
 
 @pytest.fixture
-def rate_limited_workflow(temp_workspace):
-    """Create a sample rate-limited workflow."""
-    content = """
-name: rate_limited_workflow
-description: A rate-limited workflow
-
-settings:
-  rate_limit:
-    requests_per_second: 2
-    burst: 3
-
-steps:
-  - name: rate_limited_tasks
-    task: batch
-    input: ["1", "2", "3", "4", "5"]
-    task:
-      type: http
-      url: "https://api.example.com/endpoint/{{ item }}"
-      method: GET
-"""
-    workflow_file = temp_workspace / "rate_limited_workflow.yaml"
-    workflow_file.write_text(content)
-    return workflow_file
-
-
-@pytest.fixture
 def custom_task_module(temp_workspace):
     """Create a sample custom task module."""
     module_dir = temp_workspace / "custom_tasks"

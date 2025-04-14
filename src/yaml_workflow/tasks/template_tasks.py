@@ -1,6 +1,7 @@
 """Template-based task handlers."""
 
 from pathlib import Path
+import logging
 from typing import Any, Dict
 
 from jinja2 import StrictUndefined, Template, UndefinedError
@@ -8,6 +9,7 @@ from jinja2 import StrictUndefined, Template, UndefinedError
 from ..workspace import resolve_path
 from . import register_task
 
+logger = logging.getLogger(__name__)
 
 @register_task("template")
 def render_template(
@@ -37,11 +39,17 @@ def render_template(
     if not output_file:
         raise ValueError("No output file specified")
 
+    logger.debug(f"Template string: {template_str}")
+    logger.debug(f"Context for rendering: {context}")
+
     # Render template with strict undefined handling
     template = Template(template_str, undefined=StrictUndefined)
     try:
         rendered = template.render(**context)
+        logger.debug(f"Rendered template: {rendered}")
     except UndefinedError as e:
+        logger.error(f"Template rendering failed: {str(e)}")
+        logger.error(f"Available context variables: {list(context.keys())}")
         raise ValueError(f"Template error: {str(e)}")
 
     # Save to file

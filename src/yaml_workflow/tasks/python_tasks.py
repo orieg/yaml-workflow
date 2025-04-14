@@ -13,6 +13,44 @@ from .base import get_task_logger, log_task_error, log_task_execution, log_task_
 logger = logging.getLogger(__name__)
 
 
+@register_task("print_vars")
+def print_vars_task(
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Union[str, Path]
+) -> Dict[str, Any]:
+    """Print all available variables in the context.
+
+    Args:
+        step: The step configuration
+        context: The execution context
+        workspace: The workspace path
+
+    Returns:
+        Dict containing success status
+    """
+    try:
+        logger = get_task_logger(workspace, step.get("name", "print_vars"))
+        workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
+        log_task_execution(logger, step, context, workspace_path)
+
+        print("\n=== Available Variables ===")
+        print("\nContext:")
+        for key, value in context.items():
+            print(f"{key}: {type(value)} = {value}")
+        
+        print("\nStep:")
+        for key, value in step.items():
+            print(f"{key}: {type(value)} = {value}")
+
+        print("\nWorkspace:", workspace)
+        print("=== End Variables ===\n")
+
+        return {"success": True}
+
+    except Exception as e:
+        log_task_error(logger, e)
+        raise
+
+
 @register_task("python")
 def python_task(
     step: Dict[str, Any], context: Dict[str, Any], workspace: Union[str, Path]
