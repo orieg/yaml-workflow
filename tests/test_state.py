@@ -217,25 +217,25 @@ def test_retry_state_management(workflow_state):
     retry_state = {
         "attempt": 1,
         "last_error": "Test error",
-        "last_attempt": "2024-01-01T00:00:00"
+        "last_attempt": "2024-01-01T00:00:00",
     }
     workflow_state.update_retry_state("step1", retry_state)
-    
+
     # Verify retry state was saved
     state = workflow_state.get_retry_state("step1")
     assert state == retry_state
-    
+
     # Test updating attempt count
     retry_state["attempt"] = 2
     workflow_state.update_retry_state("step1", retry_state)
     state = workflow_state.get_retry_state("step1")
     assert state["attempt"] == 2
-    
+
     # Test clearing retry state
     workflow_state.clear_retry_state("step1")
     state = workflow_state.get_retry_state("step1")
     assert state == {}
-    
+
     # Test getting retry state for non-existent step
     state = workflow_state.get_retry_state("non_existent")
     assert state == {}
@@ -247,13 +247,13 @@ def test_retry_state_reset(workflow_state):
     retry_state = {
         "attempt": 1,
         "last_error": "Test error",
-        "last_attempt": "2024-01-01T00:00:00"
+        "last_attempt": "2024-01-01T00:00:00",
     }
     workflow_state.update_retry_state("step1", retry_state)
-    
+
     # Reset workflow state
     workflow_state.reset_state()
-    
+
     # Verify retry state was cleared
     state = workflow_state.get_retry_state("step1")
     assert state == {}

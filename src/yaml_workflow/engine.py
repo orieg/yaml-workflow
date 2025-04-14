@@ -6,10 +6,10 @@ import importlib
 import inspect
 import logging
 import logging.handlers
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
-import time
 
 import yaml
 from jinja2 import Template
@@ -649,7 +649,9 @@ class WorkflowEngine:
         self.logger.debug(f"Final context after step '{name}': {self.context}")
         self.logger.info(f"Step '{name}' completed. Outputs: {self.context}")
 
-    def _handle_step_error(self, step: Dict[str, Any], error: Exception) -> Optional[Dict[str, Any]]:
+    def _handle_step_error(
+        self, step: Dict[str, Any], error: Exception
+    ) -> Optional[Dict[str, Any]]:
         """
         Handle step error according to on_error configuration.
 
@@ -665,7 +667,7 @@ class WorkflowEngine:
         if not on_error:
             # No error handling configured, mark as failed and re-raise
             self.state.mark_step_failed(name, str(error))
-            return None
+            raise WorkflowError(f"Error in step {name}: {str(error)}")
 
         action = on_error.get("action", "fail")
         message = on_error.get("message", str(error))
@@ -685,7 +687,7 @@ class WorkflowEngine:
         if action == "fail":
             # Mark as failed and stop workflow
             self.state.mark_step_failed(name, message)
-            return None
+            raise WorkflowError(message)
         elif action == "continue" or action == "skip":
             # Mark as failed but return empty result to continue
             self.state.mark_step_failed(name, message)
@@ -694,9 +696,11 @@ class WorkflowEngine:
             # Check if retry configuration exists
             retry_config = step.get("retry", {})
             if not retry_config:
-                self.logger.warning("Retry action specified but no retry configuration found")
+                self.logger.warning(
+                    "Retry action specified but no retry configuration found"
+                )
                 self.state.mark_step_failed(name, message)
-                return None
+                raise WorkflowError(f"No retry configuration found for step {name}")
 
             max_attempts = retry_config.get("max_attempts", 3)
             delay = retry_config.get("delay", 5)
@@ -708,27 +712,40 @@ class WorkflowEngine:
 
             if attempt >= max_attempts:
                 self.logger.error(f"Step '{name}' failed after {attempt} attempts")
-                self.state.mark_step_failed(name, f"{message} (after {attempt} attempts)")
-                return None
+                self.state.mark_step_failed(
+                    name, f"{message} (after {attempt} attempts)"
+                )
+                raise WorkflowError(
+                    f"Step {name} failed after {attempt} attempts: {message}"
+                )
 
             # Update retry state
-            self.state.update_retry_state(name, {
-                "attempt": attempt + 1,
-                "last_error": message,
-                "last_attempt": datetime.now().isoformat()
-            })
+            self.state.update_retry_state(
+                name,
+                {
+                    "attempt": attempt + 1,
+                    "last_error": message,
+                    "last_attempt": datetime.now().isoformat(),
+                },
+            )
 
             # Wait before retry with exponential backoff
             wait_time = delay * (backoff ** (attempt - 1))
-            self.logger.info(f"Retrying step '{name}' in {wait_time} seconds (attempt {attempt + 1}/{max_attempts})")
+            self.logger.info(
+                f"Retrying step '{name}' in {wait_time} seconds (attempt {attempt + 1}/{max_attempts})"
+            )
             time.sleep(wait_time)
 
             # Try running the step again
             try:
                 handler = get_task_handler(step["task"])
+                if handler is None:
+                    raise WorkflowError(f"Unknown task type: {step['task']}")
                 result = handler(step, self.context, self.workspace)
                 # Clear retry state on success
                 self.state.clear_retry_state(name)
+                # Mark step as completed
+                self.state.mark_step_complete(name, {name: result})
                 return result
             except Exception as retry_error:
                 # Handle retry failure recursively
@@ -739,21 +756,28 @@ class WorkflowEngine:
             if next_step:
                 try:
                     notify_step = next(
-                        s for s in self.workflow.get("steps", [])
+                        s
+                        for s in self.workflow.get("steps", [])
                         if s.get("name") == next_step
                     )
                     handler = get_task_handler(notify_step["task"])
+                    if handler is None:
+                        raise WorkflowError(f"Unknown task type: {notify_step['task']}")
                     # Add error info to context for notification
                     self.context["error"] = {
                         "step": name,
                         "message": message,
-                        "error": str(error)
+                        "error": str(error),
                     }
                     handler(notify_step, self.context, self.workspace)
                 except Exception as notify_error:
-                    self.logger.error(f"Failed to execute notification task: {notify_error}")
-            return None
+                    self.logger.error(
+                        f"Failed to execute notification task: {notify_error}"
+                    )
+            raise WorkflowError(message)
         else:
             self.logger.error(f"Unknown error action: {action}")
             self.state.mark_step_failed(name, message)
-            return None
+            raise WorkflowError(
+                f"Unknown error action '{action}' for step {name}: {message}"
+            )

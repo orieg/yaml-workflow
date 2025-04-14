@@ -5,10 +5,12 @@ import pytest
 
 from yaml_workflow.engine import WorkflowEngine
 from yaml_workflow.exceptions import (
+    FlowNotFoundError,
     InvalidFlowDefinitionError,
     StepNotInFlowError,
     WorkflowError,
 )
+from yaml_workflow.tasks import register_task
 
 
 @pytest.fixture
@@ -165,18 +167,15 @@ def test_on_error_fail(tmp_path):
                 "name": "step1",
                 "task": "fail",
                 "inputs": {"message": "Deliberate failure"},
-                "on_error": {
-                    "action": "fail",
-                    "message": "Custom error message"
-                }
+                "on_error": {"action": "fail", "message": "Custom error message"},
             }
         ]
     }
     engine = WorkflowEngine(workflow)
-    
+
     with pytest.raises(WorkflowError) as exc_info:
         engine.run()
-    
+
     assert "Custom error message" in str(exc_info.value)
     state = engine.state.get_state()
     assert state["execution_state"]["status"] == "failed"
@@ -197,21 +196,18 @@ def test_on_error_continue(tmp_path):
                 "name": "step2",
                 "task": "fail",
                 "inputs": {"message": "Deliberate failure"},
-                "on_error": {
-                    "action": "continue",
-                    "message": "Skipping failed step"
-                }
+                "on_error": {"action": "continue", "message": "Skipping failed step"},
             },
             {
                 "name": "step3",
                 "task": "echo",
                 "inputs": {"message": "Step 3"},
-            }
+            },
         ]
     }
     engine = WorkflowEngine(workflow)
     result = engine.run()
-    
+
     assert result["status"] == "completed"
     state = engine.state.get_state()
     assert "step1" in state["steps"]
@@ -225,34 +221,27 @@ def test_on_error_continue(tmp_path):
 def test_on_error_retry(tmp_path):
     """Test on_error with retry action."""
     attempts = []
-    
+
     @register_task("flaky")
     def flaky_task(step, context, workspace):
         attempts.append(len(attempts) + 1)
         if len(attempts) < 3:
             raise ValueError("Temporary failure")
         return {"success": True}
-    
+
     workflow = {
         "steps": [
             {
                 "name": "flaky_step",
                 "task": "flaky",
-                "retry": {
-                    "max_attempts": 3,
-                    "delay": 0.1,
-                    "backoff": 1
-                },
-                "on_error": {
-                    "action": "retry",
-                    "message": "Retrying flaky step"
-                }
+                "retry": {"max_attempts": 3, "delay": 0.1, "backoff": 1},
+                "on_error": {"action": "retry", "message": "Retrying flaky step"},
             }
         ]
     }
     engine = WorkflowEngine(workflow)
     result = engine.run()
-    
+
     assert result["status"] == "completed"
     assert len(attempts) == 3  # Should succeed on third try
     state = engine.state.get_state()
@@ -262,12 +251,12 @@ def test_on_error_retry(tmp_path):
 def test_on_error_notify(tmp_path):
     """Test on_error with notify action."""
     notifications = []
-    
+
     @register_task("notify")
     def notify_task(step, context, workspace):
         notifications.append(context["error"])
         return {"notified": True}
-    
+
     workflow = {
         "steps": [
             {
@@ -277,20 +266,17 @@ def test_on_error_notify(tmp_path):
                 "on_error": {
                     "action": "notify",
                     "message": "Step failed: {{ error }}",
-                    "next": "notification"
-                }
+                    "next": "notification",
+                },
             },
-            {
-                "name": "notification",
-                "task": "notify"
-            }
+            {"name": "notification", "task": "notify"},
         ]
     }
     engine = WorkflowEngine(workflow)
-    
+
     with pytest.raises(WorkflowError):
         engine.run()
-    
+
     assert len(notifications) == 1
     assert notifications[0]["step"] == "failing_step"
     assert "Deliberate failure" in notifications[0]["error"]
@@ -306,16 +292,19 @@ def test_on_error_template_message(tmp_path):
                 "inputs": {"message": "Error XYZ occurred"},
                 "on_error": {
                     "action": "fail",
-                    "message": "Task failed with: {{ error }}"
-                }
+                    "message": "Task failed with: {{ error }}",
+                },
             }
         ]
     }
     engine = WorkflowEngine(workflow)
-    
+
     with pytest.raises(WorkflowError) as exc_info:
         engine.run()
-    
+
     assert "Task failed with: Error XYZ occurred" in str(exc_info.value)
     state = engine.state.get_state()
-    assert "Task failed with: Error XYZ occurred" in state["execution_state"]["failed_step"]["error"]
+    assert (
+        "Task failed with: Error XYZ occurred"
+        in state["execution_state"]["failed_step"]["error"]
+    )
