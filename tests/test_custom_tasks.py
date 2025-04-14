@@ -27,7 +27,8 @@ def custom_task_module():
         step: Dict[str, Any], context: Dict[str, Any], workspace: str
     ) -> Dict[str, Any]:
         logger = get_task_logger(workspace, step.get("name", "custom"))
-        log_task_execution(logger, step, context, workspace)
+        workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
+        log_task_execution(logger, step, context, workspace_path)
 
         inputs = step.get("inputs", {})
         message = inputs.get("message")

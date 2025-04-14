@@ -192,11 +192,11 @@ def python_task(
                 return {"result": [float(r) for r in results]}  # Ensure float type
 
             # Otherwise multiply all numbers together and then by the factor
-            result: float = 1.0  # Explicitly declare as float
+            multiply_result: float = 1.0  # Explicitly declare as float
             for num in numbers:
-                result *= float(num)
-            result *= factor
-            return {"result": result}
+                multiply_result *= float(num)
+            multiply_result *= factor
+            return {"result": multiply_result}
 
         elif operation == "divide":
             # Get dividend from inputs or context
@@ -216,8 +216,8 @@ def python_task(
                 dividend = float(dividend)
                 if dividend == 0:
                     raise ValueError("Cannot divide zero by a number")
-                result = dividend / divisor
-                return {"result": result}
+                division_result = dividend / divisor
+                return {"result": division_result}
             except (TypeError, ValueError) as e:
                 raise ValueError(f"Invalid input for division: {e}")
 
@@ -237,13 +237,13 @@ def python_task(
             # Pass item as first argument only if handler accepts parameters
             try:
                 if "item" in inputs and accepts_item:
-                    result = handler(inputs["item"], *args, **kwargs)
+                    custom_result = handler(inputs["item"], *args, **kwargs)
                 else:
-                    result = handler(*args, **kwargs)
+                    custom_result = handler(*args, **kwargs)
 
-                if isinstance(result, Exception):
-                    raise result
-                return {"result": result}
+                if isinstance(custom_result, Exception):
+                    raise custom_result
+                return {"result": custom_result}
             except Exception as e:
                 log_task_error(logger, e)  # Pass the actual exception
                 raise
