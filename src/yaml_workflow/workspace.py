@@ -142,11 +142,29 @@ class WorkflowState:
             "completed_steps": [],
             "failed_step": None,
             "step_outputs": {},
+            "retry_state": {},  # Add retry state tracking
             "last_updated": datetime.now().isoformat(),
             "status": "not_started",
             "flow": None,
         }
         self.save()
+
+    def get_retry_state(self, step_name: str) -> Dict[str, Any]:
+        """Get retry state for a step."""
+        return self.metadata["execution_state"].get("retry_state", {}).get(step_name, {})
+
+    def update_retry_state(self, step_name: str, retry_state: Dict[str, Any]) -> None:
+        """Update retry state for a step."""
+        if "retry_state" not in self.metadata["execution_state"]:
+            self.metadata["execution_state"]["retry_state"] = {}
+        self.metadata["execution_state"]["retry_state"][step_name] = retry_state
+        self.save()
+
+    def clear_retry_state(self, step_name: str) -> None:
+        """Clear retry state for a step."""
+        if "retry_state" in self.metadata["execution_state"]:
+            self.metadata["execution_state"]["retry_state"].pop(step_name, None)
+            self.save()
 
 
 def sanitize_name(name: str) -> str:
