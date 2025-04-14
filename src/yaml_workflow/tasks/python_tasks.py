@@ -36,7 +36,7 @@ def print_vars_task(
         print("\nContext:")
         for key, value in context.items():
             print(f"{key}: {type(value)} = {value}")
-        
+
         print("\nStep:")
         for key, value in step.items():
             print(f"{key}: {type(value)} = {value}")

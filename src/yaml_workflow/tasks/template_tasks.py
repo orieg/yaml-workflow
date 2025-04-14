@@ -1,7 +1,7 @@
 """Template-based task handlers."""
 
-from pathlib import Path
 import logging
+from pathlib import Path
 from typing import Any, Dict
 
 from jinja2 import StrictUndefined, Template, UndefinedError
@@ -10,6 +10,7 @@ from ..workspace import resolve_path
 from . import register_task
 
 logger = logging.getLogger(__name__)
+
 
 @register_task("template")
 def render_template(

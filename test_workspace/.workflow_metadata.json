@@ -1,0 +1,49 @@
+{
+  "workflow_name": "Advanced Hello World",
+  "created_at": "2025-04-14T01:43:04.460234",
+  "run_number": 1,
+  "custom_dir": true,
+  "base_dir": "/Users/nicolas/Documents/git/orieg/yaml-workflow/runs",
+  "execution_state": {
+    "current_step": 7,
+    "completed_steps": [
+      "validate_input",
+      "check_validation",
+      "process_validation",
+      "read_validation",
+      "debug_vars",
+      "debug_validation",
+      "notify_status"
+    ],
+    "failed_step": null,
+    "step_outputs": {
+      "validate_input": {
+        "validate_input": ""
+      },
+      "check_validation": {
+        "check_validation": "Valid: Alice\n"
+      },
+      "process_validation": {
+        "process_validation": "Validation passed\n"
+      },
+      "read_validation": {
+        "read_validation": "true\n"
+      },
+      "debug_vars": {
+        "debug_vars": {
+          "success": true
+        }
+      },
+      "debug_validation": {
+        "debug_validation": "=== Debug Info ===\nValidation Result File Content:\ntrue\nValidation Passed: true\n\n=== End Debug ===\n"
+      },
+      "notify_status": {
+        "notify_status": "Workflow completed successfully!\nCheck the output files for detailed results:\n- greeting.json: JSON formatted greeting\n- greetings.yaml: Multi-language greetings\n- validation_result.txt: Input validation details\n"
+      }
+    },
+    "last_updated": "2025-04-14T01:43:04.498504",
+    "status": "completed",
+    "flow": null,
+    "completed_at": "2025-04-14T01:43:04.498502"
+  }
+}
