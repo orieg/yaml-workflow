@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      id-token: write  # Required for PyPI trusted publishing
       contents: write  # Required for creating GitHub releases
     
     steps:
@@ -48,13 +47,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install build twine
+        pip install build
         
     - name: Build package
       run: python -m build
-      
-    - name: Check distribution
-      run: twine check dist/*
       
     - name: Create GitHub Release
       if: ${{ !steps.vars.outputs.is_test }}
@@ -69,19 +65,4 @@ jobs:
       with:
         files: dist/*
         prerelease: true
-        generate_release_notes: true
-      
-    - name: Publish to PyPI
-      if: ${{ !steps.vars.outputs.is_test }}
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
-      run: twine upload dist/*
-      
-    - name: Publish to TestPyPI
-      if: ${{ steps.vars.outputs.is_test }}
-      env:
-        TWINE_USERNAME: __token__
-        TWINE_PASSWORD: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        TWINE_REPOSITORY_URL: https://test.pypi.org/legacy/
-      run: twine upload dist/* 
+        generate_release_notes: true 
