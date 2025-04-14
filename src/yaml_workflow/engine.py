@@ -6,7 +6,7 @@ import logging
 import logging.handlers
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Union
 
 import yaml
 from jinja2 import Template
@@ -177,7 +177,7 @@ class WorkflowEngine:
             raise InvalidFlowDefinitionError("root", "'definitions' must be a list")
 
         # Validate each flow definition
-        defined_flows = set()
+        defined_flows: Set[str] = set()
         for flow_def in flows["definitions"]:
             if not isinstance(flow_def, dict):
                 raise InvalidFlowDefinitionError(
@@ -353,7 +353,7 @@ class WorkflowEngine:
                 self.state.set_flow(flow)
 
         # Run steps
-        results = {}
+        results: Dict[str, Any] = {}
         for i, step in enumerate(steps, 1):
             if not isinstance(step, dict):
                 raise WorkflowError(f"Invalid step format at position {i}")

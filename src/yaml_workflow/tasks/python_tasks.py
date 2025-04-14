@@ -5,7 +5,7 @@ Python task implementations for executing Python functions.
 import inspect
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, Callable
 
 from . import register_task
 from .base import get_task_logger, log_task_error, log_task_execution, log_task_result
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @register_task("python")
 def python_task(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: str
+    step: Dict[str, Any], context: Dict[str, Any], workspace: Union[str, Path]
 ) -> Dict[str, Any]:
     """Execute a Python task with the given operation and inputs.
 
@@ -29,7 +29,8 @@ def python_task(
     """
     try:
         logger = get_task_logger(workspace, step.get("name", "python"))
-        log_task_execution(logger, step, context, workspace)
+        workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
+        log_task_execution(logger, step, context, workspace_path)
 
         inputs = step.get("inputs", {})
         operation = inputs.get("operation")
@@ -61,11 +62,11 @@ def python_task(
                 results = [num * factor for num in numbers]
                 # Return single value if input was single value
                 if isinstance(inputs["item"], (int, float)):
-                    return {"result": results[0]}
-                return {"result": results}
+                    return {"result": float(results[0])}  # Ensure float type
+                return {"result": [float(r) for r in results]}  # Ensure float type
 
             # Otherwise multiply all numbers together and then by the factor
-            result = 1
+            result: float = 1.0  # Explicitly declare as float
             for num in numbers:
                 result *= float(num)
             result *= factor
@@ -108,28 +109,24 @@ def python_task(
             accepts_item = len(sig.parameters) > 0
 
             # Pass item as first argument only if handler accepts parameters
-            if "item" in inputs and accepts_item:
-                try:
+            try:
+                if "item" in inputs and accepts_item:
                     result = handler(inputs["item"], *args, **kwargs)
-                    if isinstance(result, Exception):
-                        raise result
-                    return {"result": result}
-                except Exception as e:
-                    log_task_error(logger, str(e))
-                    raise
-            else:
-                try:
+                else:
                     result = handler(*args, **kwargs)
-                    if isinstance(result, Exception):
-                        raise result
-                    return {"result": result}
-                except Exception as e:
-                    log_task_error(logger, str(e))
-                    raise
+                
+                if isinstance(result, Exception):
+                    raise result
+                return {"result": result}
+            except Exception as e:
+                log_task_error(logger, e)  # Pass the actual exception
+                raise
 
         else:
-            raise ValueError(f"Unknown operation: {operation}")
+            msg = f"Unknown operation: {operation}"
+            log_task_error(logger, ValueError(msg))  # Pass an actual exception
+            raise ValueError(msg)
 
     except Exception as e:
-        log_task_error(logger, str(e))
+        log_task_error(logger, e)  # Pass the actual exception
         raise

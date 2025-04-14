@@ -2,6 +2,8 @@
 Custom exceptions for the YAML Workflow Engine.
 """
 
+from typing import Optional
+
 
 class WorkflowError(Exception):
     """Base exception class for all workflow-related errors."""
@@ -132,7 +134,7 @@ class OutputHandlingError(WorkflowRuntimeError):
 class RequiredVariableError(WorkflowRuntimeError):
     """Raised when a required variable is missing from the context."""
 
-    def __init__(self, variable_name: str, step_name: str = None):
+    def __init__(self, variable_name: str, step_name: Optional[str] = None):
         self.variable_name = variable_name
         self.step_name = step_name
         location = f" in step '{step_name}'" if step_name else ""
