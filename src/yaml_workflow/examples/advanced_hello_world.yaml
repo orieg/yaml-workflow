@@ -45,7 +45,6 @@ steps:
   # The content is stored in the validation_content variable for the next step
   - name: check_validation
     task: read_file
-    module: yaml_workflow_engine.tasks.file_tasks
     params:
       file_path: "output/validation_result.txt"
       encoding: "utf-8"
@@ -59,28 +58,34 @@ steps:
       if grep -q "^Error:" "output/validation_result.txt"; then
         echo "Validation failed:" >&2
         cat "output/validation_result.txt" >&2
-        echo "false" > "output/validation_passed.txt"
+        printf "false" > "output/validation_passed.txt"
       else
         echo "Validation passed"
-        echo "true" > "output/validation_passed.txt"
+        printf "true" > "output/validation_passed.txt"
       fi
 
   # Step 3b: Read validation result
   - name: read_validation
     task: read_file
-    module: yaml_workflow_engine.tasks.file_tasks
     params:
       file_path: "output/validation_passed.txt"
-      encoding: "utf-8"
+    outputs: validation_content
+
+  # Debug step to print all variables
+  - name: debug_vars
+    task: print_vars
+    params:
+      message: "Available variables"
 
   # Debug step to print validation result
   - name: debug_validation
     task: shell
     command: |
       echo "=== Debug Info ==="
-      echo "Validation Result File Content:"
+      printf "Validation Result File Content:"
       cat "output/validation_passed.txt"
-      echo "Validation Passed: {{ read_validation.content }}"
+      echo ""
+      echo "Validation Content: {{ validation_content }}"
       echo "=== End Debug ==="
 
   # Step 4: Get current timestamp
@@ -90,14 +95,13 @@ steps:
     task: shell
     command: date -u +"%Y-%m-%dT%H:%M:%SZ"
     outputs: current_timestamp
-    condition: "'{{read_validation.content.strip()}}' == 'true'"
+    condition: "'{{ validation_content }}' == 'true'"
 
   # Step 5: Create JSON greeting
   # Only runs if validation passed
   # Demonstrates JSON file creation with template variables
   - name: create_greeting
     task: write_json
-    module: yaml_workflow_engine.tasks.file_tasks
     params:
       file_path: "output/greeting.json"
       data: 
@@ -106,14 +110,13 @@ steps:
         run_number: "{{ run_number }}"
         language: "en"
       indent: 2
-    condition: "'{{read_validation.content.strip()}}' == 'true'"
+    condition: "'{{ validation_content }}' == 'true'"
 
   # Step 6: Create multi-language greetings
   # Only runs if validation passed
   # Demonstrates YAML file creation with template variables
   - name: translate_greeting
     task: write_yaml
-    module: yaml_workflow_engine.tasks.file_tasks
     params:
       file_path: "output/greetings.yaml"
       data:
@@ -123,7 +126,7 @@ steps:
         German: "Hallo, {{ name }}!"
         Italian: "Ciao, {{ name }}!"
         Japanese: "こんにちは、{{ name }}さん！"
-    condition: "'{{read_validation.content.strip()}}' == 'true'"
+    condition: "'{{ validation_content }}' == 'true'"
 
   # Step 7: Format and display results
   # Only runs if validation passed
@@ -143,14 +146,13 @@ steps:
         echo
         echo "=== End of Results ==="
       fi
-    condition: "'{{read_validation.content.strip()}}' == 'true'"
+    condition: "'{{ validation_content }}' == 'true'"
 
   # Step 8: Handle validation errors
   # Only runs if validation failed
   # Creates an error report with details about the validation failure
   - name: handle_error
     task: write_file
-    module: yaml_workflow_engine.tasks.file_tasks
     params:
       file_path: "output/error_report.txt"
       content: |
@@ -163,7 +165,7 @@ steps:
         - Name must be provided
         - Name must be between 2 and 50 characters
         - Name must not contain special characters
-    condition: "'{{read_validation.content.strip()}}' == 'false'"
+    condition: "'{{ validation_content }}' == 'false'"
 
   # Step 9: Final status notification
   # Always runs (no condition)
@@ -180,5 +182,9 @@ steps:
       else
         echo "Workflow failed due to validation errors."
         echo "Check error_report.txt for details."
-        cat "output/error_report.txt"
+        if [ -f "output/error_report.txt" ]; then
+          cat "output/error_report.txt"
+        else
+          cat "output/validation_result.txt"
+        fi
       fi 
