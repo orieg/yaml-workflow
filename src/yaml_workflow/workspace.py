@@ -57,13 +57,19 @@ class WorkflowState:
             "execution_state": self.metadata["execution_state"],
             "steps": {
                 step: {
-                    "status": "completed"
-                    if step in self.metadata["execution_state"]["completed_steps"]
-                    else "failed"
-                    if self.metadata["execution_state"]["failed_step"]
-                    and self.metadata["execution_state"]["failed_step"]["step_name"]
-                    == step
-                    else "not_started",
+                    "status": (
+                        "completed"
+                        if step in self.metadata["execution_state"]["completed_steps"]
+                        else (
+                            "failed"
+                            if self.metadata["execution_state"]["failed_step"]
+                            and self.metadata["execution_state"]["failed_step"][
+                                "step_name"
+                            ]
+                            == step
+                            else "not_started"
+                        )
+                    ),
                     "outputs": self.metadata["execution_state"]["step_outputs"].get(
                         step, {}
                     ),

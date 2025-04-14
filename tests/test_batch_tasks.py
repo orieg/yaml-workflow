@@ -96,9 +96,9 @@ def test_batch_with_error_handling(temp_workspace):
                 "function": "process_item",
                 "inputs": {
                     "operation": "custom",
-                    "handler": lambda x: x
-                    if "error" not in x
-                    else ValueError(f"Error processing {x}"),
+                    "handler": lambda x: (
+                        x if "error" not in x else ValueError(f"Error processing {x}")
+                    ),
                 },
             },
         },
