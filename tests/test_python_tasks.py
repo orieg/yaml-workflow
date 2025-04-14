@@ -85,5 +85,77 @@ def test_unknown_operation(context, workspace):
 
 def test_missing_operation(context, workspace):
     step = {"name": "missing_op", "inputs": {}}
-    with pytest.raises(ValueError, match="Operation must be specified"):
+    with pytest.raises(ValueError, match="Either code or operation must be specified for Python task"):
+        python_task(step, context, workspace)
+
+
+def test_python_code_execution(context, workspace):
+    step = {
+        "name": "code_exec",
+        "code": """
+x = 5
+y = 3
+result = x * y
+""",
+        "inputs": {}
+    }
+    result = python_task(step, context, workspace)
+    assert result["result"] == 15
+
+
+def test_python_code_with_inputs(context, workspace):
+    step = {
+        "name": "code_with_inputs",
+        "code": """
+x = x if 'x' in locals() else 0
+y = y if 'y' in locals() else 0
+result = x + y
+""",
+        "inputs": {
+            "x": 10,
+            "y": 20
+        }
+    }
+    result = python_task(step, context, workspace)
+    assert result["result"] == 30
+
+
+def test_python_code_with_context(context, workspace):
+    context["data"] = {"value": 42}
+    step = {
+        "name": "code_with_context",
+        "code": """
+value = context['data']['value']
+result = value * 2
+""",
+        "inputs": {}
+    }
+    result = python_task(step, context, workspace)
+    assert result["result"] == 84
+
+
+def test_python_code_execution_error(context, workspace):
+    step = {
+        "name": "code_error",
+        "code": """
+# This will raise a NameError
+result = undefined_variable
+""",
+        "inputs": {}
+    }
+    with pytest.raises(ValueError, match="Code execution failed: name 'undefined_variable' is not defined"):
+        python_task(step, context, workspace)
+
+
+def test_python_code_syntax_error(context, workspace):
+    step = {
+        "name": "syntax_error",
+        "code": """
+# This has invalid syntax
+if True
+    result = 42
+""",
+        "inputs": {}
+    }
+    with pytest.raises(ValueError, match="Code execution failed: expected ':'"):
         python_task(step, context, workspace)
