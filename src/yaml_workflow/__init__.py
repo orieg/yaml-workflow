@@ -2,4 +2,6 @@
 YAML Workflow Engine - A simple workflow engine using YAML configuration
 """
 
-__version__ = "0.1.0"
+from importlib.metadata import version
+
+__version__ = version("yaml-workflow")
