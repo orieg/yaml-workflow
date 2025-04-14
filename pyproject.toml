@@ -38,8 +38,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/yaml-workflow"
-Issues = "https://github.com/yourusername/yaml-workflow/issues"
+Homepage = "https://github.com/orieg/yaml-workflow"
+Issues = "https://github.com/orieg/yaml-workflow/issues"
+Documentation = "https://github.com/orieg/yaml-workflow#readme"
 
 [project.scripts]
 yaml-workflow = "yaml_workflow.cli:main"
