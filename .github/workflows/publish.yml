@@ -38,7 +38,7 @@ jobs:
           pytest
           
       - name: Publish to PyPI
-        if: "!contains(github.ref, '-test')"
+        if: ${{ !contains(github.ref, '-test') }}
         uses: pypa/gh-action-pypi-publish@release/v1
         
       - name: Publish to TestPyPI
