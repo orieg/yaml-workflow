@@ -2,6 +2,8 @@
 
 The YAML Workflow Engine allows you to execute Python code directly in your workflows using the `python` task.
 
+Python tasks allow you to execute Python functions within your workflows. These tasks can accept parameters, which support Jinja2 template substitution (see [Templating Guide](../templating.md) for details).
+
 ## Task Configuration
 
 ### Required Fields

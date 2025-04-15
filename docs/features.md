@@ -29,7 +29,7 @@ steps:
 
 ### Dynamic Variable Resolution
 
-Use Jinja2 templates for dynamic values:
+Use Jinja2 templates for dynamic values. For comprehensive documentation on templating features and best practices, see the [Templating Guide](guide/templating.md).
 
 ```yaml
 steps:

@@ -95,10 +95,24 @@ The engine provides several error handling mechanisms:
 
 ## Templating
 
-The engine uses Jinja2 for templating, allowing:
+The engine uses Jinja2 for templating, providing powerful features for dynamic content generation and variable substitution. For detailed information about templating capabilities, see the [Templating Guide](templating.md).
 
-- Parameter substitution
-- Environment variable access
-- Task output reuse
-- Conditional expressions
-- Custom filters and functions 
+Key templating features include:
+- Variable substitution using `{{ variable }}`
+- Control structures (if/else, loops)
+- Filters and expressions
+- Access to environment variables and step outputs
+- Error handling and default values
+
+Example:
+```yaml
+steps:
+  - name: template_example
+    task: template
+    template: |
+      Hello, {{ name }}!
+      Environment: {{ env.ENVIRONMENT | default('development') }}
+      Run number: {{ run_number }}
+```
+
+For more examples and best practices, refer to the [Templating Guide](templating.md). 
