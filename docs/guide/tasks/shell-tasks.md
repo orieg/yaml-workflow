@@ -31,7 +31,7 @@ steps:
 
 The shell task supports:
 - Command string execution
-- Variable substitution using Jinja2 templates
+- Variable substitution using Jinja2 templates (see [Templating Guide](../templating.md))
 - Working directory set to workflow workspace
 - Output capture (stdout)
 - Error handling with subprocess

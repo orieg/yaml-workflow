@@ -1,5 +1,7 @@
 # Template Tasks
 
+> For a comprehensive guide on templating syntax, features, and best practices, see the [Templating Guide](../templating.md).
+
 ## Overview
 
 ```mermaid

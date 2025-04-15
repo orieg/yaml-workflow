@@ -119,7 +119,7 @@ Tasks for file operations with support for various formats:
 
 ## Template Tasks
 
-Tasks for rendering templates using Jinja2:
+Tasks for rendering templates using Jinja2. For detailed information about templating capabilities, syntax, and best practices, see the [Templating Guide](guide/templating.md).
 
 ```yaml
 - name: render_template_step
