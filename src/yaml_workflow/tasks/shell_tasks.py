@@ -7,8 +7,9 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from jinja2 import Template
+from jinja2 import Template, StrictUndefined, UndefinedError
 
+from ..exceptions import TemplateError
 from . import register_task
 
 
@@ -112,6 +113,34 @@ def set_environment(env_vars: Dict[str, str]) -> Dict[str, str]:
     return dict(os.environ)
 
 
+def process_command(command: str, context: Dict[str, Any]) -> str:
+    """
+    Process a shell command template with the given context.
+
+    Args:
+        command: Shell command template
+        context: Template context
+
+    Returns:
+        str: Processed shell command
+
+    Raises:
+        TemplateError: If template resolution fails
+    """
+    try:
+        template = Template(command, undefined=StrictUndefined)
+        return template.render(**context)
+    except UndefinedError as e:
+        available = {
+            "args": list(context["args"].keys()) if "args" in context else [],
+            "env": list(context["env"].keys()) if "env" in context else [],
+            "steps": list(context["steps"].keys()) if "steps" in context else []
+        }
+        raise TemplateError(f"{str(e)}. Available variables: {available}")
+    except Exception as e:
+        raise TemplateError(f"Failed to process shell command: {str(e)}")
+
+
 @register_task("shell")
 def shell_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
     """
@@ -133,8 +162,7 @@ def shell_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -
         raise ValueError("No command provided")
 
     # Render command with context
-    template = Template(command_template)
-    command = template.render(**context)
+    command = process_command(command_template, context)
 
     # Run command from workspace directory
     result = subprocess.run(

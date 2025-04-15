@@ -187,3 +187,10 @@ class StepNotInFlowError(FlowError):
         super().__init__(f"Step '{step_name}' not found in flow '{flow_name}'")
         self.step_name = step_name
         self.flow_name = flow_name
+
+
+class TemplateError(WorkflowError):
+    """Raised when template resolution fails."""
+
+    def __init__(self, message: str):
+        super().__init__(f"Template error: {message}")
