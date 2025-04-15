@@ -7,6 +7,9 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
+from jinja2 import Template, StrictUndefined, UndefinedError
+
+from ..exceptions import TemplateError
 from . import register_task
 from .base import get_task_logger, log_task_error, log_task_execution, log_task_result
 
@@ -14,73 +17,30 @@ logger = logging.getLogger(__name__)
 
 
 def execute_code(code: str, inputs: Dict[str, Any], context: Dict[str, Any]) -> Any:
-    """
-    Execute Python code string with given inputs and context.
+    """Execute Python code with given inputs and context.
 
     Args:
         code: Python code to execute
         inputs: Input variables for the code
-        context: Workflow context
+        context: Context variables for the code
 
     Returns:
-        Any: Result of code execution
+        The value of the 'result' variable after code execution, or None if not set
 
     Raises:
-        Exception: If code execution fails
+        TemplateError: If template resolution or code execution fails
     """
-    # Create a clean namespace for code execution
-    namespace = {
-        # Add builtins that are safe to use
-        "str": str,
-        "int": int,
-        "float": float,
-        "bool": bool,
-        "list": list,
-        "dict": dict,
-        "set": set,
-        "tuple": tuple,
-        "len": len,
-        "range": range,
-        "enumerate": enumerate,
-        "zip": zip,
-        "min": min,
-        "max": max,
-        "sum": sum,
-        "abs": abs,
-        "round": round,
-        # Add standard library modules that are safe to use
-        "json": __import__("json"),
-        "datetime": __import__("datetime"),
-        "math": __import__("math"),
-        "random": __import__("random"),
-        "uuid": __import__("uuid"),
-        "base64": __import__("base64"),
-        "hashlib": __import__("hashlib"),
-        "re": __import__("re"),
-        "csv": __import__("csv"),
-        "io": __import__("io"),
-        "pathlib": __import__("pathlib"),
-        # Add inputs and context
-        **inputs,
-        "context": context,
-    }
+    # Create a new dictionary with a copy of the context to avoid modifying the original
+    local_vars = {"context": context}
+    local_vars.update(inputs)
 
-    # Execute the code
-    exec(code + "\nresult = None", namespace)
-
-    # Get the result
-    result = namespace.get("result")
-    if result is None:
-        # If no result was set, try to get the last expression's value
-        lines = code.strip().split("\n")
-        if lines:
-            last_line = lines[-1].strip()
-            if last_line and not last_line.startswith(("#", '"', "'")):
-                # Re-execute with just the last line assigned to result
-                exec(code + f"\nresult = {last_line}", namespace)
-                result = namespace.get("result")
-
-    return result
+    try:
+        # Execute the code
+        exec(code, {}, local_vars)
+        # Only return the result if it was explicitly set
+        return local_vars.get("result", None)
+    except Exception as e:
+        raise TemplateError(f"Failed to execute Python code: {str(e)}")
 
 
 @register_task("print_vars")
@@ -96,6 +56,9 @@ def print_vars_task(
 
     Returns:
         Dict containing success status
+
+    Raises:
+        TemplateError: If task execution fails
     """
     try:
         logger = get_task_logger(workspace, step.get("name", "print_vars"))
@@ -118,7 +81,7 @@ def print_vars_task(
 
     except Exception as e:
         log_task_error(logger, e)
-        raise
+        raise TemplateError(f"Failed to print variables: {str(e)}")
 
 
 @register_task("python")
@@ -138,6 +101,9 @@ def python_task(
 
     Returns:
         Dict containing the result of the operation/code
+
+    Raises:
+        TemplateError: If task execution fails
     """
     try:
         logger = get_task_logger(workspace, step.get("name", "python"))
@@ -148,21 +114,15 @@ def python_task(
         if "code" in step:
             code = step["code"]
             inputs = step.get("inputs", {})
-            try:
-                result = execute_code(code, inputs, context)
-                return {"result": result}
-            except Exception as e:
-                log_task_error(logger, e)
-                raise ValueError(f"Code execution failed: {str(e)}")
+            result = execute_code(code, inputs, context)
+            return {"result": result}
 
         # Operation mode
         inputs = step.get("inputs", {})
         operation = inputs.get("operation")
 
         if not operation:
-            raise ValueError(
-                "Either code or operation must be specified for Python task"
-            )
+            raise ValueError("Either code or operation must be specified for Python task")
 
         if operation == "multiply":
             # Get numbers from inputs or context
@@ -246,13 +206,14 @@ def python_task(
                 return {"result": custom_result}
             except Exception as e:
                 log_task_error(logger, e)  # Pass the actual exception
-                raise
+                raise TemplateError(f"Custom handler failed: {str(e)}")
 
         else:
-            msg = f"Unknown operation: {operation}"
-            log_task_error(logger, ValueError(msg))  # Pass an actual exception
-            raise ValueError(msg)
+            raise ValueError(f"Unknown operation: {operation}")
 
+    except ValueError as e:
+        raise TemplateError(str(e))
     except Exception as e:
-        log_task_error(logger, e)  # Pass the actual exception
+        if not isinstance(e, TemplateError):
+            raise TemplateError(f"Python task failed: {str(e)}")
         raise

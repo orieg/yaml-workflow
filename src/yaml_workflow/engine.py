@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
 import yaml
-from jinja2 import Template
+from jinja2 import Template, StrictUndefined
 
 from .exceptions import (
     FlowError,
@@ -22,6 +22,7 @@ from .exceptions import (
     StepExecutionError,
     StepNotInFlowError,
     WorkflowError,
+    TemplateError,
 )
 from .state import WorkflowState
 from .tasks import get_task_handler
@@ -527,7 +528,7 @@ class WorkflowEngine:
 
     def resolve_value(self, value: Any) -> Any:
         """
-        Resolve a value, replacing any ${var} references with context values.
+        Resolve a value using Jinja2 template resolution.
 
         Args:
             value: Value to resolve
@@ -535,17 +536,25 @@ class WorkflowEngine:
         Returns:
             Any: Resolved value
         """
-        if isinstance(value, str) and "${" in value:
-            # Simple variable substitution
-            for var_name, var_value in self.context.items():
-                placeholder = "${" + var_name + "}"
-                if placeholder in value:
-                    value = value.replace(placeholder, str(var_value))
-        return value
+        if not isinstance(value, str):
+            return value
+            
+        try:
+            template = Template(value, undefined=StrictUndefined)
+            return template.render(**self.context)
+        except UndefinedError as e:
+            available = {
+                "args": list(self.context["args"].keys()) if "args" in self.context else [],
+                "env": list(self.context["env"].keys()) if "env" in self.context else [],
+                "steps": list(self.context["steps"].keys()) if "steps" in self.context else []
+            }
+            raise TemplateError(f"{str(e)}. Available variables: {available}")
+        except Exception as e:
+            raise TemplateError(f"Failed to resolve template '{value}': {str(e)}")
 
     def resolve_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Resolve all inputs, replacing variables with their values from context.
+        Resolve all inputs using Jinja2 template resolution.
 
         Args:
             inputs: Input dictionary

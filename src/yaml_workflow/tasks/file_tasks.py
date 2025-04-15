@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import yaml
-from jinja2 import Template
+from jinja2 import Template, StrictUndefined, UndefinedError
 
 from ..workspace import resolve_path
+from ..exceptions import TemplateError
 from . import register_task
 from .base import get_task_logger, log_task_error, log_task_execution, log_task_result
 
@@ -42,12 +43,19 @@ def write_file_direct(
 
     Returns:
         str: Path to written file
+
+    Raises:
+        TemplateError: If template resolution fails
+        IOError: If file cannot be written
     """
-    resolved_path = resolve_path(workspace, file_path)
-    ensure_directory(resolved_path)
-    with open(resolved_path, "wb") as f:
-        f.write(content.encode(encoding))
-    return str(resolved_path)
+    try:
+        resolved_path = resolve_path(workspace, file_path)
+        ensure_directory(resolved_path)
+        with open(resolved_path, "wb") as f:
+            f.write(content.encode(encoding))
+        return str(resolved_path)
+    except IOError as e:
+        raise TemplateError(f"Failed to write file '{file_path}': {str(e)}")
 
 
 def read_file_direct(file_path: str, workspace: Path, encoding: str = "utf-8") -> str:
@@ -60,10 +68,16 @@ def read_file_direct(file_path: str, workspace: Path, encoding: str = "utf-8") -
 
     Returns:
         str: File content
+
+    Raises:
+        TemplateError: If file cannot be read or decoded
     """
-    resolved_path = resolve_path(workspace, file_path)
-    with open(resolved_path, "rb") as f:
-        return f.read().decode(encoding)
+    try:
+        resolved_path = resolve_path(workspace, file_path)
+        with open(resolved_path, "rb") as f:
+            return f.read().decode(encoding)
+    except (IOError, UnicodeDecodeError) as e:
+        raise TemplateError(f"Failed to read file '{file_path}': {str(e)}")
 
 
 def append_file_direct(
@@ -79,12 +93,18 @@ def append_file_direct(
 
     Returns:
         str: Path to the file
+
+    Raises:
+        TemplateError: If file cannot be appended to
     """
-    resolved_path = resolve_path(workspace, file_path)
-    ensure_directory(resolved_path)
-    with open(resolved_path, "a", encoding=encoding) as f:
-        f.write(content)
-    return str(resolved_path)
+    try:
+        resolved_path = resolve_path(workspace, file_path)
+        ensure_directory(resolved_path)
+        with open(resolved_path, "a", encoding=encoding) as f:
+            f.write(content)
+        return str(resolved_path)
+    except IOError as e:
+        raise TemplateError(f"Failed to append to file '{file_path}': {str(e)}")
 
 
 def copy_file_direct(source: str, destination: str, workspace: Path) -> str:
@@ -97,12 +117,18 @@ def copy_file_direct(source: str, destination: str, workspace: Path) -> str:
 
     Returns:
         str: Path to destination file
+
+    Raises:
+        TemplateError: If file cannot be copied
     """
-    source_path = resolve_path(workspace, source)
-    dest_path = resolve_path(workspace, destination)
-    ensure_directory(dest_path)
-    shutil.copy2(source_path, dest_path)
-    return str(dest_path)
+    try:
+        source_path = resolve_path(workspace, source)
+        dest_path = resolve_path(workspace, destination)
+        ensure_directory(dest_path)
+        shutil.copy2(source_path, dest_path)
+        return str(dest_path)
+    except (IOError, shutil.Error) as e:
+        raise TemplateError(f"Failed to copy file from '{source}' to '{destination}': {str(e)}")
 
 
 def move_file_direct(source: str, destination: str, workspace: Path) -> str:
@@ -115,12 +141,18 @@ def move_file_direct(source: str, destination: str, workspace: Path) -> str:
 
     Returns:
         str: Path to destination file
+
+    Raises:
+        TemplateError: If file cannot be moved
     """
-    source_path = resolve_path(workspace, source)
-    dest_path = resolve_path(workspace, destination)
-    ensure_directory(dest_path)
-    shutil.move(str(source_path), str(dest_path))
-    return str(dest_path)
+    try:
+        source_path = resolve_path(workspace, source)
+        dest_path = resolve_path(workspace, destination)
+        ensure_directory(dest_path)
+        shutil.move(str(source_path), str(dest_path))
+        return str(dest_path)
+    except (IOError, shutil.Error) as e:
+        raise TemplateError(f"Failed to move file from '{source}' to '{destination}': {str(e)}")
 
 
 def delete_file_direct(file_path: str, workspace: Path) -> str:
@@ -132,11 +164,17 @@ def delete_file_direct(file_path: str, workspace: Path) -> str:
 
     Returns:
         str: Path to deleted file
+
+    Raises:
+        TemplateError: If file cannot be deleted
     """
-    resolved_path = resolve_path(workspace, file_path)
-    if resolved_path.exists():
-        resolved_path.unlink()
-    return str(resolved_path)
+    try:
+        resolved_path = resolve_path(workspace, file_path)
+        if resolved_path.exists():
+            resolved_path.unlink()
+        return str(resolved_path)
+    except IOError as e:
+        raise TemplateError(f"Failed to delete file '{file_path}': {str(e)}")
 
 
 # Task handlers
@@ -404,10 +442,28 @@ def process_templates(data: Any, context: Dict[str, Any]) -> Any:
 
     Returns:
         Any: Processed data
+
+    Raises:
+        TemplateError: If template resolution fails
     """
     if isinstance(data, str):
-        template = Template(data)
-        return template.render(**context)
+        try:
+            template = Template(data, undefined=StrictUndefined)
+            return template.render(**context)
+        except UndefinedError as e:
+            available = {
+                "args": list(context["args"].keys()) if "args" in context else [],
+                "env": list(context["env"].keys()) if "env" in context else [],
+                "steps": list(context["steps"].keys()) if "steps" in context else [],
+                "vars": {k: type(v).__name__ for k, v in context.items() 
+                        if k not in ["args", "env", "steps"]}
+            }
+            raise TemplateError(
+                f"Failed to resolve variable in template '{data}': {str(e)}. "
+                f"Available variables: {available}"
+            )
+        except Exception as e:
+            raise TemplateError(f"Failed to process template '{data}': {str(e)}")
     elif isinstance(data, dict):
         return {k: process_templates(v, context) for k, v in data.items()}
     elif isinstance(data, list):
@@ -460,12 +516,16 @@ def read_json(
         Union[Dict[str, Any], List[Any]]: Parsed JSON content
 
     Raises:
-        FileNotFoundError: If file does not exist
-        json.JSONDecodeError: If file contains invalid JSON
+        TemplateError: If file cannot be read or contains invalid JSON
     """
-    path = resolve_path(workspace, file_path) if workspace else Path(file_path)
-    with path.open("r") as f:
-        return json.load(f)
+    try:
+        path = resolve_path(workspace, file_path) if workspace else Path(file_path)
+        with path.open("r") as f:
+            return json.load(f)
+    except json.JSONDecodeError as e:
+        raise TemplateError(f"Invalid JSON in file '{file_path}': {str(e)}")
+    except IOError as e:
+        raise TemplateError(f"Failed to read JSON file '{file_path}': {str(e)}")
 
 
 def write_json(
@@ -487,18 +547,22 @@ def write_json(
         str: Path to written file
 
     Raises:
-        TypeError: If data cannot be serialized to JSON
-        IOError: If file cannot be written
+        TemplateError: If data cannot be serialized or file cannot be written
     """
     if not file_path:
         raise ValueError("file_path cannot be empty")
 
-    path = resolve_path(workspace, file_path) if workspace else Path(file_path)
-    ensure_directory(path)
+    try:
+        path = resolve_path(workspace, file_path) if workspace else Path(file_path)
+        ensure_directory(path)
 
-    with path.open("w") as f:
-        json.dump(data, f, indent=indent)
-    return str(path)
+        with path.open("w") as f:
+            json.dump(data, f, indent=indent)
+        return str(path)
+    except TypeError as e:
+        raise TemplateError(f"Failed to serialize data to JSON: {str(e)}")
+    except IOError as e:
+        raise TemplateError(f"Failed to write JSON file '{file_path}': {str(e)}")
 
 
 def read_yaml(file_path: str, workspace: Optional[Path] = None) -> Dict[str, Any]:
@@ -513,12 +577,16 @@ def read_yaml(file_path: str, workspace: Optional[Path] = None) -> Dict[str, Any
         Dict[str, Any]: Parsed YAML content
 
     Raises:
-        FileNotFoundError: If file does not exist
-        yaml.YAMLError: If file contains invalid YAML
+        TemplateError: If file cannot be read or contains invalid YAML
     """
-    path = resolve_path(workspace, file_path) if workspace else Path(file_path)
-    with path.open("r") as f:
-        return yaml.safe_load(f)
+    try:
+        path = resolve_path(workspace, file_path) if workspace else Path(file_path)
+        with path.open("r") as f:
+            return yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise TemplateError(f"Invalid YAML in file '{file_path}': {str(e)}")
+    except IOError as e:
+        raise TemplateError(f"Failed to read YAML file '{file_path}': {str(e)}")
 
 
 def write_yaml(
@@ -536,15 +604,19 @@ def write_yaml(
         str: Path to written file
 
     Raises:
-        yaml.YAMLError: If data cannot be serialized to YAML
-        IOError: If file cannot be written
+        TemplateError: If data cannot be serialized or file cannot be written
     """
     if not file_path:
         raise ValueError("file_path cannot be empty")
 
-    path = resolve_path(workspace, file_path) if workspace else Path(file_path)
-    ensure_directory(path)
+    try:
+        path = resolve_path(workspace, file_path) if workspace else Path(file_path)
+        ensure_directory(path)
 
-    with path.open("w") as f:
-        yaml.dump(data, f)
-    return str(path)
+        with path.open("w") as f:
+            yaml.dump(data, f)
+        return str(path)
+    except yaml.YAMLError as e:
+        raise TemplateError(f"Failed to serialize data to YAML: {str(e)}")
+    except IOError as e:
+        raise TemplateError(f"Failed to write YAML file '{file_path}': {str(e)}")

@@ -290,7 +290,7 @@ def test_resume_workflow(run_cli, example_workflows_dir, workspace_dir):
     assert (
         exit_code != 0
     ), "Workflow should fail on first run due to missing required_param"
-    assert "Error: required_param is required" in err
+    assert "'required_param' is undefined" in err, "Error message should indicate undefined required_param"
 
     print("\n=== First run output ===")
     print("Exit code:", exit_code)

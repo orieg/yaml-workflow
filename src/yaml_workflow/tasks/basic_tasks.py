@@ -2,6 +2,12 @@
 Basic task functions for demonstration and testing.
 """
 
+from typing import Dict, Any
+from jinja2 import Template, StrictUndefined, UndefinedError
+
+from ..exceptions import TemplateError
+from . import register_task
+
 
 def echo(message: str) -> str:
     """
@@ -70,17 +76,30 @@ def join_strings(*strings: str, separator: str = " ") -> str:
     return separator.join(strings)
 
 
-def create_greeting(template: str = "Hello, {{ name }}!", **kwargs) -> str:
+def create_greeting(name: str, context: Dict[str, Any]) -> str:
     """
-    Create a greeting using a template and keyword arguments.
+    Create a greeting message.
 
     Args:
-        template: Template string with placeholders. Defaults to "Hello, {{ name }}!"
-        **kwargs: Keyword arguments to fill template placeholders
+        name: Name to greet
+        context: Template context
 
     Returns:
-        str: Formatted greeting
-    """
-    from jinja2 import Template
+        str: Greeting message
 
-    return Template(template).render(**kwargs)
+    Raises:
+        TemplateError: If template resolution fails
+    """
+    try:
+        template = Template("Hello {{ name }}!", undefined=StrictUndefined)
+        return template.render(name=name, **context)
+    except UndefinedError as e:
+        available = {
+            "name": name,
+            "args": list(context["args"].keys()) if "args" in context else [],
+            "env": list(context["env"].keys()) if "env" in context else [],
+            "steps": list(context["steps"].keys()) if "steps" in context else []
+        }
+        raise TemplateError(f"{str(e)}. Available variables: {available}")
+    except Exception as e:
+        raise TemplateError(f"Failed to create greeting: {str(e)}")

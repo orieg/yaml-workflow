@@ -9,7 +9,9 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, ParamSpec, TypeVar, cast
 
-from jinja2 import Template, UndefinedError
+from jinja2 import Template, UndefinedError, StrictUndefined
+
+from ..exceptions import TemplateError
 
 # Type variables for task function signatures
 P = ParamSpec("P")
@@ -80,10 +82,19 @@ def create_task_handler(func: Callable[..., R]) -> TaskHandler:
             if isinstance(value, str):
                 # Resolve template variables in strings using Jinja2
                 try:
-                    template = Template(value)
+                    template = Template(value, undefined=StrictUndefined)
                     processed_inputs[key] = template.render(**context)
                 except UndefinedError as e:
-                    raise KeyError(f"Missing template variable in '{value}': {str(e)}")
+                    # Enhance error message with available variables
+                    available = {
+                        "args": list(context["args"].keys()) if "args" in context else [],
+                        "env": list(context["env"].keys()) if "env" in context else [],
+                        "steps": list(context["steps"].keys()) if "steps" in context else []
+                    }
+                    raise TemplateError(
+                        f"Failed to resolve template variable in input '{key}': {str(e)}. "
+                        f"Available variables: {available}"
+                    )
             else:
                 processed_inputs[key] = value
 
