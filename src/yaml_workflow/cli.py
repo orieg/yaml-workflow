@@ -83,7 +83,9 @@ def run_workflow(args):
             print(str(e), file=sys.stderr)
             sys.exit(1)
 
-        # If resuming, check the existing workspace first
+        # If resuming, check the existing workspace and load metadata first
+        resume_from = None
+        metadata = None
         if args.resume and args.workspace:
             workspace_path = Path(args.workspace)
             if workspace_path.exists():
@@ -101,12 +103,20 @@ def run_workflow(args):
                             f"Cannot resume: Failed to read metadata file - {str(e)}"
                         )
 
-                    if metadata.get("execution_state", {}).get("status") == "failed":
+                    # Ensure execution_state exists
+                    if "execution_state" not in metadata:
+                        raise ValueError("Cannot resume: Invalid metadata format - missing execution_state")
+
+                    # Ensure retry_state exists
+                    if "retry_state" not in metadata["execution_state"]:
+                        metadata["execution_state"]["retry_state"] = {}
+
+                    # Check if workflow is in failed state
+                    if metadata["execution_state"].get("status") == "failed":
                         failed_step = metadata["execution_state"].get("failed_step")
                         if failed_step:
-                            print(
-                                f"Found failed workflow state, resuming from step: {failed_step['step_name']}"
-                            )
+                            resume_from = failed_step["step_name"]
+                            print(f"Found failed workflow state, resuming from step: {resume_from}")
                         else:
                             raise ValueError("No failed step found to resume from.")
                     else:
@@ -118,10 +128,19 @@ def run_workflow(args):
             else:
                 raise ValueError("Cannot resume: Workspace directory not found")
 
-        # Create workflow engine
+        # Create workflow engine with loaded metadata
         engine = WorkflowEngine(
-            workflow=args.workflow, workspace=args.workspace, base_dir=args.base_dir
+            workflow=args.workflow,
+            workspace=args.workspace,
+            base_dir=args.base_dir,
+            metadata=metadata,  # Pass loaded metadata to engine
         )
+
+        # Update parameters
+        if param_dict:
+            print("Parameters provided:")
+            for name, value in param_dict.items():
+                print(f"  {name}: {value}")
 
         # Parse skip steps
         skip_step_list = []
@@ -131,24 +150,11 @@ def run_workflow(args):
 
         # Handle start-from and resume logic
         start_from_step = None
-        resume_from = None
 
         # Check start-from first (takes precedence)
         if args.start_from:
             start_from_step = args.start_from
             print(f"Starting workflow from step: {start_from_step}")
-        # Check resume flag - only if workflow is in failed state
-        elif args.resume:
-            state = engine.state
-            if state.metadata["execution_state"]["status"] == "failed":
-                failed_step = state.metadata["execution_state"]["failed_step"]
-                if failed_step:
-                    resume_from = failed_step["step_name"]
-                    print(f"Resuming workflow from failed step: {resume_from}")
-                else:
-                    raise ValueError("No failed step found to resume from.")
-            else:
-                raise ValueError("Cannot resume: workflow is not in failed state")
 
         # Run workflow with appropriate parameters
         results = engine.run(

@@ -32,8 +32,15 @@ def workflow_definition():
 
 @pytest.fixture
 def engine(workflow_definition, tmp_path):
-    """Create a workflow engine instance."""
-    return WorkflowEngine(workflow_definition, workspace=str(tmp_path))
+    """Create a test workflow engine."""
+    engine = WorkflowEngine(workflow_definition, workspace=str(tmp_path))
+    engine.context = {
+        "args": {"input_file": "test.txt", "mode": "read"},
+        "env": {"HOME": "/home/user"},
+        "steps": {},
+        "workflow_name": "test_workflow"
+    }
+    return engine
 
 
 def test_template_engine_initialization(engine):
@@ -61,6 +68,50 @@ def test_resolve_template_undefined(engine):
     error_msg = str(exc.value)
     assert "Variable 'args.missing' is undefined" in error_msg
     assert "Available variables in 'args' namespace" in error_msg
+
+
+def test_resolve_template_with_multiple_vars(engine):
+    """Test template with multiple variables."""
+    result = engine.resolve_template("File '{{ args.input_file }}' in mode '{{ args.mode }}'")
+    assert result == "File 'test.txt' in mode 'read'"
+
+
+def test_resolve_template_with_env_vars(engine):
+    """Test template with environment variables."""
+    result = engine.resolve_template("Home directory: {{ env.HOME }}")
+    assert result == "Home directory: /home/user"
+
+
+def test_resolve_template_with_whitespace(engine):
+    """Test template with various whitespace."""
+    result = engine.resolve_template("{{args.input_file}} {{ args.mode}} {{args.mode }}")
+    assert result == "test.txt read read"
+
+
+def test_resolve_template_empty_string(engine):
+    """Test resolving an empty template string."""
+    result = engine.resolve_template("")
+    assert result == ""
+
+
+def test_resolve_template_no_variables(engine):
+    """Test template with no variables."""
+    result = engine.resolve_template("Plain text")
+    assert result == "Plain text"
+
+
+def test_resolve_template_with_special_chars(engine):
+    """Test template with special characters."""
+    engine.context["args"]["special"] = "!@#$%^&*()"
+    result = engine.resolve_template("Special: {{ args.special }}")
+    assert result == "Special: !@#$%^&*()"
+
+
+def test_resolve_template_with_numbers(engine):
+    """Test template with numeric values."""
+    engine.context["args"]["number"] = 42
+    result = engine.resolve_template("Number: {{ args.number }}")
+    assert result == "Number: 42"
 
 
 def test_resolve_value_string(engine):
@@ -124,5 +175,4 @@ def test_error_message_template(engine):
     with pytest.raises(WorkflowError) as exc:
         engine._handle_step_error(step, error)
     
-    # Verify that the error message was properly templated
     assert str(exc.value) == "Failed to process test.txt: Invalid input" 

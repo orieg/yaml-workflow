@@ -92,6 +92,7 @@ class WorkflowEngine:
         workflow: str | Dict[str, Any],
         workspace: Optional[str] = None,
         base_dir: str = "runs",
+        metadata: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the workflow engine.
@@ -100,6 +101,7 @@ class WorkflowEngine:
             workflow: Path to workflow YAML file or workflow definition dictionary
             workspace: Optional custom workspace directory
             base_dir: Base directory for workflow runs
+            metadata: Optional pre-loaded metadata for resuming workflows
 
         Raises:
             WorkflowError: If workflow file not found or invalid
@@ -114,12 +116,19 @@ class WorkflowEngine:
                 raise WorkflowError(f"Workflow file not found: {workflow}")
 
             # Load workflow from file
-            with open(self.workflow_file) as f:
-                self.workflow = yaml.safe_load(f)
+            try:
+                with open(self.workflow_file) as f:
+                    self.workflow = yaml.safe_load(f)
+            except yaml.YAMLError as e:
+                raise WorkflowError(f"Invalid YAML in workflow file: {e}")
 
         # Validate workflow structure
         if not isinstance(self.workflow, dict):
             raise WorkflowError("Invalid workflow format: root must be a mapping")
+
+        # Validate required sections
+        if not self.workflow.get("steps") and not self.workflow.get("flows"):
+            raise WorkflowError("Invalid workflow file: missing both 'steps' and 'flows' sections")
 
         # Get workflow name
         self.name = self.workflow.get("name")
@@ -136,8 +145,8 @@ class WorkflowEngine:
         # Set up logging
         self.logger = setup_logging(self.workspace, self.name)
 
-        # Initialize workflow state
-        self.state = WorkflowState(self.workspace)
+        # Initialize workflow state with pre-loaded metadata if available
+        self.state = WorkflowState(self.workspace, metadata)
 
         # Initialize template engine
         self.template_engine = TemplateEngine()
@@ -174,6 +183,19 @@ class WorkflowEngine:
                 self.context[param_name] = param_config
                 self.context["args"][param_name] = param_config
 
+        # If there's existing state, restore step outputs to context
+        if self.state.metadata.get("execution_state", {}).get("step_outputs"):
+            step_outputs = self.state.metadata["execution_state"]["step_outputs"]
+            for step_name, outputs in step_outputs.items():
+                if isinstance(outputs, dict):
+                    # If outputs is a dict with a single key matching step name, use its value
+                    if len(outputs) == 1 and step_name in outputs:
+                        self.context[step_name] = outputs[step_name]
+                    else:
+                        self.context[step_name] = outputs
+                else:
+                    self.context[step_name] = outputs
+
         # Validate flows if present
         self._validate_flows()
 
@@ -184,6 +206,8 @@ class WorkflowEngine:
             self.logger.info("Default parameters loaded:")
             for name, value in self.context["args"].items():
                 self.logger.info(f"  {name}: {value}")
+
+        self.current_step = None  # Track current step for error handling
 
     def _validate_flows(self) -> None:
         """Validate workflow flows configuration."""
@@ -347,7 +371,8 @@ class WorkflowEngine:
         # Handle workflow resumption vs fresh start
         if resume_from:
             # Verify workflow is in failed state and step exists
-            if self.state.metadata["execution_state"]["status"] != "failed":
+            state = self.state.metadata["execution_state"]
+            if state["status"] != "failed" or not state["failed_step"]:
                 raise WorkflowError("Cannot resume: workflow is not in failed state")
             if not any(step.get("name") == resume_from for step in steps):
                 raise WorkflowError(
@@ -563,15 +588,20 @@ class WorkflowEngine:
 
     def resolve_value(self, value: Any) -> Any:
         """
-        Resolve a value using Jinja2 template resolution.
+        Resolve a single value, handling template strings.
 
         Args:
-            value: Value to resolve
+            value: Value to resolve, may be a template string
 
         Returns:
             Any: Resolved value
         """
-        return self.template_engine.process_value(value, self.context)
+        try:
+            return self.template_engine.process_value(value, self.context)
+        except Exception as e:
+            if isinstance(self.current_step, dict) and "name" in self.current_step:
+                self.state.mark_step_failed(self.current_step["name"], str(e))
+            raise
 
     def resolve_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -594,82 +624,95 @@ class WorkflowEngine:
         """
         name = step.get("name", "unnamed_step")
         self.logger.info(f"Running step: {name}")
+        self.current_step = step  # Set current step for error handling
 
-        # Import module
         try:
-            module = importlib.import_module(step["module"])
-        except ImportError as e:
-            raise ModuleNotFoundError(name, step["module"]) from e
+            # Import module
+            try:
+                module = importlib.import_module(step["module"])
+            except ImportError as e:
+                raise ModuleNotFoundError(name, step["module"]) from e
 
-        # Get function
-        try:
-            func = getattr(module, step["function"])
-        except AttributeError as e:
-            raise FunctionNotFoundError(name, step["module"], step["function"]) from e
+            # Get function
+            try:
+                func = getattr(module, step["function"])
+            except AttributeError as e:
+                raise FunctionNotFoundError(name, step["module"], step["function"]) from e
 
-        # Prepare inputs
-        inputs = self.resolve_inputs(step.get("inputs", {}))
+            # Prepare inputs
+            inputs = self.resolve_inputs(step.get("inputs", {}))
 
-        # Add workspace to inputs if function accepts it
-        sig = inspect.signature(func)
-        if "workspace" in sig.parameters and self.workspace:
-            inputs["workspace"] = self.workspace
+            # Add workspace to inputs if function accepts it
+            sig = inspect.signature(func)
+            if "workspace" in sig.parameters and self.workspace:
+                inputs["workspace"] = self.workspace
 
-        self.logger.info(f"Step inputs: {inputs}")
+            self.logger.info(f"Step inputs: {inputs}")
 
-        # Execute function
-        try:
-            result = func(**inputs)
-            self.logger.debug(f"Task returned result of type {type(result)}: {result}")
-        except Exception as e:
-            raise StepExecutionError(name, e) from e
+            # Execute function
+            try:
+                result = func(**inputs)
+                self.logger.debug(f"Task returned result of type {type(result)}: {result}")
+            except Exception as e:
+                raise StepExecutionError(name, e) from e
 
-        # Store outputs in context
-        outputs: Union[List[str], str, None] = step.get("outputs")
-        if outputs is not None:
-            self.logger.debug(
-                f"Storing outputs in context. Current context before: {self.context}"
-            )
-            self.logger.debug(f"Task result type: {type(result)}, value: {result}")
-            if isinstance(outputs, str):
-                # Ensure we store raw strings for template variables
-                if isinstance(result, dict) and "content" in result:
-                    self.logger.warning(
-                        f"Task '{name}' returned a dict with 'content' property - using raw content value"
-                    )
-                    self.context[outputs] = result["content"]
-                else:
-                    self.context[outputs] = result
+            # Store outputs in context
+            outputs: Union[List[str], str, None] = step.get("outputs")
+            if outputs is not None:
                 self.logger.debug(
-                    f"Stored single output '{outputs}' = {self.context[outputs]}"
+                    f"Storing outputs in context. Current context before: {self.context}"
                 )
-            elif isinstance(outputs, list):
-                if len(outputs) == 1:
+                self.logger.debug(f"Task result type: {type(result)}, value: {result}")
+                if isinstance(outputs, str):
+                    # Ensure we store raw strings for template variables
                     if isinstance(result, dict) and "content" in result:
                         self.logger.warning(
                             f"Task '{name}' returned a dict with 'content' property - using raw content value"
                         )
-                        self.context[outputs[0]] = result["content"]
+                        self.context[outputs] = result["content"]
                     else:
-                        self.context[outputs[0]] = result
+                        self.context[outputs] = result
                     self.logger.debug(
-                        f"Stored single output from list '{outputs[0]}' = {self.context[outputs[0]]}"
+                        f"Stored single output '{outputs}' = {self.context[outputs]}"
                     )
-                elif len(outputs) > 1 and isinstance(result, (list, tuple)):
-                    for output, value in zip(outputs, result):
-                        if isinstance(value, dict) and "content" in value:
+                elif isinstance(outputs, list):
+                    if len(outputs) == 1:
+                        if isinstance(result, dict) and "content" in result:
                             self.logger.warning(
                                 f"Task '{name}' returned a dict with 'content' property - using raw content value"
                             )
-                            self.context[output] = value["content"]
+                            self.context[outputs[0]] = result["content"]
                         else:
-                            self.context[output] = value
+                            self.context[outputs[0]] = result
                         self.logger.debug(
-                            f"Stored multiple output '{output}' = {self.context[output]}"
+                            f"Stored single output from list '{outputs[0]}' = {self.context[outputs[0]]}"
                         )
+                    elif len(outputs) > 1 and isinstance(result, (list, tuple)):
+                        for output, value in zip(outputs, result):
+                            if isinstance(value, dict) and "content" in value:
+                                self.logger.warning(
+                                    f"Task '{name}' returned a dict with 'content' property - using raw content value"
+                                )
+                                self.context[output] = value["content"]
+                            else:
+                                self.context[output] = value
+                            self.logger.debug(
+                                f"Stored multiple output '{output}' = {self.context[output]}"
+                            )
 
-        self.logger.debug(f"Final context after step '{name}': {self.context}")
-        self.logger.info(f"Step '{name}' completed. Outputs: {self.context}")
+            self.logger.debug(f"Final context after step '{name}': {self.context}")
+            self.logger.info(f"Step '{name}' completed. Outputs: {self.context}")
+
+            # Mark step as completed
+            self.state.mark_step_complete(name, {name: result})
+
+        except Exception as e:
+            # Handle step error
+            result = self._handle_step_error(step, e)
+            if result is None:
+                raise
+        finally:
+            self.current_step = None  # Clear current step
 
     def _handle_step_error(
         self, step: Dict[str, Any], error: Exception
@@ -732,12 +775,11 @@ class WorkflowEngine:
 
             if attempt >= max_attempts:
                 self.logger.error(f"Step '{name}' failed after {attempt} attempts")
-                self.state.mark_step_failed(
-                    name, f"{message} (after {attempt} attempts)"
-                )
-                raise WorkflowError(
-                    f"Step {name} failed after {attempt} attempts: {message}"
-                )
+                error_message = f"{message} (after {attempt} attempts)"
+                # Mark step as failed and clear retry state
+                self.state.mark_step_failed(name, error_message)
+                self.state.clear_retry_state(name)
+                raise WorkflowError(f"Step {name} failed after {attempt} attempts: {message}")
 
             # Update retry state
             self.state.update_retry_state(
@@ -768,7 +810,18 @@ class WorkflowEngine:
                 self.state.mark_step_complete(name, {name: result})
                 return result
             except Exception as retry_error:
-                # Handle retry failure recursively
+                # Get updated retry state to check attempt count
+                retry_state = self.state.get_retry_state(name)
+                attempt = retry_state.get("attempt", 1)
+                
+                if attempt >= max_attempts:
+                    # If this was the last retry, mark as failed and clear retry state
+                    error_message = f"Failed after {attempt} attempts: {str(retry_error)}"
+                    self.state.mark_step_failed(name, error_message)
+                    self.state.clear_retry_state(name)
+                    raise WorkflowError(error_message)
+                
+                # Otherwise, handle retry failure recursively
                 return self._handle_step_error(step, retry_error)
         elif action == "notify":
             # Mark as failed but try to execute notification task if specified
