@@ -6,6 +6,7 @@
 # - Shell command execution
 # - Template rendering with variable substitution
 # - Multi-step workflow with dependencies
+# - Namespaced variable access (args.VAR)
 
 name: Advanced Hello World
 description: >
@@ -17,6 +18,7 @@ description: >
   - Shell commands
   - Template rendering
   - Custom module tasks
+  - Namespaced variables
 
 params:
   name:
@@ -30,14 +32,14 @@ steps:
     task: shell
     command: |
       mkdir -p "output/"
-      if [ -z "{{ name|default('') }}" ]; then
+      if [ -z "{{ args.name|default('') }}" ]; then
         echo "Error: Name parameter is required" > "output/validation_result.txt"
-      elif [ "{{ name|length }}" -lt 2 ]; then
+      elif [ "{{ args.name|length }}" -lt 2 ]; then
         echo "Error: Name must be at least 2 characters long" > "output/validation_result.txt"
-      elif [ "{{ name|length }}" -gt 50 ]; then
+      elif [ "{{ args.name|length }}" -gt 50 ]; then
         echo "Error: Name must not exceed 50 characters" > "output/validation_result.txt"
       else
-        echo "Valid: {{ name }}" > "output/validation_result.txt"
+        echo "Valid: {{ args.name }}" > "output/validation_result.txt"
       fi
 
   # Step 2: Read the validation result file
@@ -105,7 +107,7 @@ steps:
     params:
       file_path: "output/greeting.json"
       data: 
-        greeting: "Hello, {{ name }}!"
+        greeting: "Hello, {{ args.name }}!"
         timestamp: "{{ current_timestamp }}"
         run_number: "{{ run_number }}"
         language: "en"
@@ -120,12 +122,12 @@ steps:
     params:
       file_path: "output/greetings.yaml"
       data:
-        English: "Hello, {{ name }}!"
-        Spanish: "¡Hola, {{ name }}!"
-        French: "Bonjour, {{ name }}!"
-        German: "Hallo, {{ name }}!"
-        Italian: "Ciao, {{ name }}!"
-        Japanese: "こんにちは、{{ name }}さん！"
+        English: "Hello, {{ args.name }}!"
+        Spanish: "¡Hola, {{ args.name }}!"
+        French: "Bonjour, {{ args.name }}!"
+        German: "Hallo, {{ args.name }}!"
+        Italian: "Ciao, {{ args.name }}!"
+        Japanese: "こんにちは、{{ args.name }}さん！"
     condition: "'{{ validation_content }}' == 'true'"
 
   # Step 7: Format and display results
@@ -157,7 +159,7 @@ steps:
       file_path: "output/error_report.txt"
       content: |
         Workflow encountered an error:
-        Input validation failed{% if name %} for name: {{ name }}{% else %}: name parameter not provided{% endif %}
+        Input validation failed{% if args.name %} for name: {{ args.name }}{% else %}: name parameter not provided{% endif %}
         
         Please check the requirements and try again.
         

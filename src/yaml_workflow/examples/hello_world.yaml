@@ -6,6 +6,7 @@
 # - Built-in variables (run_number, workflow_name, timestamp, workspace)
 # - Error handling with detailed messages
 # - File operations with validation
+# - Namespaced variable access (args.VAR)
 #
 # Usage:
 # yaml-workflow run hello_world.yaml --name="World"
@@ -31,7 +32,7 @@ steps:
   - name: create_greeting
     task: template
     template: |
-      Hello, {{ name }}!
+      Hello, {{ args.name }}!
       
       This is run #{{ run_number }} of the {{ workflow_name }} workflow.
       Created at: {{ timestamp }}

@@ -705,6 +705,9 @@ The codebase currently has mixed variable resolution patterns:
    - [x] Add error handling examples
    - [x] Document batch processing improvements
    - [x] Update advanced hello world example
+   - [x] Update python_tasks.yaml with args prefix
+   - [x] Update template_tasks.yaml with args prefix
+   - [x] Update test_resume.yaml with args prefix
    - [ ] Update remaining examples
    - [ ] Run documentation tests
 
@@ -731,24 +734,32 @@ The codebase currently has mixed variable resolution patterns:
    - Added validation error handling
    - Added template resolution error examples
 
+4. Variable Access Documentation
+   - Added namespaced variable access examples
+   - Updated to use args prefix consistently
+   - Added error handling for undefined variables
+   - Added examples of step output access
+   - Added environment variable access patterns
+
 **Remaining Tasks:**
 1. Update remaining example workflows:
-   - [ ] Basic workflow examples
-   - [ ] Python task examples
-   - [ ] Shell task examples
-   - [ ] Template task examples
+   - [ ] data_pipeline.yaml
+   - [ ] error_handling.yaml
+   - [ ] parallel_tasks.yaml
+   - [ ] conditional_flows.yaml
+   - [ ] custom_tasks.yaml
 
 2. Documentation Tests:
-   - [ ] Verify all examples are runnable
-   - [ ] Check for consistent syntax usage
-   - [ ] Validate error handling examples
-   - [ ] Test all documented features
+   - [ ] Create test suite for examples
+   - [ ] Add validation for syntax consistency
+   - [ ] Add error handling coverage tests
+   - [ ] Add feature coverage matrix
 
 3. Final Review:
-   - [ ] Check for any remaining legacy syntax
-   - [ ] Verify all features are documented
-   - [ ] Ensure consistent terminology
-   - [ ] Update troubleshooting guides
+   - [ ] Audit for legacy syntax
+   - [ ] Verify feature documentation
+   - [ ] Check terminology consistency
+   - [ ] Update migration guide
 
 ### Risk Assessment
 
@@ -938,6 +949,9 @@ The codebase currently has mixed variable resolution patterns:
   - [x] Add error handling examples
   - [x] Document batch processing improvements
   - [x] Update advanced hello world example
+  - [x] Update python_tasks.yaml with args prefix
+  - [x] Update template_tasks.yaml with args prefix
+  - [x] Update test_resume.yaml with args prefix
   - [ ] Update remaining examples
   - [ ] Run documentation tests
 
