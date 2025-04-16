@@ -10,8 +10,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple, Union
 
-from jinja2 import Template
+from jinja2 import Template, StrictUndefined, UndefinedError
 
+from ..exceptions import TemplateError
 from . import get_task_handler, register_task
 from .base import get_task_logger
 
@@ -31,6 +32,46 @@ def chunk_iterator(items: List[Any], chunk_size: int) -> Iterator[List[Any]]:
         raise ValueError("Chunk size must be greater than 0")
     for i in range(0, len(items), chunk_size):
         yield items[i : i + chunk_size]
+
+
+def resolve_template(template_str: str, context: Dict[str, Any], item: Any = None, batch_index: int = 0, batch: List[Any] = None) -> str:
+    """Resolve a template string with batch context.
+    
+    Args:
+        template_str: Template string to resolve
+        context: Base context dictionary
+        item: Current batch item
+        batch_index: Current batch index
+        batch: Current batch list
+        
+    Returns:
+        str: Resolved template string
+        
+    Raises:
+        TemplateError: If template resolution fails
+    """
+    try:
+        template = Template(template_str, undefined=StrictUndefined)
+        batch_context = {
+            **context,
+            "item": item,
+            "batch_index": batch_index,
+            "batch": batch or [],
+        }
+        return template.render(**batch_context)
+    except UndefinedError as e:
+        available = {
+            "args": list(context["args"].keys()) if "args" in context else [],
+            "env": list(context["env"].keys()) if "env" in context else [],
+            "steps": list(context["steps"].keys()) if "steps" in context else [],
+            "batch": ["item", "batch_index", "batch"]
+        }
+        raise TemplateError(
+            f"Failed to resolve variable in template '{template_str}': {str(e)}. "
+            f"Available variables: {available}"
+        )
+    except Exception as e:
+        raise TemplateError(f"Failed to render template: {str(e)}")
 
 
 class BatchProcessor:
@@ -118,6 +159,10 @@ class BatchProcessor:
 
         Returns:
             Tuple[bool, Any]: Success status and task result
+        
+        Raises:
+            TemplateError: If template resolution fails
+            ValueError: If task configuration is invalid
         """
         try:
             self.logger.info(f"Processing item: {item}")
@@ -145,13 +190,12 @@ class BatchProcessor:
 
             # Add command for shell tasks
             if "command" in task_config:
-                # Render command template with batch context
-                template = Template(task_config["command"])
-                step["command"] = template.render(
-                    item=item,
-                    batch_index=task_config.get("batch_index", 0),
-                    batch=task_config.get("batch", []),
-                    **context,
+                step["command"] = resolve_template(
+                    task_config["command"],
+                    context,
+                    item,
+                    task_config.get("batch_index", 0),
+                    task_config.get("batch", [])
                 )
 
             # Add template and output for template tasks
@@ -159,30 +203,25 @@ class BatchProcessor:
                 step["template"] = task_config["template"]
 
             if "output" in task_config:
-                # Render output template with batch context
-                template = Template(task_config["output"])
-                step["output"] = str(
-                    self.workspace
-                    / template.render(
-                        item=item,
-                        batch_index=task_config.get("batch_index", 0),
-                        batch=task_config.get("batch", []),
-                        **context,
-                    )
+                output_path = resolve_template(
+                    task_config["output"],
+                    context,
+                    item,
+                    task_config.get("batch_index", 0),
+                    task_config.get("batch", [])
                 )
+                step["output"] = str(self.workspace / output_path)
 
             # Add file output path if specified
             if "file_output" in task_config:
-                template = Template(task_config["file_output"])
-                step["file_output"] = str(
-                    self.workspace
-                    / template.render(
-                        item=item,
-                        batch_index=task_config.get("batch_index", 0),
-                        batch=task_config.get("batch", []),
-                        **context,
-                    )
+                file_output_path = resolve_template(
+                    task_config["file_output"],
+                    context,
+                    item,
+                    task_config.get("batch_index", 0),
+                    task_config.get("batch", [])
                 )
+                step["file_output"] = str(self.workspace / file_output_path)
 
             # Add inputs if any
             step["inputs"] = {
@@ -228,201 +267,209 @@ class BatchProcessor:
         error_handler: Optional[Callable[[str, Any, Exception], None]] = None,
         aggregator: Optional[Callable[[List[Any]], Any]] = None,
     ) -> Dict[str, Any]:
-        """
-        Process a batch of items.
+        """Process a batch of items in parallel with state management.
 
         Args:
             items: List of items to process
             task_config: Task configuration
             context: Workflow context
-            chunk_size: Size of chunks for parallel processing
+            chunk_size: Number of items to process in each chunk
             max_workers: Maximum number of worker threads
-            resume_state: Whether to load and save state
+            resume_state: Whether to resume from previous state
             progress_callback: Optional callback for progress updates
             error_handler: Optional callback for error handling
             aggregator: Optional function to aggregate results
 
         Returns:
-            Dict[str, Any]: Processing results including:
-                - processed_items: List of successfully processed items' results
-                - failed_items: List of failed items
-                - results: Dict mapping item IDs to their results
-                - aggregated_result: Result of aggregation if specified
+            Dict containing processing results and statistics
+
+        Raises:
+            TemplateError: If template resolution fails
+            ValueError: If configuration is invalid
         """
-        self.logger.info(f"Starting batch processing of {len(items)} items")
-
-        # Initialize tracking sets
-        processed_items: Set[str] = set()
-        failed_items: Set[str] = set()
-        results: Dict[str, Any] = {}
-
-        # Load state if resuming
-        if resume_state:
-            processed_items, failed_items = self.load_state()
-            self.logger.info(
-                f"Loaded state: {len(processed_items)} processed, {len(failed_items)} failed"
-            )
-
-        # Filter out already processed items
-        remaining_items = [
-            item
-            for item in items
-            if str(item) not in processed_items and str(item) not in failed_items
-        ]
-
-        if not remaining_items:
-            self.logger.info("No items to process")
+        if not items:
             return {
-                "processed_items": list(processed_items),
-                "failed_items": list(failed_items),
-                "results": results,
-                "aggregated_result": None,
+                "processed": [],
+                "failed": [],
+                "results": [],
+                "stats": {},
+                "processed_items": [],  # For backward compatibility
+                "failed_items": [],     # For backward compatibility
+                "aggregated_result": None  # For backward compatibility
             }
 
-        self.logger.info(f"Processing {len(remaining_items)} remaining items")
+        # Validate chunk size
+        if chunk_size <= 0:
+            raise ValueError("Chunk size must be greater than 0")
+
+        # Load previous state if resuming
+        processed, failed = self.load_state() if resume_state else (set(), set())
+        results: List[Any] = []
         total_items = len(items)
-        processed_count = len(processed_items)
+        completed = 0
+        aggregated_result = None  # Store the final aggregated result
+        item_results = {}  # Map items to their results
 
-        # Process items in chunks
-        for chunk_index, chunk in enumerate(
-            chunk_iterator(remaining_items, chunk_size)
-        ):
-            self.logger.info(f"Processing chunk {chunk_index + 1}")
+        try:
+            # Process items in chunks
+            for chunk_index, chunk in enumerate(chunk_iterator(items, chunk_size)):
+                chunk_results = []
+                chunk_failed = []
 
-            # Update task config with batch information
-            batch_config = {**task_config, "batch_index": chunk_index, "batch": chunk}
+                # Update task config with chunk information
+                chunk_task_config = {
+                    **task_config,
+                    "batch": chunk,
+                    "batch_index": chunk_index,
+                    "previous_batch_result": results[-chunk_size:] if results else None,
+                }
 
-            # Process chunk in parallel if max_workers specified
-            if max_workers:
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    futures = {
-                        executor.submit(
-                            self.process_item,
-                            item,
-                            batch_config,
-                            context,
-                            progress_callback,
-                        ): item
-                        for item in chunk
-                    }
+                # Process chunk in parallel with limited workers
+                with ThreadPoolExecutor(max_workers=max_workers or chunk_size) as executor:
+                    # Create a mapping of futures to items
+                    futures = {}
+                    for item in chunk:
+                        if str(item) not in processed and str(item) not in failed:
+                            future = executor.submit(
+                                self.process_item, item, chunk_task_config, context, progress_callback
+                            )
+                            futures[future] = item
 
+                    # Process completed futures
                     for future in as_completed(futures):
                         item = futures[future]
                         try:
                             success, result = future.result()
                             if success:
-                                processed_items.add(str(item))
-                                results[str(item)] = result
-                                processed_count += 1
-                                if progress_callback:
-                                    progress_callback(
-                                        str(item), processed_count / total_items * 100
-                                    )
+                                chunk_results.append(result)
+                                processed.add(str(item))
+                                item_results[str(item)] = result
                             else:
-                                failed_items.add(str(item))
-                                if error_handler:
-                                    error_handler(str(item), item, Exception(result))
+                                chunk_failed.append(item)
+                                failed.add(str(item))
                         except Exception as e:
-                            failed_items.add(str(item))
+                            self.logger.error(f"Failed to process item {item}: {str(e)}")
                             if error_handler:
                                 error_handler(str(item), item, e)
-            else:
-                # Process chunk sequentially
-                for item in chunk:
-                    success, result = self.process_item(
-                        item, batch_config, context, progress_callback
-                    )
-                    if success:
-                        processed_items.add(str(item))
-                        results[str(item)] = result
-                        processed_count += 1
+                            chunk_failed.append(item)
+                            failed.add(str(item))
+
+                        # Update progress
+                        completed += 1
                         if progress_callback:
-                            progress_callback(
-                                str(item), processed_count / total_items * 100
-                            )
-                    else:
-                        failed_items.add(str(item))
+                            progress = completed / total_items * 100
+                            progress_callback(item, progress)
+
+                # Save state after each chunk
+                self.save_state(processed, failed)
+
+                # Aggregate chunk results if needed
+                if aggregator and chunk_results:
+                    try:
+                        chunk_result = aggregator(chunk_results)
+                        results.append(chunk_result)
+                        # Store the last aggregated result
+                        aggregated_result = chunk_result
+                    except Exception as e:
+                        self.logger.error(f"Failed to aggregate chunk results: {str(e)}")
                         if error_handler:
-                            error_handler(str(item), item, Exception(result))
-
-            # Save state after each chunk if resuming
-            if resume_state:
-                self.save_state(processed_items, failed_items)
-
-        # Aggregate results if specified
-        aggregated_result = None
-        if aggregator and results:
-            try:
-                aggregated_result = aggregator(
-                    [results[str(item)] for item in items if str(item) in results]
-                )
-            except Exception as e:
-                self.logger.error(f"Failed to aggregate results: {str(e)}")
-
-        # Return results with actual values instead of just IDs
-        processed_results = []
-        for item in items:
-            item_str = str(item)
-            if item_str in processed_items:
-                result = results[item_str]
-                # Handle different result formats
-                if isinstance(result, dict) and "result" in result:
-                    processed_results.append(result["result"])
+                            error_handler("aggregation", chunk_results, e)
                 else:
-                    processed_results.append(result)
+                    results.extend(chunk_results)
 
-        return {
-            "processed_items": processed_results,
-            "failed_items": list(failed_items),
-            "results": results,
-            "aggregated_result": aggregated_result,
-        }
+            # Calculate statistics
+            stats = {
+                "total": total_items,
+                "processed": len(processed),
+                "failed": len(failed),
+                "success_rate": len(processed) / total_items * 100 if total_items > 0 else 0,
+                "chunks": (total_items + chunk_size - 1) // chunk_size,
+                "completed_at": datetime.now().isoformat(),
+            }
+
+            # Create a list of results in the same order as input items
+            processed_results = []
+            for item in items:
+                if str(item) in processed:
+                    processed_results.append(item_results[str(item)])
+
+            return {
+                "processed": list(processed),
+                "failed": list(failed),
+                "results": results,
+                "stats": stats,
+                "processed_items": processed_results,  # Contains results in original item order
+                "failed_items": list(failed),
+                "aggregated_result": aggregated_result
+            }
+
+        except ValueError as e:
+            self.logger.error(f"Invalid configuration: {str(e)}")
+            raise  # Re-raise ValueError as is
+        except Exception as e:
+            self.logger.error(f"Batch processing failed: {str(e)}")
+            raise TemplateError(f"Batch processing failed: {str(e)}")
 
 
 @register_task("batch_processor")
 def process_batch(
     step: Dict[str, Any], context: Dict[str, Any], workspace: Union[str, Path]
 ) -> Dict[str, Any]:
-    """Task handler for batch processing.
+    """Process a batch of items using the specified task.
 
     Args:
-        step: Step configuration including items and processing task
-        context: Execution context
-        workspace: Path to workspace directory
+        step: Step configuration including:
+            - items: List of items to process (or iterate_over for backward compatibility)
+            - task: Task type to use for processing
+            - chunk_size: Optional size of chunks for parallel processing
+            - max_workers: Optional maximum number of worker threads
+            - resume: Optional flag to resume from previous state
+        context: Workflow context
+        workspace: Workspace directory
 
     Returns:
-        Dictionary containing processing results
+        Dict containing processing results and statistics
 
     Raises:
-        ValueError: If required configuration is missing or invalid
+        TemplateError: If template resolution fails
+        ValueError: If required configuration is missing
     """
-    # Convert workspace to Path if it's a string
-    workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
+    try:
+        # Get required parameters - support both new 'items' and legacy 'iterate_over'
+        items = step.get("items") or step.get("iterate_over")
+        if not items:
+            raise ValueError("items parameter (or iterate_over for backward compatibility) is required")
 
-    # Create processor instance
-    processor = BatchProcessor(workspace_path, step.get("name", "batch_processor"))
+        # Get task configuration - support both new style and legacy
+        task_config = step.copy()
+        if "processing_task" in step:
+            # Legacy format - merge processing_task into main config
+            task_config.update(step["processing_task"])
+            
+        # Get optional parameters with defaults
+        chunk_size = step.get("chunk_size", 10)
+        max_workers = step.get("max_workers")
+        resume = step.get("resume", False) or step.get("resume_state", False)
 
-    # Get configuration
-    items = step.get("iterate_over", [])
-    processing_task = step.get("processing_task", {})
-    chunk_size = step.get("chunk_size", 10)
-    max_workers = step.get("max_workers")
-    resume_state = step.get("resume_state", False)
-    progress_callback = step.get("progress_callback")
-    error_handler = step.get("error_handler")
+        # Create processor instance
+        processor = BatchProcessor(workspace, step.get("name", "batch_processor"))
 
-    # Validate chunk size
-    if chunk_size <= 0:
-        raise ValueError("Chunk size must be greater than 0")
+        # Process items
+        result = processor.process_batch(
+            items=items,
+            task_config=task_config,
+            context=context,
+            chunk_size=chunk_size,
+            max_workers=max_workers,
+            resume_state=resume,
+            progress_callback=step.get("progress_callback"),
+            error_handler=step.get("error_handler"),
+            aggregator=step.get("aggregator"),
+        )
 
-    # Process batch
-    return processor.process_batch(
-        items=items,
-        task_config=processing_task,
-        context=context,
-        chunk_size=chunk_size,
-        max_workers=max_workers,
-        resume_state=resume_state,
-        progress_callback=progress_callback,
-        error_handler=error_handler,
-    )
+        return result
+
+    except Exception as e:
+        if isinstance(e, (ValueError, TemplateError)):
+            raise
+        raise TemplateError(f"Batch processing failed: {str(e)}")
