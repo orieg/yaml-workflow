@@ -1,537 +1,543 @@
-# Implementation Details: Namespaced Variables
+# Template Engine Centralization Plan
 
-## Requirements
+## Goal
 
-### Dependencies
-```python
-requirements = {
-    "jinja2": ">=3.0.0",    # Template processing
-    "typing_extensions": ">=4.0.0",  # Type hints for Python 3.7+
-}
+The primary goal of this implementation is to centralize all template processing in the workflow engine. Currently, template resolution is scattered across different task handlers, leading to inconsistent behavior and duplicate code. We will:
 
-dev_requirements = {
-    "pytest": ">=7.0.0",     # Testing framework
-    "pytest-cov": ">=4.0.0", # Coverage reporting
-    "black": ">=22.0.0",     # Code formatting
-    "mypy": ">=1.0.0"        # Type checking
-}
-```
+1. Move all template processing to the engine level
+2. Ensure consistent Jinja2 feature support across all components
+3. Remove duplicate template processing code from task handlers
+4. Implement comprehensive testing for template features
 
-### Python Version
-- Minimum: Python 3.10
-- Recommended: Python 3.10+
+Key Benefits:
+- Consistent template behavior across all task types
+- Centralized error handling and reporting
+- Easier maintenance and feature additions
+- Better testing coverage
+- Reduced code duplication
 
-### Development Environment
-- Git for version control
-- Virtual environment (venv or conda)
-- IDE with Python support (VS Code recommended)
+## Implementation Plan
 
-## Initial Setup
+### Phase 0: Task Handler Audit
+- [ ] List all template resolution points in each task handler:
+  - python_task
+  - shell_task
+  - template_task
+  - batch_task
+  - file_task
+  - custom_task
+- [ ] Document current template resolution approach in each
+- [ ] Create test cases covering current template usage
 
-1. Environment Preparation
-   ```bash
-   # Create and activate virtual environment
-   python -m venv venv
-   source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+### Phase 1: Basic Variable Resolution
+1. Engine Updates
+   - [ ] Move simple variable resolution ({{ var }}) to engine level
+   - [ ] Add tests for basic variable resolution
+   - [ ] Add engine method for task handlers to use
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Move template resolution to engine level
+
+     - Add basic variable resolution to engine
+     - Add engine.resolve_template method
+     - Add tests for basic resolution
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+2. Task Handler Updates (one at a time)
+   Python Task:
+   - [ ] Remove direct template resolution
+   - [ ] Use engine's resolution method
+   - [ ] Update tests
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update python_task to use engine template resolution
+
+     - Remove direct template processing
+     - Use engine.resolve_template
+     - Add tests verifying resolution
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   # Install dependencies
-   pip install -r requirements.txt
-   pip install -r requirements-dev.txt
-   ```
+   Shell Task:
+   - [ ] Remove direct template resolution
+   - [ ] Use engine's resolution method
+   - [ ] Update tests
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update shell_task to use engine template resolution
 
-2. Project Structure
-   ```
-   yaml-workflow/
-   ├── src/
-   │   └── yaml_workflow/
-   │       ├── __init__.py
-   │       ├── engine.py
-   │       ├── template.py
-   │       └── tasks/
-   │           └── __init__.py
-   ├── tests/
-   │   ├── __init__.py
-   │   ├── test_engine.py
-   │   └── test_template.py
-   ├── examples/
-   │   └── basic_workflow.yaml
-   ├── requirements.txt
-   ├── requirements-dev.txt
-   └── setup.py
-   ```
-
-3. Initial Validation
-   ```bash
-   # Run existing tests to ensure clean starting point
-   pytest
+     - Remove direct template processing
+     - Use engine.resolve_template
+     - Add tests verifying resolution
+     - Verify existing shell_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   # Check code formatting
-   black src tests
+   Template Task:
+   - [ ] Remove direct template resolution
+   - [ ] Use engine's resolution method
+   - [ ] Update tests
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update template_task to use engine template resolution
+
+     - Remove direct template processing
+     - Use engine.resolve_template
+     - Add tests verifying resolution
+     - Verify existing template_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   # Run type checking
-   mypy src
-   ```
+   Batch Task:
+   - [ ] Remove direct template resolution
+   - [ ] Use engine's resolution method
+   - [ ] Update tests
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update batch_task to use engine template resolution
 
-## Overview
-
-This document describes the implementation of namespaced variables in the workflow engine:
-- `args.VAR`: Access to workflow parameters
-- `env.VAR`: Access to environment variables
-- `steps.STEP_NAME.output`: Access to step outputs (singular, supports multiple return types)
-
-## Current Implementation
-
-The workflow engine uses a namespaced context structure for all variable access:
-
-```python
-self.context = {
-    # Built-in variables
-    "workflow_name": self.name,
-    "workspace": str(self.workspace),
-    "run_number": self.workspace_info.get("run_number"),
-    "timestamp": datetime.now().isoformat(),
-    "workflow_file": str(self.workflow_file.absolute() if self.workflow_file else ""),
-    
-    # Namespaced variables
-    "args": {},    # Workflow parameters
-    "env": dict(os.environ),  # Environment variables
-    "steps": {},   # Step outputs and metadata
-}
-```
-
-### Variable Resolution
-
-Template resolution is handled using Jinja2 with StrictUndefined for better error detection:
-
-```python
-def resolve_template(self, template_str: str) -> str:
-    """Resolve template with both direct and namespaced variables."""
-    template = Template(template_str, undefined=StrictUndefined)
-    try:
-        return template.render(**self.context)
-    except UndefinedError as e:
-        # Enhance error message with available variables
-        available = {
-            "args": list(self.context["args"].keys()),
-            "env": list(self.context["env"].keys()),
-            "steps": list(self.context["steps"].keys())
-        }
-        raise TemplateError(f"{str(e)}. Available variables: {available}")
-```
-
-## Template Processing Implementation
-
-### Overview
-
-The template processing system provides essential Jinja2 features for workflow configuration:
-- Support for basic Jinja2 control structures (`{% if %}`, `{% for %}`)
-- Simple variable substitution with namespaced access
-- Basic error handling with clear messages
-- Direct integration with workflow engine
-
-### Native Jinja2 Features
-
-The system uses standard Jinja2 control structures without modification:
-
-1. Conditional Logic
-   ```jinja2
-   {% if condition %}
-     content
-   {% elif other_condition %}
-     other content
-   {% else %}
-     default content
-   {% endif %}
-   ```
-
-2. Loops
-   ```jinja2
-   {% for item in items %}
-     {{ item.name }}
-   {% endfor %}
-   ```
-
-3. Assignments
-   ```jinja2
-   {% set value = some_calculation %}
-   ```
-
-4. Expressions
-   ```jinja2
-   {% if user.age > 18 and user.country in allowed_countries %}
-   ```
-
-All these are native Jinja2 features - we simply pass them through to Jinja2's template engine without modification.
-
-### Current Implementation
-
-The template engine is implemented as a simple service within the workflow engine:
-
-```python
-class TemplateEngine:
-    def __init__(self):
-        self.env = Environment(
-            undefined=StrictUndefined,
-            autoescape=True
-        )
-        
-    def process_template(self, template: str, context: Dict[str, Any]) -> str:
-        """Process template with workflow context."""
-        template = self.env.from_string(template)
-        try:
-            return template.render(**context)
-        except UndefinedError as e:
-            # Provide clear error with available variables
-            available = {
-                "args": list(context["args"].keys()),
-                "env": list(context["env"].keys()),
-                "steps": list(context["steps"].keys())
-            }
-            raise TemplateError(f"{str(e)}. Available variables: {available}")
-            
-    def process_value(self, value: Any, context: Dict[str, Any]) -> Any:
-        """Process any value that might contain templates."""
-        if isinstance(value, str) and ("{{" in value or "{%" in value):
-            return self.process_template(value, context)
-        return value
-```
-
-### Features
-
-1. Core Template Processing
-   - Variable substitution using native Jinja2 syntax `{{ var }}`
-   - Native Jinja2 control structures:
-     - `{% if %}` for conditionals
-     - `{% for %}` for loops
-     - `{% set %}` for assignments
-   - No custom syntax or extensions needed
-   - Direct pass-through to Jinja2 engine
-
-2. Error Handling
-   - Clear error messages
-   - List of available variables
-   - Basic template debugging
-
-3. Integration
-   - Direct workflow engine integration
-   - Simple task handler support
-   - Consistent variable access
-
-### Integration Example
-
-```yaml
-steps:
-  - name: process_data
-    task: python
-    inputs:
-      data: "{{ args.input_data }}"
-      mode: "{{ env.PROCESSING_MODE }}"
-    condition: "{% if steps.validate.output.status == 'ok' %}true{% else %}false{% endif %}"
-```
-
-### Implementation Steps
-
-1. Core Updates
-   ```python
-   # Implementation sequence with dependencies
-   1.1 Update WorkflowEngine
-       - Add template engine instance
-       - Update template processing
-       Dependencies:
-       - TemplateEngine class
-       - WorkflowEngine class
-       Integration Points:
-       - Template processing in step execution
-       - Variable resolution in context
+     - Remove direct template processing
+     - Use engine.resolve_template
+     - Add tests verifying resolution
+     - Verify existing batch_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   1.2 Update Task Handlers
-       - Use engine's template processing
-       - Remove duplicate implementations
-       Dependencies:
-       - Updated WorkflowEngine
-       - Task handler base class
-       Integration Points:
-       - Template processing in input handling
-       - Error propagation
+   File Task:
+   - [ ] Remove direct template resolution
+   - [ ] Use engine's resolution method
+   - [ ] Update tests
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update file_task to use engine template resolution
+
+     - Remove direct template processing
+     - Use engine.resolve_template
+     - Add tests verifying resolution
+     - Verify existing file_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   1.3 Error Handling
-       - Implement clear error messages
-       - Add basic debugging support
-       Dependencies:
-       - TemplateError class
-       - Logging configuration
-       Integration Points:
-       - Error handling in template processing
-       - Task error propagation
-   ```
+   Custom Task:
+   - [ ] Remove direct template resolution
+   - [ ] Use engine's resolution method
+   - [ ] Update tests
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update custom_task to use engine template resolution
 
-2. Testing
-   ```python
-   2.1 Basic Tests
-       - Variable substitution
-       - Control structures
-       - Error messages
-       Test Files:
-       - test_template_engine.py
-       - test_variable_resolution.py
+     - Remove direct template processing
+     - Use engine.resolve_template
+     - Add tests verifying resolution
+     - Verify existing custom_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+### Phase 2: Basic Control Structures
+1. Engine Updates
+   - [ ] Add support for if statements in engine
+   - [ ] Add tests for if statement resolution
+   - [ ] Add engine method for condition evaluation
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Add if statement support to engine
+
+     - Add condition evaluation to engine
+     - Add engine.evaluate_condition method
+     - Add tests for if statements
+     - Support full Jinja2 if syntax
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+2. Task Handler Updates (one at a time)
+   Python Task:
+   - [ ] Remove condition evaluation code
+   - [ ] Use engine's condition evaluation
+   - [ ] Update tests with if statements
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update python_task to use engine condition evaluation
+
+     - Remove task-specific condition handling
+     - Use engine.evaluate_condition
+     - Add tests for if statements
+     - Verify conditional python_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   2.2 Integration Tests
-       - Workflow execution
-       - Task processing
-       Test Files:
-       - test_workflow_integration.py
-       - test_task_handlers.py
-   ```
+   Shell Task:
+   - [ ] Remove condition evaluation code
+   - [ ] Use engine's condition evaluation
+   - [ ] Update tests with if statements
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update shell_task to use engine condition evaluation
 
-### Component Integration
-
-```mermaid
-graph TD
-    A[WorkflowEngine] --> B[TemplateEngine]
-    A --> C[TaskHandler]
-    B --> D[ErrorHandler]
-    C --> B
-    C --> D
-```
-
-### Migration
-
-Each change should be small and self-contained, with full test suite execution between changes.
-
-1. Code Updates (Sequential Steps)
-
-   # Migration sequence - Execute full test suite after each step
+     - Remove task-specific condition handling
+     - Use engine.evaluate_condition
+     - Add tests for if statements
+     - Verify conditional shell_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   Step 1: Template Engine Base
-   1.1 Create basic TemplateEngine class with minimal functionality
-       Files: src/yaml_workflow/template.py
-       Tests: tests/test_template.py
-       - Basic template processing
-       - Simple error handling
-       Version Control:
-         git checkout -b feature/template-engine
-         git add src/yaml_workflow/template.py tests/test_template.py
-         git commit -m "Add basic TemplateEngine class"
-       Validation:
-         pytest tests/test_template.py
-         black src/yaml_workflow/template.py
-         mypy src/yaml_workflow/template.py
+   Template Task:
+   - [ ] Remove condition evaluation code
+   - [ ] Use engine's condition evaluation
+   - [ ] Update tests with if statements
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update template_task to use engine condition evaluation
+
+     - Remove task-specific condition handling
+     - Use engine.evaluate_condition
+     - Add tests for if statements
+     - Verify conditional template_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   1.2 Add variable resolution
-       Files: src/yaml_workflow/template.py
-       Tests: tests/test_template.py
-       - Add context support
-       - Add variable lookup
-       Version Control:
-         git add src/yaml_workflow/template.py tests/test_template.py
-         git commit -m "Add variable resolution to TemplateEngine"
-       Validation:
-         pytest
-         black src tests
-         mypy src
+   Batch Task:
+   - [ ] Remove condition evaluation code
+   - [ ] Use engine's condition evaluation
+   - [ ] Update tests with if statements
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update batch_task to use engine condition evaluation
+
+     - Remove task-specific condition handling
+     - Use engine.evaluate_condition
+     - Add tests for if statements
+     - Verify conditional batch_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   1.3 Add error enhancement
-       Files: src/yaml_workflow/template.py
-       Tests: tests/test_template.py
-       - Improve error messages
-       - Add variable listing
-       Version Control:
-         git add src/yaml_workflow/template.py tests/test_template.py
-         git commit -m "Enhance error handling in TemplateEngine"
-       Validation:
-         pytest
-         black src tests
-         mypy src
+   File Task:
+   - [ ] Remove condition evaluation code
+   - [ ] Use engine's condition evaluation
+   - [ ] Update tests with if statements
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update file_task to use engine condition evaluation
+
+     - Remove task-specific condition handling
+     - Use engine.evaluate_condition
+     - Add tests for if statements
+     - Verify conditional file_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
    
-   Step 2: Engine Integration
-   2.1 Add TemplateEngine to WorkflowEngine
-       Files: src/yaml_workflow/engine.py
-       Tests: tests/test_engine.py
-       - Initialize template engine
-       - Basic integration
-       Version Control:
-         git checkout -b feature/engine-integration
-         git add src/yaml_workflow/engine.py tests/test_engine.py
-         git commit -m "Integrate TemplateEngine with WorkflowEngine"
-       Validation:
-         pytest
-         black src tests
-         mypy src
+   Custom Task:
+   - [ ] Remove condition evaluation code
+   - [ ] Use engine's condition evaluation
+   - [ ] Update tests with if statements
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update custom_task to use engine condition evaluation
 
-2. Testing Strategy
+     - Remove task-specific condition handling
+     - Use engine.evaluate_condition
+     - Add tests for if statements
+     - Verify conditional custom_task workflows
+     EOF
+     
+     git commit -F commit.txt
+     ```
 
-   # Test after each change
+### Phase 3: Loop Support
+1. Engine Updates
+   - [ ] Add for loop support in engine
+   - [ ] Add tests for loop resolution
+   - [ ] Add engine method for loop handling
+
+2. Task Handler Updates (one at a time)
+   Python Task:
+   - [ ] Remove loop handling code
+   - [ ] Use engine's loop handling
+   - [ ] Update tests with loops
    
-   Step 1: Unit Tests
-   - Run specific test for changed component
-   - Run related component tests
-   - Run full unit test suite
-   Files: tests/test_*.py
-   Command: pytest tests/
-   Validation Points:
-   - All tests pass
-   - No regressions
-   - Coverage maintained or improved
+   Shell Task:
+   - [ ] Remove loop handling code
+   - [ ] Use engine's loop handling
+   - [ ] Update tests with loops
    
-   Step 2: Integration
-   - Run integration tests
-   - Verify no regressions
-   - Check example workflows
-   Files: tests/test_integration.py
-   Command: pytest tests/test_integration.py
-   Validation Points:
-   - All workflows execute successfully
-   - Error messages are clear
-   - Performance is maintained
+   Template Task:
+   - [ ] Remove loop handling code
+   - [ ] Use engine's loop handling
+   - [ ] Update tests with loops
    
-   Step 3: Validation
-   - Run example workflows
-   - Check error messages
-   - Verify backwards compatibility
-   Files: examples/*.yaml
-   Command: yaml-workflow run examples/*.yaml
-   Validation Points:
-   - All examples work
-   - Output matches expected
-   - Error handling works
-
-3. Rollback Plan
-
-   # Have a rollback strategy for each change
+   Batch Task:
+   - [ ] Remove loop handling code
+   - [ ] Use engine's loop handling
+   - [ ] Update tests with loops
    
-   For each change:
-   1. Create backup of modified files
-   2. Document exact changes made
-   3. Keep test results before change
-   4. Have clear rollback steps ready
+   File Task:
+   - [ ] Remove loop handling code
+   - [ ] Use engine's loop handling
+   - [ ] Update tests with loops
    
-   If tests fail:
-   1. Revert specific change:
-      git checkout -- src/yaml_workflow/template.py
-      # or
-      git reset --hard HEAD~1
-   2. Run tests to verify restoration:
-      pytest
-   3. Review and adjust approach
-   4. Try smaller change if needed
+   Custom Task:
+   - [ ] Remove loop handling code
+   - [ ] Use engine's loop handling
+   - [ ] Update tests with loops
+
+### Phase 4: Variable Assignment
+1. Engine Updates
+   - [ ] Add support for set statements
+   - [ ] Add tests for variable assignment
+   - [ ] Add engine method for variable assignment
+
+2. Task Handler Updates (one at a time)
+   Python Task:
+   - [ ] Remove variable assignment code
+   - [ ] Use engine's variable assignment
+   - [ ] Update tests with set statements
    
-   Emergency Rollback:
-   ```bash
-   # Full feature rollback
-   git checkout main
-   git branch -D feature/template-engine
-   # Clean up any artifacts
-   git clean -fd
-   ```
-
-## Batch Processing Implementation
-
-### Overview
-
-The batch processing functionality provides simple parallel task execution:
-- Basic parallel execution with worker limits
-- Simple progress tracking
-- Error handling per item
-- Result collection
-
-### Implementation
-
-```python
-class BatchProcessor:
-    def __init__(self, max_workers: Optional[int] = None):
-        """Initialize batch processor with optional worker limit."""
-        self.max_workers = max_workers or os.cpu_count()
-        
-    def process_batch(
-        self,
-        items: List[Any],
-        task_func: Callable[[Any], Any],
-        on_error: Optional[Callable[[Any, Exception], None]] = None
-    ) -> Dict[str, Any]:
-        """Process items in parallel with basic error handling."""
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            futures = []
-            results = []
-            errors = []
-            
-            for item in items:
-                future = executor.submit(task_func, item)
-                futures.append((item, future))
-            
-            for item, future in futures:
-                try:
-                    result = future.result()
-                    results.append(result)
-                except Exception as e:
-                    if on_error:
-                        on_error(item, e)
-                    errors.append((item, str(e)))
-            
-            return {
-                "results": results,
-                "errors": errors,
-                "total": len(items),
-                "successful": len(results),
-                "failed": len(errors)
-            }
-```
-
-### Usage Example
-
-```yaml
-steps:
-  - name: process_files
-    task: batch
-    inputs:
-      items: "{{ args.files }}"
-      max_workers: 4
-      task:
-        name: process_file
-        inputs:
-          operation: compress
-```
-
-### Implementation Steps
-
-1. Core Implementation
-   ```python
-   Step 1: Basic Processor
-   - Implement BatchProcessor class
-   - Add simple parallel execution
-   - Add basic error handling
-   Files: src/yaml_workflow/batch.py
+   Shell Task:
+   - [ ] Remove variable assignment code
+   - [ ] Use engine's variable assignment
+   - [ ] Update tests with set statements
    
-   Step 2: Task Integration
-   - Create batch task handler
-   - Add result collection
-   Files: src/yaml_workflow/tasks/batch.py
-   ```
-
-2. Testing
-   ```python
-   Step 1: Unit Tests
-   - Parallel execution
-   - Error handling
-   Files: tests/test_batch.py
+   Template Task:
+   - [ ] Remove variable assignment code
+   - [ ] Use engine's variable assignment
+   - [ ] Update tests with set statements
    
-   Step 2: Integration
-   - Task integration
-   - Result handling
-   Files: tests/test_batch_integration.py
-   ```
+   Batch Task:
+   - [ ] Remove variable assignment code
+   - [ ] Use engine's variable assignment
+   - [ ] Update tests with set statements
+   
+   File Task:
+   - [ ] Remove variable assignment code
+   - [ ] Use engine's variable assignment
+   - [ ] Update tests with set statements
+   
+   Custom Task:
+   - [ ] Remove variable assignment code
+   - [ ] Use engine's variable assignment
+   - [ ] Update tests with set statements
 
-## Migration Status
+### Phase 5: Filters and Expressions
+1. Engine Updates
+   - [ ] Add support for basic filters (upper, lower, etc)
+   - [ ] Add tests for filter resolution
+   - [ ] Add support for basic expressions (math, concatenation)
+   - [ ] Add tests for expression resolution
 
-✅ Completed:
-- Basic workflow engine functionality
-- Namespaced variable support
-- Simple template processing
-- Basic error handling
-- Core test suite
+2. Task Handler Updates (one at a time)
+   Python Task:
+   - [ ] Remove filter/expression handling code
+   - [ ] Use engine's filter/expression handling
+   - [ ] Update tests with filters and expressions
+   
+   Shell Task:
+   - [ ] Remove filter/expression handling code
+   - [ ] Use engine's filter/expression handling
+   - [ ] Update tests with filters and expressions
+   
+   Template Task:
+   - [ ] Remove filter/expression handling code
+   - [ ] Use engine's filter/expression handling
+   - [ ] Update tests with filters and expressions
+   
+   Batch Task:
+   - [ ] Remove filter/expression handling code
+   - [ ] Use engine's filter/expression handling
+   - [ ] Update tests with filters and expressions
+   
+   File Task:
+   - [ ] Remove filter/expression handling code
+   - [ ] Use engine's filter/expression handling
+   - [ ] Update tests with filters and expressions
+   
+   Custom Task:
+   - [ ] Remove filter/expression handling code
+   - [ ] Use engine's filter/expression handling
+   - [ ] Update tests with filters and expressions
 
-🔄 In Progress:
-- Centralizing template processing
-- Updating task handlers to use engine's template processing
-- Adding clear error messages
-- Completing integration tests
-- Updating example workflows
+### Phase 6: Error Handling
+1. Engine Updates
+   - [ ] Improve error messages for undefined variables
+   - [ ] Add tests for error scenarios
+   - [ ] Add error handling for nested variable access
+
+2. Task Handler Updates (one at a time)
+   Python Task:
+   - [ ] Remove task-specific error handling
+   - [ ] Use engine's error handling
+   - [ ] Update tests with error scenarios
+   
+   Shell Task:
+   - [ ] Remove task-specific error handling
+   - [ ] Use engine's error handling
+   - [ ] Update tests with error scenarios
+   
+   Template Task:
+   - [ ] Remove task-specific error handling
+   - [ ] Use engine's error handling
+   - [ ] Update tests with error scenarios
+   
+   Batch Task:
+   - [ ] Remove task-specific error handling
+   - [ ] Use engine's error handling
+   - [ ] Update tests with error scenarios
+   
+   File Task:
+   - [ ] Remove task-specific error handling
+   - [ ] Use engine's error handling
+   - [ ] Update tests with error scenarios
+   
+   Custom Task:
+   - [ ] Remove task-specific error handling
+   - [ ] Use engine's error handling
+   - [ ] Update tests with error scenarios
+
+### Phase 7: Advanced Features
+1. Engine Updates
+   - [ ] Add support for macros
+   - [ ] Add support for includes
+   - [ ] Add support for custom filters
+   - [ ] Add comprehensive tests for advanced features
+
+2. Task Handler Updates (one at a time)
+   Python Task:
+   - [ ] Remove any custom template features
+   - [ ] Use engine's advanced features
+   - [ ] Update tests with macros and includes
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update python_task to use engine advanced features
+
+     - Remove custom template features
+     - Use engine's advanced features
+     - Add tests for macros and includes
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+   Shell Task:
+   - [ ] Remove any custom template features
+   - [ ] Use engine's advanced features
+   - [ ] Update tests with macros and includes
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update shell_task to use engine advanced features
+
+     - Remove custom template features
+     - Use engine's advanced features
+     - Add tests for macros and includes
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+   Template Task:
+   - [ ] Remove any custom template features
+   - [ ] Use engine's advanced features
+   - [ ] Update tests with macros and includes
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update template_task to use engine advanced features
+
+     - Remove custom template features
+     - Use engine's advanced features
+     - Add tests for macros and includes
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+   Batch Task:
+   - [ ] Remove any custom template features
+   - [ ] Use engine's advanced features
+   - [ ] Update tests with macros and includes
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update batch_task to use engine advanced features
+
+     - Remove custom template features
+     - Use engine's advanced features
+     - Add tests for macros and includes
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+   File Task:
+   - [ ] Remove any custom template features
+   - [ ] Use engine's advanced features
+   - [ ] Update tests with macros and includes
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update file_task to use engine advanced features
+
+     - Remove custom template features
+     - Use engine's advanced features
+     - Add tests for macros and includes
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+   Custom Task:
+   - [ ] Remove any custom template features
+   - [ ] Use engine's advanced features
+   - [ ] Update tests with macros and includes
+   - [ ] After tests pass:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update custom_task to use engine advanced features
+
+     - Remove custom template features
+     - Use engine's advanced features
+     - Add tests for macros and includes
+     EOF
+     
+     git commit -F commit.txt
+     ```
