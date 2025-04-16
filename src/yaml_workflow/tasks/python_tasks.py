@@ -37,7 +37,7 @@ def execute_code(code: str, inputs: Dict[str, Any], context: Dict[str, Any]) -> 
     try:
         # Execute the code
         exec(code, {}, local_vars)
-        # Only return the result if it was explicitly set
+        # Only return the result if it was explicitly set in the code
         return local_vars.get("result", None)
     except Exception as e:
         raise TemplateError(f"Failed to execute Python code: {str(e)}")

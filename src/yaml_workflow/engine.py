@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
+import os
 
 import yaml
 from jinja2 import Template, StrictUndefined
@@ -143,6 +144,10 @@ class WorkflowEngine:
             "workspace": str(self.workspace),
             "run_number": self.workspace_info.get("run_number"),
             "timestamp": datetime.now().isoformat(),
+            # Initialize namespaced variables
+            "args": {},
+            "env": dict(os.environ),
+            "steps": {},
         }
 
         # Add workflow file path if available
@@ -153,7 +158,17 @@ class WorkflowEngine:
         params = self.workflow.get("params", {})
         for param_name, param_config in params.items():
             if isinstance(param_config, dict) and "default" in param_config:
-                self.context[param_name] = param_config["default"]
+                # Store in both root (backward compatibility) and args namespace
+                default_value = param_config["default"]
+                self.context[param_name] = default_value
+                self.context["args"][param_name] = default_value
+            elif isinstance(param_config, dict):
+                # Handle case where param is defined but no default
+                self.context["args"][param_name] = None
+            else:
+                # Handle simple parameter definition
+                self.context[param_name] = param_config
+                self.context["args"][param_name] = param_config
 
         # Validate flows if present
         self._validate_flows()
@@ -163,9 +178,8 @@ class WorkflowEngine:
         self.logger.info(f"Run number: {self.context['run_number']}")
         if params:
             self.logger.info("Default parameters loaded:")
-            for name, value in self.context.items():
-                if name in params:
-                    self.logger.info(f"  {name}: {value}")
+            for name, value in self.context["args"].items():
+                self.logger.info(f"  {name}: {value}")
 
     def _validate_flows(self) -> None:
         """Validate workflow flows configuration."""
@@ -275,7 +289,9 @@ class WorkflowEngine:
         """
         # Update context with provided parameters (overriding defaults)
         if params:
+            # Update both root (backward compatibility) and args namespace
             self.context.update(params)
+            self.context["args"].update(params)
             self.logger.info("Parameters provided:")
             for name, value in params.items():
                 self.logger.info(f"  {name}: {value}")
@@ -526,6 +542,34 @@ class WorkflowEngine:
         self.logger.info(f"Created workspace: {self.workspace}")
         return self.workspace
 
+    def resolve_template(self, template_str: str) -> str:
+        """
+        Resolve template with both direct and namespaced variables.
+
+        Args:
+            template_str: Template string to resolve
+
+        Returns:
+            str: Resolved template string
+
+        Raises:
+            TemplateError: If template resolution fails
+        """
+        template = Template(template_str, undefined=StrictUndefined)
+        try:
+            return template.render(**self.context)
+        except UndefinedError as e:
+            # Enhance error message with available variables
+            available = {
+                "args": list(self.context["args"].keys()),
+                "env": list(self.context["env"].keys()),
+                "steps": list(self.context["steps"].keys()),
+                "root": [k for k in self.context.keys() if k not in ["args", "env", "steps"]]
+            }
+            raise TemplateError(f"{str(e)}. Available variables: {available}")
+        except Exception as e:
+            raise TemplateError(f"Failed to resolve template: {str(e)}")
+
     def resolve_value(self, value: Any) -> Any:
         """
         Resolve a value using Jinja2 template resolution.
@@ -544,9 +588,10 @@ class WorkflowEngine:
             return template.render(**self.context)
         except UndefinedError as e:
             available = {
-                "args": list(self.context["args"].keys()) if "args" in self.context else [],
-                "env": list(self.context["env"].keys()) if "env" in self.context else [],
-                "steps": list(self.context["steps"].keys()) if "steps" in self.context else []
+                "args": list(self.context["args"].keys()),
+                "env": list(self.context["env"].keys()),
+                "steps": list(self.context["steps"].keys()),
+                "root": [k for k in self.context.keys() if k not in ["args", "env", "steps"]]
             }
             raise TemplateError(f"{str(e)}. Available variables: {available}")
         except Exception as e:

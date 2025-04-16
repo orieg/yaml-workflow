@@ -177,12 +177,15 @@ class BatchProcessor:
                 raise ValueError(f"Task handler not found: {task_type}")
 
             # Prepare task step configuration
-            step = {"name": f"process_{item}", "task": task_type}
-
-            # Copy all task configuration to step
-            for key, value in task_config.items():
-                if key != "batch_index" and key != "batch":
-                    step[key] = value
+            step = {
+                "name": f"process_{item}",
+                "task": task_type,
+                # Copy all task configuration to step except special keys
+                **{k: v for k, v in task_config.items() if k not in [
+                    "batch_index", "batch", "previous_batch_result",
+                    "progress_callback", "error_handler", "aggregator"
+                ]}
+            }
 
             # Add function if specified
             if "function" in task_config:
@@ -223,7 +226,7 @@ class BatchProcessor:
                 )
                 step["file_output"] = str(self.workspace / file_output_path)
 
-            # Add inputs if any
+            # Add inputs if any, merging with task_config inputs
             step["inputs"] = {
                 **(task_config.get("inputs", {})),
                 "item": item,  # Add current item to inputs
@@ -295,12 +298,18 @@ class BatchProcessor:
                 "stats": {},
                 "processed_items": [],  # For backward compatibility
                 "failed_items": [],     # For backward compatibility
-                "aggregated_result": None  # For backward compatibility
+                "aggregated_result": None,  # For backward compatibility
+                "item_results": {}  # Map of items to their results
             }
 
-        # Validate chunk size
+        # Validate chunk size and max_workers
         if chunk_size <= 0:
             raise ValueError("Chunk size must be greater than 0")
+        if max_workers is not None and max_workers <= 0:
+            raise ValueError("Max workers must be greater than 0")
+
+        # Use max_workers if specified, otherwise use a reasonable default
+        effective_max_workers = max_workers if max_workers is not None else min(chunk_size, os.cpu_count() or 1)
 
         # Load previous state if resuming
         processed, failed = self.load_state() if resume_state else (set(), set())
@@ -325,7 +334,7 @@ class BatchProcessor:
                 }
 
                 # Process chunk in parallel with limited workers
-                with ThreadPoolExecutor(max_workers=max_workers or chunk_size) as executor:
+                with ThreadPoolExecutor(max_workers=effective_max_workers) as executor:
                     # Create a mapping of futures to items
                     futures = {}
                     for item in chunk:
@@ -343,10 +352,12 @@ class BatchProcessor:
                             if success:
                                 chunk_results.append(result)
                                 processed.add(str(item))
-                                item_results[str(item)] = result
+                                item_results[str(item)] = result.get("result") if isinstance(result, dict) else result
                             else:
                                 chunk_failed.append(item)
                                 failed.add(str(item))
+                                if error_handler:
+                                    error_handler(str(item), item, Exception(result))
                         except Exception as e:
                             self.logger.error(f"Failed to process item {item}: {str(e)}")
                             if error_handler:
@@ -360,8 +371,9 @@ class BatchProcessor:
                             progress = completed / total_items * 100
                             progress_callback(item, progress)
 
-                # Save state after each chunk
-                self.save_state(processed, failed)
+                # Save state after each chunk if resume is enabled
+                if resume_state:
+                    self.save_state(processed, failed)
 
                 # Aggregate chunk results if needed
                 if aggregator and chunk_results:
@@ -387,19 +399,14 @@ class BatchProcessor:
                 "completed_at": datetime.now().isoformat(),
             }
 
-            # Create a list of results in the same order as input items
-            processed_results = []
-            for item in items:
-                if str(item) in processed:
-                    processed_results.append(item_results[str(item)])
-
             return {
                 "processed": list(processed),
                 "failed": list(failed),
                 "results": results,
                 "stats": stats,
-                "processed_items": processed_results,  # Contains results in original item order
-                "failed_items": list(failed),
+                "item_results": item_results,  # Add map of items to results
+                "processed_items": [],  # Will be populated by process_batch task
+                "failed_items": [],     # Will be populated by process_batch task
                 "aggregated_result": aggregated_result
             }
 
@@ -424,6 +431,7 @@ def process_batch(
             - chunk_size: Optional size of chunks for parallel processing
             - max_workers: Optional maximum number of worker threads
             - resume: Optional flag to resume from previous state
+            - parallel_settings: Optional dictionary with parallel processing settings
         context: Workflow context
         workspace: Workspace directory
 
@@ -446,9 +454,12 @@ def process_batch(
             # Legacy format - merge processing_task into main config
             task_config.update(step["processing_task"])
             
-        # Get optional parameters with defaults
-        chunk_size = step.get("chunk_size", 10)
-        max_workers = step.get("max_workers")
+        # Get parallel settings
+        parallel_settings = step.get("parallel_settings", {})
+        chunk_size = parallel_settings.get("chunk_size", step.get("chunk_size", 10))
+        max_workers = parallel_settings.get("max_workers", step.get("max_workers"))
+
+        # Get resume flag
         resume = step.get("resume", False) or step.get("resume_state", False)
 
         # Create processor instance
@@ -467,6 +478,15 @@ def process_batch(
             aggregator=step.get("aggregator"),
         )
 
+        # Ensure processed_items contains results in original order
+        processed_items = []
+        for item in items:
+            if str(item) in result["processed"]:
+                # Get the result from the item_results map
+                processed_items.append(result.get("item_results", {}).get(str(item)))
+
+        result["processed_items"] = processed_items
+        result["failed_items"] = [item for item in items if str(item) in result["failed"]]
         return result
 
     except Exception as e:
