@@ -28,6 +28,7 @@ from .exceptions import (
 from .state import WorkflowState
 from .tasks import get_task_handler
 from .workspace import create_workspace, get_workspace_info
+from .template import TemplateEngine
 
 
 def setup_logging(workspace: Path, name: str) -> logging.Logger:
@@ -137,6 +138,9 @@ class WorkflowEngine:
 
         # Initialize workflow state
         self.state = WorkflowState(self.workspace)
+
+        # Initialize template engine
+        self.template_engine = TemplateEngine()
 
         # Initialize context with default parameter values
         self.context = {
@@ -555,20 +559,7 @@ class WorkflowEngine:
         Raises:
             TemplateError: If template resolution fails
         """
-        template = Template(template_str, undefined=StrictUndefined)
-        try:
-            return template.render(**self.context)
-        except UndefinedError as e:
-            # Enhance error message with available variables
-            available = {
-                "args": list(self.context["args"].keys()),
-                "env": list(self.context["env"].keys()),
-                "steps": list(self.context["steps"].keys()),
-                "root": [k for k in self.context.keys() if k not in ["args", "env", "steps"]]
-            }
-            raise TemplateError(f"{str(e)}. Available variables: {available}")
-        except Exception as e:
-            raise TemplateError(f"Failed to resolve template: {str(e)}")
+        return self.template_engine.process_template(template_str, self.context)
 
     def resolve_value(self, value: Any) -> Any:
         """
@@ -580,22 +571,7 @@ class WorkflowEngine:
         Returns:
             Any: Resolved value
         """
-        if not isinstance(value, str):
-            return value
-            
-        try:
-            template = Template(value, undefined=StrictUndefined)
-            return template.render(**self.context)
-        except UndefinedError as e:
-            available = {
-                "args": list(self.context["args"].keys()),
-                "env": list(self.context["env"].keys()),
-                "steps": list(self.context["steps"].keys()),
-                "root": [k for k in self.context.keys() if k not in ["args", "env", "steps"]]
-            }
-            raise TemplateError(f"{str(e)}. Available variables: {available}")
-        except Exception as e:
-            raise TemplateError(f"Failed to resolve template '{value}': {str(e)}")
+        return self.template_engine.process_value(value, self.context)
 
     def resolve_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -607,15 +583,7 @@ class WorkflowEngine:
         Returns:
             Dict[str, Any]: Resolved inputs
         """
-        resolved: Dict[str, Any] = {}
-        for key, value in inputs.items():
-            if isinstance(value, dict):
-                resolved[key] = self.resolve_inputs(value)
-            elif isinstance(value, list):
-                resolved[key] = [self.resolve_value(v) for v in value]
-            else:
-                resolved[key] = self.resolve_value(value)
-        return resolved
+        return self.template_engine.process_value(inputs, self.context)
 
     def execute_step(self, step: Dict[str, Any]) -> None:
         """
@@ -730,9 +698,7 @@ class WorkflowEngine:
         # Render error message template if it contains variables
         if "{{" in message and "}}" in message:
             try:
-                template = Template(message)
-                context = {**self.context, "error": str(error)}
-                message = template.render(**context)
+                message = self.template_engine.process_template(message, {**self.context, "error": str(error)})
             except Exception as e:
                 self.logger.warning(f"Failed to render error message template: {e}")
 
