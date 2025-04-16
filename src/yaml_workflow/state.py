@@ -26,16 +26,35 @@ METADATA_FILE = ".workflow_metadata.json"
 class WorkflowState:
     """Manages workflow execution state and persistence."""
 
-    def __init__(self, workspace: Path):
+    def __init__(self, workspace: Path, metadata: Optional[Dict[str, Any]] = None):
+        """Initialize workflow state.
+        
+        Args:
+            workspace: Path to workspace directory
+            metadata: Optional pre-loaded metadata for resuming workflows
+        """
         self.workspace = workspace
         self.metadata_path = workspace / METADATA_FILE
-        self._load_state()
+        if metadata is not None:
+            self.metadata = metadata
+            # Ensure retry_state exists
+            if "execution_state" in self.metadata:
+                if "retry_state" not in self.metadata["execution_state"]:
+                    self.metadata["execution_state"]["retry_state"] = {}
+                    self.save()
+        else:
+            self._load_state()
 
     def _load_state(self) -> None:
         """Load workflow state from metadata file."""
         if self.metadata_path.exists():
             with open(self.metadata_path) as f:
                 self.metadata = json.load(f)
+            # Ensure retry_state exists in loaded metadata
+            if "execution_state" in self.metadata:
+                if "retry_state" not in self.metadata["execution_state"]:
+                    self.metadata["execution_state"]["retry_state"] = {}
+                    self.save()
         else:
             self.metadata = {}
 
@@ -49,6 +68,7 @@ class WorkflowState:
                 "last_updated": datetime.now().isoformat(),
                 "status": "not_started",  # Possible values: not_started, in_progress, completed, failed
                 "flow": None,  # Track which flow is being executed
+                "retry_state": {},  # Initialize retry state
             }
             self.save()  # Save the initialized state to disk
 
@@ -103,6 +123,10 @@ class WorkflowState:
     def mark_step_failed(self, step_name: str, error: str) -> None:
         """Mark a step as failed with error information."""
         state = self.metadata["execution_state"]
+        # Clear any existing retry state for this step
+        if "retry_state" in state:
+            state["retry_state"].pop(step_name, None)
+        # Set failed step info
         state["failed_step"] = {
             "step_name": step_name,
             "error": error,
@@ -131,11 +155,16 @@ class WorkflowState:
     def can_resume_from_step(self, step_name: str) -> bool:
         """Check if workflow can be resumed from a specific step."""
         state = self.metadata["execution_state"]
-        return (
-            state["status"] == "failed"
-            and state["failed_step"] is not None
-            and step_name not in state["completed_steps"]
-        )
+        # Check if workflow is in failed state and has a failed step
+        if state["status"] != "failed" or not state["failed_step"]:
+            return False
+        # Check if the failed step matches the requested step
+        if state["failed_step"]["step_name"] != step_name:
+            return False
+        # Ensure there's no active retry state for this step
+        if "retry_state" in state and step_name in state["retry_state"]:
+            return False
+        return True
 
     def get_completed_outputs(self) -> Dict[str, Any]:
         """Get outputs from all completed steps."""

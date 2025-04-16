@@ -16,24 +16,163 @@ Key Benefits:
 - Better testing coverage
 - Reduced code duplication
 
+## Recent Progress
+
+### Resume Functionality Improvements (2024-04-16)
+- [x] Fixed resume functionality in workflow engine
+  - Fixed issue where workflow state wasn't properly preserved when resuming
+  - Modified WorkflowState to accept pre-loaded metadata
+  - Changed order of operations in CLI to load metadata before engine initialization
+  - Added proper retry state handling
+  - All resume functionality tests now passing
+
+### State Management Enhancements (2024-04-16)
+- [x] Improved state management and error handling
+  - Added proper retry state initialization and handling
+  - Enhanced error messages for state transitions
+  - Added validation for execution state format
+  - Improved metadata loading and saving
+  - Added type definitions for execution state
+  - Added proper state initialization in both new and resume scenarios
+
+### CLI Improvements (2024-04-16)
+- [x] Enhanced CLI workflow handling
+  - Added better error handling for invalid metadata
+  - Improved resume logic with proper state validation
+  - Added checks for workflow status before resuming
+  - Enhanced parameter handling during resume
+  - Added better error messages for resume failures
+
+### Template Engine Improvements (2024-04-16)
+- [x] Enhanced template resolution in engine
+  - Added comprehensive test suite for template resolution
+  - Improved error handling for undefined variables
+  - Added support for multiple variable contexts
+  - Enhanced whitespace handling
+  - Added tests for special characters and numeric values
+  - Improved error messages with available variables context
+
 ## Implementation Plan
 
 ### Phase 0: Task Handler Audit
-- [ ] List all template resolution points in each task handler:
+- [x] List all template resolution points in each task handler:
   - python_task
   - shell_task
   - template_task
   - batch_task
   - file_task
   - custom_task
-- [ ] Document current template resolution approach in each
-- [ ] Create test cases covering current template usage
+- [x] Document current template resolution approach in each:
+
+  Current Template Resolution Approaches:
+  
+  1. Python Task:
+     - Uses Jinja2 with StrictUndefined mode
+     - Resolves templates in execute_code function
+     - Handles both code and input variable templating
+     - Error handling with detailed variable context
+  
+  2. Shell Task:
+     - Uses Jinja2 with StrictUndefined mode
+     - Resolves templates in process_command function
+     - Single-pass command string templating
+     - Provides args, env, steps context
+  
+  3. Template Task:
+     - Uses Jinja2 with StrictUndefined mode
+     - Direct template rendering with full context
+     - Handles file output path resolution
+     - Enhanced error reporting with available variables
+  
+  4. Batch Task:
+     - Uses Jinja2 with StrictUndefined mode
+     - Resolves templates in resolve_template function
+     - Adds batch-specific context (item, batch_index, batch)
+     - Used for command and output path resolution
+  
+  5. File Task:
+     - Uses Jinja2 with StrictUndefined mode
+     - Recursive template processing via process_templates
+     - Handles nested data structures
+     - Template resolution for paths and content
+  
+  6. Custom Task:
+     - Uses base task handler wrapper
+     - Template resolution through create_task_handler
+     - Processes string inputs only
+     - Inherits common error handling
+
+  Common Patterns:
+  - All use Jinja2 templating engine
+  - Most use StrictUndefined mode
+  - Similar error handling with TemplateError
+  - Common context variables (args, env, steps)
+  - Varying levels of template processing depth
+
+- [x] Create test cases covering current template usage:
+
+  Test Coverage Plan:
+
+  1. Python Task Tests:
+     - [x] Basic variable substitution in code
+     - [x] Error handling for undefined variables
+     - [x] Template resolution in function inputs
+     - [ ] Complex expressions in code blocks
+     - [ ] Nested variable access
+
+  2. Shell Task Tests:
+     - [ ] Basic command templating
+     - [ ] Environment variable substitution
+     - [ ] Error handling for invalid templates
+     - [ ] Complex command construction
+     - [ ] Working directory path resolution
+
+  3. Template Task Tests:
+     - [x] Basic template rendering
+     - [x] Loop constructs
+     - [x] Conditional logic
+     - [x] Error handling for undefined variables
+     - [x] File path resolution
+
+  4. Batch Task Tests:
+     - [x] Item variable substitution
+     - [x] Batch index templating
+     - [x] Previous batch result access
+     - [x] Error handling in batch context
+     - [x] Parallel processing with templates
+
+  5. File Task Tests:
+     - [ ] Path template resolution
+     - [ ] Content template processing
+     - [ ] Recursive template handling
+     - [ ] Error handling for file operations
+     - [ ] Template context in file operations
+
+  6. Custom Task Tests:
+     - [ ] Input variable templating
+     - [ ] Error handling for custom handlers
+     - [ ] Context variable access
+     - [ ] Template resolution in outputs
+     - [ ] Custom template filters
+
+  Common Test Cases:
+  - [ ] Variable namespace isolation
+  - [ ] Error message clarity
+  - [ ] Performance with large templates
+  - [ ] Memory usage in recursive processing
+  - [ ] Template syntax validation
+
+  Note: Checked items [x] indicate existing test coverage, unchecked items [ ] need to be implemented.
 
 ### Phase 1: Basic Variable Resolution
 1. Engine Updates
-   - [ ] Move simple variable resolution ({{ var }}) to engine level
-   - [ ] Add tests for basic variable resolution
-   - [ ] Add engine method for task handlers to use
+   - [x] Move simple variable resolution ({{ var }}) to engine level
+   - [x] Add tests for basic variable resolution
+   - [x] Add engine method for task handlers to use
+   - [x] Add comprehensive test suite for template resolution
+   - [x] Add error handling for undefined variables
+   - [x] Add support for multiple variable contexts
+   - [x] Add tests for special characters and numeric values
    - [ ] After tests pass:
      ```bash
      cat > commit.txt << 'EOF'
@@ -49,9 +188,9 @@ Key Benefits:
 
 2. Task Handler Updates (one at a time)
    Python Task:
-   - [ ] Remove direct template resolution
-   - [ ] Use engine's resolution method
-   - [ ] Update tests
+   - [x] Remove direct template resolution
+   - [x] Use engine's resolution method
+   - [x] Update tests
    - [ ] After tests pass:
      ```bash
      cat > commit.txt << 'EOF'
@@ -84,9 +223,9 @@ Key Benefits:
      ```
    
    Template Task:
-   - [ ] Remove direct template resolution
-   - [ ] Use engine's resolution method
-   - [ ] Update tests
+   - [x] Remove direct template resolution
+   - [x] Use engine's resolution method
+   - [x] Update tests
    - [ ] After tests pass:
      ```bash
      cat > commit.txt << 'EOF'
@@ -102,9 +241,9 @@ Key Benefits:
      ```
    
    Batch Task:
-   - [ ] Remove direct template resolution
-   - [ ] Use engine's resolution method
-   - [ ] Update tests
+   - [x] Remove direct template resolution
+   - [x] Use engine's resolution method
+   - [x] Update tests
    - [ ] After tests pass:
      ```bash
      cat > commit.txt << 'EOF'

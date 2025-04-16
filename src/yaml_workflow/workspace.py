@@ -109,21 +109,9 @@ def create_workspace(
     if custom_dir:
         workspace = Path(custom_dir)
     else:
-        workspace = base_path / sanitized_name
-
-    # Load existing metadata if it exists
-    metadata_path = workspace / METADATA_FILE
-    existing_metadata = {}
-    if metadata_path.exists():
-        try:
-            with open(metadata_path) as f:
-                existing_metadata = json.load(f)
-        except (json.JSONDecodeError, IOError):
-            pass
-
-    # Get run number
-    existing_run = get_run_number_from_metadata(workspace)
-    run_number = (existing_run + 1) if existing_run is not None else 1
+        # Get run number
+        run_number = get_next_run_number(base_path, sanitized_name)
+        workspace = base_path / f"{sanitized_name}_run_{run_number}"
 
     # Create workspace directories
     workspace.mkdir(parents=True, exist_ok=True)
@@ -131,20 +119,14 @@ def create_workspace(
     (workspace / "output").mkdir(exist_ok=True)
     (workspace / "temp").mkdir(exist_ok=True)
 
-    # Create new metadata preserving execution state
+    # Create new metadata
     metadata = {
         "workflow_name": workflow_name,
         "created_at": datetime.now().isoformat(),
-        "run_number": run_number,
+        "run_number": run_number if not custom_dir else 1,
         "custom_dir": bool(custom_dir),
         "base_dir": str(base_path.absolute()),
     }
-
-    # Preserve execution state if it exists and indicates a failed state
-    if "execution_state" in existing_metadata:
-        exec_state = existing_metadata["execution_state"]
-        if exec_state.get("status") == "failed" and exec_state.get("failed_step"):
-            metadata["execution_state"] = exec_state
 
     save_metadata(workspace, metadata)
 
