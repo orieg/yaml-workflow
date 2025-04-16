@@ -99,5 +99,6 @@ nav:
       - CLI: api/cli.md
   - Contributing:
       - Development Guide: development.md
+      - Testing Guide: testing.md
       - Coding Standards: contributing/coding-standards.md
       - Pull Requests: contributing/pull-requests.md 
