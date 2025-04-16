@@ -1,25 +1,16 @@
 # Advanced Hello World Example
 
-This example demonstrates advanced features of YAML Workflow:
+This example demonstrates advanced features of the workflow engine including:
 - Input validation with error handling
 - Conditional execution based on validation results
-- File operations (read/write) in different formats (txt, json, yaml)
+- File operations in different formats (txt, json, yaml)
 - Shell command execution
 - Template rendering with variable substitution
 - Multi-step workflow with dependencies
 
-## Workflow File
+## Workflow Definition
 
 ```yaml
-# Advanced Hello World Workflow
-# This workflow demonstrates several key features of the workflow engine:
-# - Input validation with error handling
-# - Conditional execution based on validation results
-# - File operations (read/write) in different formats (txt, json, yaml)
-# - Shell command execution
-# - Template rendering with variable substitution
-# - Multi-step workflow with dependencies
-
 name: Advanced Hello World
 description: >
   An advanced hello world workflow demonstrating:
@@ -38,7 +29,6 @@ params:
 
 steps:
   # Step 1: Validate the input name parameter
-  # Creates a validation result file that other steps will use
   - name: validate_input
     task: shell
     command: |
@@ -53,9 +43,7 @@ steps:
         echo "Valid: {{ name }}" > "output/validation_result.txt"
       fi
 
-  # Step 2: Read the validation result file
-  # This step uses the file_tasks module to read the validation result
-  # The content is stored in the validation_content variable for the next step
+  # Step 2: Read validation result
   - name: check_validation
     task: read_file
     params:
@@ -63,8 +51,7 @@ steps:
       encoding: "utf-8"
     outputs: validation_content
 
-  # Step 3: Process the validation result
-  # Creates a boolean flag file (validation_passed.txt) that will control conditional execution
+  # Step 3: Process validation result
   - name: process_validation
     task: shell
     command: |
@@ -77,42 +64,21 @@ steps:
         printf "true" > "output/validation_passed.txt"
       fi
 
-  # Step 3b: Read validation result
+  # Step 4: Read validation flag
   - name: read_validation
     task: read_file
     params:
       file_path: "output/validation_passed.txt"
     outputs: validation_content
 
-  # Debug step to print all variables
-  - name: debug_vars
-    task: print_vars
-    params:
-      message: "Available variables"
-
-  # Debug step to print validation result
-  - name: debug_validation
-    task: shell
-    command: |
-      echo "=== Debug Info ==="
-      printf "Validation Result File Content:"
-      cat "output/validation_passed.txt"
-      echo ""
-      echo "Validation Content: {{ validation_content }}"
-      echo "=== End Debug ==="
-
-  # Step 4: Get current timestamp
-  # Only runs if validation passed (condition checks validation_passed.txt)
-  # Output stored in current_timestamp variable for use in greeting
+  # Step 5: Get current timestamp (only if validation passed)
   - name: get_timestamp
     task: shell
     command: date -u +"%Y-%m-%dT%H:%M:%SZ"
     outputs: current_timestamp
     condition: "'{{ validation_content }}' == 'true'"
 
-  # Step 5: Create JSON greeting
-  # Only runs if validation passed
-  # Demonstrates JSON file creation with template variables
+  # Step 6: Create JSON greeting (only if validation passed)
   - name: create_greeting
     task: write_json
     params:
@@ -125,9 +91,7 @@ steps:
       indent: 2
     condition: "'{{ validation_content }}' == 'true'"
 
-  # Step 6: Create multi-language greetings
-  # Only runs if validation passed
-  # Demonstrates YAML file creation with template variables
+  # Step 7: Create multi-language greetings (only if validation passed)
   - name: translate_greeting
     task: write_yaml
     params:
@@ -141,9 +105,7 @@ steps:
         Japanese: "こんにちは、{{ name }}さん！"
     condition: "'{{ validation_content }}' == 'true'"
 
-  # Step 7: Format and display results
-  # Only runs if validation passed
-  # Reads and displays the generated files in a formatted output
+  # Step 8: Format and display results (only if validation passed)
   - name: format_output
     task: shell
     command: |
@@ -161,9 +123,7 @@ steps:
       fi
     condition: "'{{ validation_content }}' == 'true'"
 
-  # Step 8: Handle validation errors
-  # Only runs if validation failed
-  # Creates an error report with details about the validation failure
+  # Step 9: Handle validation errors (only if validation failed)
   - name: handle_error
     task: write_file
     params:
@@ -180,9 +140,7 @@ steps:
         - Name must not contain special characters
     condition: "'{{ validation_content }}' == 'false'"
 
-  # Step 9: Final status notification
-  # Always runs (no condition)
-  # Provides a summary of the workflow execution
+  # Step 10: Final status notification
   - name: notify_status
     task: shell
     command: |
@@ -203,12 +161,29 @@ steps:
       fi
 ```
 
-## Features Demonstrated
+## Usage Examples
+
+1. Run with default name:
+```bash
+yaml-workflow run advanced-hello-world.yaml
+```
+
+2. Run with a custom name:
+```bash
+yaml-workflow run advanced-hello-world.yaml --name="Alice"
+```
+
+3. Test validation error (name too short):
+```bash
+yaml-workflow run advanced-hello-world.yaml --name="A"
+```
+
+## Key Features Demonstrated
 
 1. **Input Validation**
-   - Parameter validation with length checks
-   - Error handling for invalid input
-   - Validation result storage
+   - Length checks (2-50 characters)
+   - Required parameter validation
+   - Validation result storage in files
 
 2. **Conditional Execution**
    - Steps that run only if validation passes
@@ -221,9 +196,9 @@ steps:
    - File-based state management
 
 4. **Variable Management**
-   - Step output capture
-   - Variable interpolation
-   - Built-in variables
+   - Step output capture using `outputs`
+   - Variable interpolation in templates
+   - Built-in variables (`run_number`)
 
 5. **Error Handling**
    - Validation error reporting
@@ -235,25 +210,7 @@ steps:
    - Unicode text handling
    - YAML formatting
 
-## Usage
-
-1. Save the workflow:
-```bash
-mkdir -p workflows
-cp examples/advanced_hello_world.yaml workflows/
-```
-
-2. Run with valid name:
-```bash
-yaml-workflow run workflows/advanced_hello_world.yaml name="Alice"
-```
-
-3. Test validation error:
-```bash
-yaml-workflow run workflows/advanced_hello_world.yaml name="A"
-```
-
-## Expected Output
+## Example Outputs
 
 ### Successful Run
 

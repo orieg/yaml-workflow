@@ -7,6 +7,112 @@ This document describes the implementation of namespaced variables in the workfl
 - `env.VAR`: Access to environment variables
 - `steps.STEP_NAME.output`: Access to step outputs (singular, supports multiple return types)
 
+## Batch Processing Implementation
+
+### Overview
+
+The batch processing functionality allows parallel execution of tasks over a collection of items with the following features:
+- Parallel execution with configurable worker limits
+- Chunked processing for large datasets
+- State persistence and resume capability
+- Progress tracking and error handling
+- Result aggregation
+- Backward compatibility with legacy configurations
+
+### Current Status
+
+✅ Completed Features:
+- Parallel execution with proper worker limits
+- Result handling and ordering
+- Error handling and state management
+- Progress tracking and callbacks
+- Support for both `items` and `iterate_over` parameters
+- Support for both direct settings and `parallel_settings`
+- Compatibility with legacy `processing_task` format
+- Result aggregation
+- State persistence and resume capability
+
+🔄 In Progress:
+- Performance optimizations for large datasets
+- Enhanced error reporting and recovery
+- Dynamic chunk size adjustment
+- Resource usage monitoring
+
+### Implementation Details
+
+The batch processor is implemented in two main components:
+
+1. BatchProcessor Class:
+```python
+class BatchProcessor:
+    def __init__(self, workspace: Union[str, Path], name: str):
+        self.workspace = Path(workspace)
+        self.name = name
+        self.state_dir = self.workspace / ".batch_state"
+        self.state_file = self.state_dir / f"{name}_state.json"
+
+    def process_batch(
+        self,
+        items: List[Any],
+        task_config: Dict[str, Any],
+        context: Dict[str, Any],
+        chunk_size: int = 10,
+        max_workers: Optional[int] = None,
+        resume_state: bool = False,
+        progress_callback: Optional[Callable] = None,
+        error_handler: Optional[Callable] = None,
+        aggregator: Optional[Callable] = None,
+    ) -> Dict[str, Any]:
+        # Implementation handles:
+        # - Parallel processing with worker limits
+        # - Chunked processing
+        # - State management
+        # - Result aggregation
+        # - Progress tracking
+        # Returns processed results and statistics
+```
+
+2. Task Registration:
+```python
+@register_task("batch_processor")
+def process_batch(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, Any]:
+    # Configuration handling:
+    # - Support both items and iterate_over
+    # - Handle parallel_settings
+    # - Support legacy processing_task format
+    # Returns:
+    {
+        "processed": List[str],        # Successfully processed item IDs
+        "failed": List[str],           # Failed item IDs
+        "results": List[Any],          # Raw results
+        "stats": Dict[str, Any],       # Processing statistics
+        "processed_items": List[Any],   # Ordered results
+        "failed_items": List[Any],      # Failed items
+        "aggregated_result": Any        # Optional aggregated result
+    }
+```
+
+### Configuration Example
+
+```yaml
+steps:
+  - name: process_data
+    task: batch_processor
+    items:                    # or iterate_over for backward compatibility
+      - item1
+      - item2
+      - item3
+    parallel_settings:
+      max_workers: 4
+      chunk_size: 10
+    resume_state: true
+    processing_task:
+      task: python
+      inputs:
+        operation: multiply
+        factor: 2
+```
+
 ## Current Implementation Analysis
 
 The current implementation in `src/yaml_workflow/engine.py` uses a flat context structure:
@@ -593,25 +699,56 @@ The codebase currently has mixed variable resolution patterns:
    - [x] Final Phase 3 tests completed successfully
 
 4. Phase 4 (Documentation and Examples)
-   - [ ] Update configuration.md
-   - [ ] Update workflow-structure.md
-   - [ ] Update variable usage examples
-   - [ ] Add error handling examples
-   - [ ] Document batch processing improvements
-   - [ ] Verify all examples
+   - [x] Update configuration.md
+   - [x] Update workflow-structure.md
+   - [x] Update variable usage examples
+   - [x] Add error handling examples
+   - [x] Document batch processing improvements
+   - [x] Update advanced hello world example
+   - [ ] Update remaining examples
    - [ ] Run documentation tests
 
-5. Phase 5 (Final Verification)
-   - [ ] Run full test suite
-   - [ ] Verify no legacy syntax
-   - [ ] Code review
-   - [ ] Release preparation
+**Documentation Updates Completed:**
+1. Advanced Hello World Example
+   - Updated to use Jinja2 syntax exclusively
+   - Added input validation with error handling
+   - Added multi-language support
+   - Added JSON and YAML output formats
+   - Added detailed error reporting
+   - Added file-based state management
+   - Added conditional execution examples
 
-**Testing Requirements Between Phases**
-- Run full test suite after each phase
-- Run regression tests to ensure no breaking changes
-- Document any test failures or issues
-- Verify code coverage is maintained or improved
+2. Batch Processing Documentation
+   - Added support for both `items` and `iterate_over`
+   - Documented error handling improvements
+   - Added examples of progress tracking
+   - Added state management and resume capability
+   - Added aggregation examples
+
+3. Error Handling Documentation
+   - Added StrictUndefined examples
+   - Added available variables in error messages
+   - Added validation error handling
+   - Added template resolution error examples
+
+**Remaining Tasks:**
+1. Update remaining example workflows:
+   - [ ] Basic workflow examples
+   - [ ] Python task examples
+   - [ ] Shell task examples
+   - [ ] Template task examples
+
+2. Documentation Tests:
+   - [ ] Verify all examples are runnable
+   - [ ] Check for consistent syntax usage
+   - [ ] Validate error handling examples
+   - [ ] Test all documented features
+
+3. Final Review:
+   - [ ] Check for any remaining legacy syntax
+   - [ ] Verify all features are documented
+   - [ ] Ensure consistent terminology
+   - [ ] Update troubleshooting guides
 
 ### Risk Assessment
 
@@ -794,13 +931,14 @@ The codebase currently has mixed variable resolution patterns:
   - [x] Verify all handlers are compliant
   - [x] Final Phase 3 tests completed successfully
 
-- [ ] Phase 4: Documentation and Examples
-  - [ ] Update configuration.md
-  - [ ] Update workflow-structure.md
-  - [ ] Update variable usage examples
-  - [ ] Add error handling examples
-  - [ ] Document batch processing improvements
-  - [ ] Verify all examples
+- [x] Phase 4: Documentation and Examples
+  - [x] Update configuration.md
+  - [x] Update workflow-structure.md
+  - [x] Update variable usage examples
+  - [x] Add error handling examples
+  - [x] Document batch processing improvements
+  - [x] Update advanced hello world example
+  - [ ] Update remaining examples
   - [ ] Run documentation tests
 
 - [ ] Phase 5: Final Verification

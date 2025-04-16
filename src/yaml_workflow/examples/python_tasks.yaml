@@ -1,0 +1,171 @@
+# Python Tasks Example
+#
+# This example demonstrates Python task features:
+# - Result handling and variable access
+# - Error handling and validation
+# - Multiple return values
+# - Module imports and dependencies
+# - Conditional execution
+#
+# Usage:
+# yaml-workflow run python_tasks.yaml --numbers=[1,2,3,4,5]
+
+name: Python Tasks
+description: Demonstrates Python task features and best practices
+
+settings:
+  error_handling:
+    undefined_variables: strict
+    show_available: true
+
+params:
+  numbers:
+    description: List of numbers to process
+    type: array
+    items:
+      type: number
+    default: [1, 2, 3, 4, 5]
+    minItems: 1
+  operation:
+    description: Operation to perform (sum, average, stats)
+    type: string
+    enum: ["sum", "average", "stats"]
+    default: "stats"
+
+steps:
+  # Step 1: Validate input parameters
+  - name: validate_input
+    task: python
+    params:
+      code: |
+        import json
+        
+        # Get and validate numbers
+        numbers = args.numbers
+        if not isinstance(numbers, list):
+          if isinstance(numbers, str):
+            try:
+              numbers = json.loads(numbers)
+            except json.JSONDecodeError:
+              raise ValueError("Invalid JSON format for numbers")
+          else:
+            raise ValueError("numbers must be a list")
+            
+        if not numbers:
+          raise ValueError("numbers list cannot be empty")
+          
+        if not all(isinstance(n, (int, float)) for n in numbers):
+          raise ValueError("all items must be numbers")
+          
+        # Get and validate operation
+        operation = args.operation
+        if operation not in ["sum", "average", "stats"]:
+          raise ValueError("invalid operation")
+          
+        # Return validated input
+        result = {
+          "numbers": numbers,
+          "operation": operation
+        }
+
+  # Step 2: Perform calculations
+  - name: calculate
+    task: python
+    params:
+      code: |
+        import statistics
+        from typing import Dict, List, Union
+        
+        def calculate_stats(numbers: List[Union[int, float]]) -> Dict[str, float]:
+            return {
+                "sum": sum(numbers),
+                "average": statistics.mean(numbers),
+                "median": statistics.median(numbers),
+                "std_dev": statistics.stdev(numbers) if len(numbers) > 1 else 0,
+                "min": min(numbers),
+                "max": max(numbers)
+            }
+        
+        # Get validated input
+        data = steps.validate_input.output
+        numbers = data["numbers"]
+        operation = data["operation"]
+        
+        # Perform requested operation
+        if operation == "sum":
+            result = sum(numbers)
+        elif operation == "average":
+            result = statistics.mean(numbers)
+        else:  # stats
+            result = calculate_stats(numbers)
+    condition: "steps.validate_input.status == 'completed'"
+
+  # Step 3: Format results
+  - name: format_results
+    task: python
+    params:
+      code: |
+        import json
+        from pathlib import Path
+        from typing import Any, Dict
+        
+        def format_value(value: Any) -> str:
+            if isinstance(value, (int, float)):
+                return f"{value:,.2f}"
+            elif isinstance(value, dict):
+                return "\n".join(f"  {k}: {format_value(v)}" for k, v in value.items())
+            return str(value)
+        
+        # Get calculation results
+        data = steps.validate_input.output
+        result = steps.calculate.output
+        
+        # Create output directory
+        Path("output").mkdir(exist_ok=True)
+        
+        # Save raw results as JSON
+        raw_output = {
+            "input": data,
+            "result": result,
+            "timestamp": timestamp,
+            "run_number": run_number
+        }
+        Path("output/results.json").write_text(json.dumps(raw_output, indent=2))
+        
+        # Format human-readable output
+        formatted = f"""
+        Python Task Results
+        ==================
+        Run #{run_number} at {timestamp}
+        
+        Input
+        -----
+        Numbers: {data['numbers']}
+        Operation: {data['operation']}
+        
+        Result
+        ------
+        {format_value(result)}
+        """
+        
+        Path("output/results.txt").write_text(formatted)
+        
+        # Return both formats
+        result = {
+            "json": raw_output,
+            "text": formatted
+        }
+    condition: "steps.calculate.status == 'completed'"
+    outputs: [json_result, text_result]
+
+  # Step 4: Display results
+  - name: show_results
+    task: shell
+    command: |
+      if [ -f "output/results.txt" ]; then
+        cat output/results.txt
+      else
+        echo "Error: Results file not found"
+        exit 1
+      fi
+    condition: "steps.format_results.status == 'completed'" 

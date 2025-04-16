@@ -1,26 +1,39 @@
-# Test Resume Workflow
-# This workflow is designed to test the workflow resumption functionality.
-# It has three steps that can be used to verify different resume scenarios:
+# Resume Functionality Example
 #
-# How to test:
-# 1. Run without required_param - will fail at first step:
-#    yaml-workflow run workflows/test_resume.yaml
+# This example demonstrates workflow resumption and state management:
+# - Input validation with strict variable checking
+# - State persistence and restoration
+# - Error handling with detailed messages
+# - Progress tracking and reporting
+# - File-based state management
 #
-# 2. Resume the failed workflow:
-#    yaml-workflow run workflows/test_resume.yaml --resume required_param=test
+# Usage Examples:
+# 1. Initial run (will fail without required_param):
+#    yaml-workflow run test_resume.yaml
 #
-# 3. Try to resume a completed workflow (should fail):
-#    yaml-workflow run workflows/test_resume.yaml --resume
+# 2. Resume after failure:
+#    yaml-workflow run test_resume.yaml --resume required_param=test
 #
-# 4. Start from a specific step (fresh run):
-#    yaml-workflow run workflows/test_resume.yaml --start-from process_data required_param=test
+# 3. Start from specific step:
+#    yaml-workflow run test_resume.yaml --start-from process_data required_param=test
 
 name: Test Resume
-description: A simple workflow to test resumption functionality
+description: Demonstrates workflow resumption and state management
+
+settings:
+  error_handling:
+    undefined_variables: strict  # Enable strict variable checking
+    show_available: true        # Show available variables in errors
+
+params:
+  required_param:
+    description: Required parameter for testing
+    type: string
+    minLength: 1
+    required: true
 
 steps:
   # Step 1: Validate required parameter
-  # This step will fail if required_param is not provided
   - name: check_required_param
     task: shell
     command: |
@@ -28,13 +41,11 @@ steps:
         echo "Error: required_param is required" >&2
         exit 1
       fi
-      echo "required_param is {{ required_param }}"
       echo "{{ required_param }}" > "output/check_result.txt"
     outputs:
       check_result: "{{ required_param }}"
 
   # Step 2: Process the data
-  # Creates a file with the parameter value
   - name: process_data
     task: shell
     command: |
@@ -44,7 +55,6 @@ steps:
       process_result: "{{ required_param }}"
 
   # Step 3: Final verification
-  # Reads and displays the processed result
   - name: final_step
     task: shell
     command: |

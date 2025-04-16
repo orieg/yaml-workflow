@@ -43,12 +43,12 @@ steps:
   - name: validate
     task: file_check
     params:
-      path: "{{ input_file }}"
+      path: "{{ args.input_file }}"
 ```
 
 ### Environment Variables
 
-Environment variables can be defined in several ways:
+Environment variables are accessed using the `env` namespace:
 
 1. In the workflow file:
 ```yaml
@@ -59,9 +59,12 @@ env:
 
 2. Using environment variables:
 ```yaml
-env:
-  API_KEY: "${API_KEY}"  # From system environment
-  DEBUG: "${DEBUG:-false}"  # With default value
+steps:
+  - name: api_call
+    task: http
+    params:
+      url: "{{ env.API_URL }}"
+      debug: "{{ env.DEBUG }}"
 ```
 
 3. From a .env file in the workspace:
@@ -72,7 +75,7 @@ DEBUG=true
 
 ### Parameters
 
-Parameters make workflows reusable and configurable:
+Parameters are accessed using the `args` namespace:
 
 ```yaml
 params:
@@ -102,6 +105,14 @@ params:
     validate:
       - file_exists
       - is_readable
+
+# Using parameters in steps
+steps:
+  - name: greet
+    task: python
+    params:
+      name: "{{ args.name }}"
+      mode: "{{ args.mode }}"
 ```
 
 ### Flow Control
@@ -136,59 +147,125 @@ Each step can have:
   description: Process input data
 ```
 
-2. Task parameters:
+2. Task parameters with error handling:
 ```yaml
   params:
-    input: "{{ input_file }}"
-    output: "{{ output_file }}"
+    input: "{{ args.input_file }}"
+    output: "{{ args.output_file }}"
+  error_handling:
+    undefined_variables: strict  # Raises error for undefined variables
+    show_available: true        # Shows available variables in error messages
 ```
 
-3. Conditions:
+3. Conditions with proper variable access:
 ```yaml
-  condition: "{{ prev_step.success and input_file }}"
+  condition: "{{ steps.previous_step.status == 'completed' and args.input_file }}"
 ```
 
-4. Error handling:
+4. Error handling with retries:
 ```yaml
   retry:
     max_attempts: 3
     delay: 5
   on_error:
     action: continue
-    message: "Processing failed, continuing..."
+    message: "Processing failed: {{ error }}"
+    notify: "{{ env.ADMIN_EMAIL }}"
 ```
 
-5. Output capture:
+5. Output capture and access:
 ```yaml
-  output_var: process_result
+  outputs:
+    - result
+    - metadata
+  # Access in later steps
+  # {{ steps.process_data.outputs.result }}
+  # {{ steps.process_data.outputs.metadata }}
+```
+
+### Batch Processing
+
+Configure batch processing tasks:
+
+```yaml
+steps:
+  - name: process_batch
+    task: batch_processor
+    params:
+      # Input items to process
+      items: "{{ steps.get_items.output }}"
+      
+      # Processing configuration
+      chunk_size: 10
+      max_workers: 4
+      
+      # Processing task
+      task: python
+      function: process_item
+      
+      # Error handling
+      on_error: continue
+      error_handler: log_error
+      
+      # Result handling
+      aggregator: combine_results
+      
+      # State management
+      resume: true
 ```
 
 ### Template Variables
 
-Available template variables:
+Available template variables are organized in namespaces:
 
-1. Parameters:
+1. Arguments (Parameters):
 ```yaml
-{{ input_file }}  # Access parameter
-{{ params.input_file }}  # Full parameter object
+{{ args.input_file }}      # Access parameter value
+{{ args.mode }}           # Access parameter with default
 ```
 
-2. Environment:
+2. Environment Variables:
 ```yaml
-{{ env.API_KEY }}  # Environment variable
+{{ env.API_KEY }}        # Environment variable
+{{ env.DEBUG }}         # Environment variable with default
 ```
 
-3. Step outputs:
+3. Step Outputs:
 ```yaml
-{{ steps.process_data.output }}  # Step output
-{{ prev_step.output }}  # Previous step
+{{ steps.process.output }}         # Direct output
+{{ steps.process.outputs.result }} # Named output
+{{ steps.process.status }}        # Step status
+{{ steps.process.error }}         # Error message if failed
 ```
 
-4. Built-in variables:
+4. Built-in Variables:
 ```yaml
-{{ workflow_dir }}  # Workflow directory
-{{ run_id }}  # Unique run ID
-{{ current_timestamp }}  # Current time
+{{ workflow.name }}          # Workflow name
+{{ workflow.workspace }}     # Workspace directory
+{{ workflow.run_id }}        # Unique run ID
+{{ workflow.timestamp }}     # Current time
+```
+
+### Error Handling
+
+Improved error messages help diagnose issues:
+
+1. Undefined Variables:
+```
+TemplateError: Variable 'result' is undefined. Available variables:
+- args: [input_file, mode, batch_size]
+- env: [API_KEY, DEBUG]
+- steps: [validate, process]
+```
+
+2. Invalid Access:
+```
+TemplateError: Invalid step attribute 'results'. Valid attributes:
+- output: Raw step output
+- outputs: Named outputs
+- status: Step status
+- error: Error message
+- timestamp: Execution time
 ```
 
 ### Workspace Configuration
@@ -201,19 +278,14 @@ project:
   name: my-project
   description: Project description
 
-# Default settings for all workflows
+# Default settings
 defaults:
-  env:
-    DEBUG: false
-  retry:
-    max_attempts: 3
-  temp_dir: .workflow/temp
-
-# Task-specific defaults
-tasks:
-  shell:
-    timeout: 300
-  http_request:
-    retry:
-      max_attempts: 5
+  error_handling:
+    undefined_variables: strict
+    show_available: true
+  
+  batch_processing:
+    chunk_size: 10
+    max_workers: 4
+    resume: true
 ``` 

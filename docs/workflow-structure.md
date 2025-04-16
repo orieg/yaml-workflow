@@ -17,24 +17,23 @@ graph TD
     H --> L[Retry Logic]
     I --> M[Error Actions]
     J --> N[Progress Tracking]
+    J --> O[Batch Processing]
 ```
 
 ## Basic Structure
 ```yaml
 name: My Workflow
 description: Workflow description
-version: "0.1.0"  # Optional
+version: "1.0"  # Optional
 
 # Optional global settings
 settings:
-  timeout: 3600
-  retry_count: 3
-  max_workers: 4
-
-# Optional environment variables
-env:
-  API_KEY: ${env:API_KEY}
-  DEBUG: "true"
+  error_handling:
+    undefined_variables: strict
+    show_available: true
+  batch_processing:
+    chunk_size: 10
+    max_workers: 4
 
 # Optional parameter definitions
 params:
@@ -51,22 +50,30 @@ params:
 flows:
   default: process  # Optional, defaults to "all" if not specified
   definitions:
-    - process: [step1, step3, step4]  # Main processing flow
-    - data_collection: [step2, step5]  # Data collection flow
-    - validation: [step1, step2]  # Validation flow
+    - process: [validate, transform, save]  # Main processing flow
+    - data_collection: [collect, process]   # Data collection flow
+    - validation: [validate]                # Validation flow
 
 # Workflow steps
 steps:
-  - name: step1
-    task: task_type
+  - name: validate
+    task: file_check
+    description: Validate input file
     params:
-      # ... step parameters ...
+      path: "{{ args.input_file }}"
+      type: "csv"
 
-  - name: step2
-    task: task_type
+  - name: transform
+    task: python
+    description: Transform data
     params:
-      # ... step parameters ...
-```
+      input: "{{ args.input_file }}"
+      batch_size: "{{ args.batch_size }}"
+    outputs:
+      - transformed_data
+      - metadata
+    error_handling:
+      undefined_variables: strict
 
 ## Workflow Lifecycle
 
@@ -87,6 +94,32 @@ stateDiagram-v2
     StepExecution --> [*]: All Steps Complete
 ```
 
+## Variable Access
+
+The workflow engine uses a namespaced approach for variable access:
+
+```yaml
+steps:
+  - name: process
+    task: python
+    params:
+      # Access workflow parameters
+      input_file: "{{ args.input_file }}"
+      batch_size: "{{ args.batch_size }}"
+      
+      # Access environment variables
+      api_url: "{{ env.API_URL }}"
+      debug: "{{ env.DEBUG }}"
+      
+      # Access step outputs
+      data: "{{ steps.transform.output }}"
+      metadata: "{{ steps.transform.outputs.metadata }}"
+      
+      # Access workflow information
+      workspace: "{{ workflow.workspace }}"
+      run_id: "{{ workflow.run_id }}"
+```
+
 ## Flow Control
 
 The workflow engine supports defining multiple flows within a single workflow. Each flow represents a specific sequence of steps to execute. This allows you to:
@@ -101,16 +134,16 @@ The workflow engine supports defining multiple flows within a single workflow. E
 ```mermaid
 graph LR
     subgraph "Process Flow"
-    A[step1] --> B[step3]
-    B --> C[step4]
+    A[validate] --> B[transform]
+    B --> C[save]
     end
     
     subgraph "Data Collection Flow"
-    D[step2] --> E[step5]
+    D[collect] --> E[process]
     end
     
     subgraph "Validation Flow"
-    F[step1] --> G[step2]
+    F[validate]
     end
 ```
 
@@ -121,64 +154,143 @@ flows:
   
   # Flow definitions
   definitions:
-    # Each item defines a named flow with its step sequence
-    - process: [step1, step3, step4]
-    - data_collection: [step2, step5]
-    - validation: [step1, step2]
+    - process: [validate, transform, save]
+    - data_collection: [collect, process]
+    - validation: [validate]
+
+# Flow execution conditions
+steps:
+  - name: validate
+    condition: "{{ args.input_file is defined }}"
+  
+  - name: transform
+    condition: "{{ steps.validate.status == 'completed' }}"
 ```
 
 ## Error Handling
 
-The workflow engine provides comprehensive error handling:
-
-```mermaid
-stateDiagram-v2
-    [*] --> StepStart: Execute Step
-    StepStart --> StepSuccess: Success
-    StepStart --> StepFailed: Failure
-    StepFailed --> CheckRetry: Check Retry Policy
-    CheckRetry --> RetryStep: Can Retry
-    CheckRetry --> ErrorAction: Max Retries Exceeded
-    RetryStep --> StepStart: Wait and Retry
-    ErrorAction --> FailWorkflow: action: fail
-    ErrorAction --> SkipStep: action: skip
-    ErrorAction --> RetryStep: action: retry
-    StepSuccess --> [*]: Continue Workflow
-    FailWorkflow --> [*]: Stop Workflow
-    SkipStep --> [*]: Next Step
-```
+The workflow engine provides comprehensive error handling with improved error messages and strict variable checking:
 
 ```yaml
+# Global settings for error handling
+settings:
+  error_handling:
+    undefined_variables: strict  # Enable StrictUndefined behavior
+    show_available: true        # Show available variables in error messages
+
 steps:
-  - name: step_with_retry
-    task: shell
-    command: "curl http://api.example.com"
-    retry:
-      max_attempts: 3
-      delay: 5
-      backoff: 2
-    on_error:
-      action: fail  # or skip, retry
-      message: "API request failed"
+  - name: template_task
+    task: template
+    error_handling:
+      undefined_variables: strict  # Override at step level
+      show_available: true
+    params:
+      template: "Hello {{ name }}!"  # Will fail if name is undefined
 ```
 
-## State Management
+When `undefined_variables` is set to `strict`, the engine provides helpful error messages:
 
-The workflow engine maintains state for each workflow run, allowing for:
-
-```mermaid
-graph TD
-    A[Workflow State] --> B[Progress Tracking]
-    A --> C[Step Outputs]
-    A --> D[Error States]
-    B --> E[Completed Steps]
-    B --> F[Current Step]
-    B --> G[Remaining Steps]
-    C --> H[Step Results]
-    C --> I[Artifacts]
-    D --> J[Failed Steps]
-    D --> K[Retry Counts]
-    D --> L[Error Messages]
+```yaml
+settings:
+  error_handling:
+    undefined_variables: strict
+    show_available: true  # Shows available env vars in errors
 ```
 
-State is stored in a `.workflow_metadata.json` file in the workspace directory. 
+If an undefined environment variable is referenced, the error message will include:
+- The name of the missing variable
+- List of available environment variables
+- Context where the error occurred
+
+## Environment Variables
+
+Environment variables in the workflow engine are handled through the workflow context and are accessible via the `env` namespace. The engine provides several ways to work with environment variables:
+
+### Access Methods
+
+1. **In Templates**
+   ```yaml
+   steps:
+     - name: use_env
+       task: template
+       params:
+         template: "API URL is {{ env.API_URL }}"
+   ```
+
+2. **In Python Tasks**
+   ```yaml
+   steps:
+     - name: python_task
+       task: python
+       params:
+         code: |
+           import os
+           result = os.environ.get('API_URL')
+   ```
+
+3. **In Shell Tasks**
+   ```yaml
+   steps:
+     - name: shell_task
+       task: shell
+       params:
+         command: "echo $API_URL"
+   ```
+
+### Environment Sources
+
+Environment variables can come from multiple sources:
+
+1. **System Environment**
+   - Inherited from the parent process
+   - Available automatically in all tasks
+
+2. **Command Line Arguments**
+   - Set via workflow parameters
+   - Override system environment variables
+
+3. **Runtime Modifications**
+   - Modified by shell tasks during execution
+   - Changes persist for subsequent steps
+
+### Error Handling
+
+When using strict undefined variable handling, the engine provides helpful error messages:
+
+```yaml
+settings:
+  error_handling:
+    undefined_variables: strict
+    show_available: true  # Shows available env vars in errors
+```
+
+If an undefined environment variable is referenced, the error message will include:
+- The name of the missing variable
+- List of available environment variables
+- Context where the error occurred
+
+### Best Practices
+
+1. Use environment variables for:
+   - Configuration values
+   - Secrets and credentials
+   - System-dependent paths
+   - Runtime environment settings
+
+2. Avoid storing sensitive information in:
+   - Workflow YAML files
+   - Task outputs
+   - Log files
+
+3. Validate required environment variables early in the workflow:
+   ```yaml
+   steps:
+     - name: validate_env
+       task: python
+       params:
+         code: |
+           required = ['API_KEY', 'DATABASE_URL']
+           missing = [var for var in required if var not in os.environ]
+           if missing:
+             raise ValueError(f"Missing required environment variables: {missing}")
+   ```

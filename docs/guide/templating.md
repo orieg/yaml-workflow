@@ -1,6 +1,278 @@
 # Templating Guide
 
-YAML Workflow uses Jinja2 as its templating engine, providing powerful variable substitution, control structures, and expressions in your workflows.
+YAML Workflow uses Jinja2 as its templating engine with StrictUndefined enabled, providing powerful variable substitution, control structures, and expressions in your workflows.
+
+## Variable Namespaces
+
+YAML Workflow organizes variables into distinct namespaces:
+
+### Arguments (Parameters)
+```yaml
+steps:
+  - name: process
+    params:
+      input: "{{ args.input_file }}"      # Access parameter
+      mode: "{{ args.mode | default('fast') }}"  # With default
+```
+
+### Environment Variables
+```yaml
+steps:
+  - name: configure
+    params:
+      api_url: "{{ env.API_URL }}"        # Access env var
+      debug: "{{ env.DEBUG | default('false') }}"  # With default
+```
+
+### Step Outputs
+```yaml
+steps:
+  - name: use_results
+    params:
+      # Direct output
+      data: "{{ steps.process.output }}"
+      
+      # Named outputs
+      result: "{{ steps.process.outputs.result }}"
+      metadata: "{{ steps.process.outputs.metadata }}"
+      
+      # Step status
+      status: "{{ steps.process.status }}"
+      error: "{{ steps.process.error }}"
+```
+
+### Workflow Information
+```yaml
+steps:
+  - name: workflow_info
+    params:
+      name: "{{ workflow.name }}"
+      workspace: "{{ workflow.workspace }}"
+      run_id: "{{ workflow.run_id }}"
+      timestamp: "{{ workflow.timestamp }}"
+```
+
+## Error Handling
+
+YAML Workflow uses StrictUndefined to catch undefined variables early:
+
+### Undefined Variables
+```yaml
+# This will fail with a helpful error message:
+steps:
+  - name: example
+    params:
+      value: "{{ unknown_var }}"
+
+# Error message will show:
+# TemplateError: Variable 'unknown_var' is undefined. Available variables:
+# - args: [input_file, mode, batch_size]
+# - env: [API_URL, DEBUG]
+# - steps: [process, transform]
+```
+
+### Safe Defaults
+```yaml
+steps:
+  - name: safe_example
+    params:
+      # Use default if variable is undefined
+      mode: "{{ args.mode | default('standard') }}"
+      
+      # Use default with type conversion
+      debug: "{{ env.DEBUG | default('false') | lower }}"
+      
+      # Complex default with condition
+      value: "{{ steps.process.output | default(args.fallback if args.fallback is defined else 'default') }}"
+```
+
+### Error Messages
+```yaml
+steps:
+  - name: validate
+    params:
+      input: "{{ args.input_file }}"
+    error_handling:
+      undefined_variables: strict  # Raises error for undefined
+      show_available: true        # Shows available variables
+    on_error:
+      message: "Failed: {{ error }}"  # Access error message
+```
+
+## Control Structures
+
+### Conditionals
+```yaml
+steps:
+  - name: conditional_step
+    condition: "{{ steps.validate.status == 'completed' and args.mode == 'full' }}"
+    params:
+      {% if env.DEBUG | default('false') | lower == 'true' %}
+      log_level: "debug"
+      verbose: true
+      {% else %}
+      log_level: "info"
+      verbose: false
+      {% endif %}
+```
+
+### Loops
+```yaml
+steps:
+  - name: batch_process
+    task: batch_processor
+    params:
+      items: "{{ steps.get_items.output }}"
+      options:
+        {% for opt in args.options %}
+        {{ opt.name }}: {{ opt.value }}
+        {% endfor %}
+```
+
+## Task-Specific Usage
+
+### Template Tasks
+```yaml
+steps:
+  - name: generate_config
+    task: template
+    template: |
+      # Configuration
+      app_name: {{ args.name }}
+      environment: {{ env.ENVIRONMENT }}
+      debug: {{ env.DEBUG | default('false') | lower }}
+      
+      # Processing
+      batch_size: {{ args.batch_size | default(100) }}
+      max_workers: {{ args.max_workers | default(4) }}
+      
+      # Previous results
+      last_run: {{ steps.previous.outputs.timestamp }}
+      status: {{ steps.previous.status }}
+    output: "{{ args.output_file }}"
+    error_handling:
+      undefined_variables: strict
+      show_available: true
+```
+
+### Python Tasks
+```yaml
+steps:
+  - name: process_data
+    task: python
+    params:
+      function: process_batch
+      args:
+        input: "{{ args.input_file }}"
+        batch_size: "{{ args.batch_size }}"
+      error_handling:
+        undefined_variables: strict
+    outputs:
+      - processed_data
+      - statistics
+```
+
+### Batch Processing
+```yaml
+steps:
+  - name: process_items
+    task: batch_processor
+    params:
+      # Input configuration
+      items: "{{ steps.get_items.output }}"
+      chunk_size: "{{ args.chunk_size }}"
+      
+      # Processing
+      task: python
+      function: process_item
+      
+      # Error handling
+      on_error: continue
+      error_handler: "{{ args.error_handler }}"
+      
+      # Results
+      aggregator: "{{ args.aggregator }}"
+```
+
+## Best Practices
+
+1. **Use Namespaced Variables**
+   ```yaml
+   # Good: Clear variable source
+   input: "{{ args.input_file }}"
+   api_key: "{{ env.API_KEY }}"
+   
+   # Bad: Unclear source
+   input: "{{ input_file }}"
+   ```
+
+2. **Enable Strict Mode**
+   ```yaml
+   # Good: Catches errors early
+   error_handling:
+     undefined_variables: strict
+     show_available: true
+   
+   # Bad: Silent failures
+   value: "{{ maybe_undefined }}"
+   ```
+
+3. **Use Type-Safe Defaults**
+   ```yaml
+   # Good: Type-safe conversion
+   debug: "{{ env.DEBUG | default('false') | lower in ['true', 'yes', '1'] }}"
+   
+   # Bad: Potential type issues
+   debug: "{{ env.DEBUG }}"
+   ```
+
+4. **Clear Error Messages**
+   ```yaml
+   # Good: Context in errors
+   {% if not args.input_file %}
+   {{ raise('Input file is required. Available args: ' ~ args.keys()) }}
+   {% endif %}
+   
+   # Bad: Unclear errors
+   {{ args.input_file }}  # Raises UndefinedError
+   ```
+
+5. **Document Dependencies**
+   ```yaml
+   # Required variables:
+   # args:
+   #   - input_file: Path to input file
+   #   - batch_size: Number of items to process
+   # env:
+   #   - API_KEY: Service API key
+   #   - ENVIRONMENT: Deployment environment
+   
+   steps:
+     - name: documented_step
+       # ... step configuration ...
+   ```
+
+## Security Considerations
+
+1. **Variable Access**
+   - Use appropriate namespaces for variables
+   - Validate variable existence before use
+   - Use strict mode to catch undefined variables
+
+2. **Error Handling**
+   - Enable strict undefined checking
+   - Show available variables in error messages
+   - Use appropriate error handlers
+
+3. **Type Safety**
+   - Use type-safe conversions
+   - Provide appropriate defaults
+   - Validate variable types
+
+4. **File Operations**
+   - Use workspace-relative paths
+   - Validate file paths
+   - Check file permissions
 
 ## Basic Syntax
 
@@ -24,28 +296,6 @@ steps:
   - name: calculate
     task: template
     template: "Result: {{ value * 2 + 5 }}"
-```
-
-### Control Structures
-
-#### Conditionals
-```yaml
-{% if env.DEBUG %}
-debug: true
-log_level: debug
-{% else %}
-debug: false
-log_level: info
-{% endif %}
-```
-
-#### Loops
-```yaml
-services:
-{% for service in services %}
-  - name: {{ service.name }}
-    port: {{ service.port }}
-{% endfor %}
 ```
 
 ## Available Variables
@@ -131,124 +381,6 @@ Jinja2 provides several built-in filters to transform data:
 {{ list | length }}      # Get list length
 ```
 
-## Error Handling
-
-### Undefined Variables
-
-By default, YAML Workflow uses `StrictUndefined`, which means accessing undefined variables will raise an error:
-```yaml
-# This will fail if 'unknown_var' is not defined
-{{ unknown_var }}
-
-# This will use a default value instead
-{{ unknown_var | default('fallback') }}
-```
-
-### Safe String
-```yaml
-# Escape HTML/XML special characters
-{{ user_input | escape }}
-
-# Mark string as safe (no escaping)
-{{ html_content | safe }}
-```
-
-## Task-Specific Usage
-
-### Template Tasks
-```yaml
-steps:
-  - name: render_template
-    task: template
-    template: |
-      # Configuration
-      name: {{ name }}
-      environment: {{ env.ENVIRONMENT }}
-      debug: {{ debug | lower }}
-    output: config.yaml
-```
-
-### Shell Tasks
-```yaml
-steps:
-  - name: run_script
-    task: shell
-    command: |
-      python process.py \
-        --input "{{ input_file }}" \
-        --output "{{ output_dir }}/result.json" \
-        --debug {{ env.DEBUG | lower }}
-```
-
-### Python Tasks
-```yaml
-steps:
-  - name: python_step
-    task: python
-    params:
-      function: process_data
-      args:
-        input: "{{ input_file }}"
-        config: 
-          debug: {{ env.DEBUG | lower }}
-          max_items: {{ max_items | default(100) }}
-```
-
-## Best Practices
-
-1. **Use Default Values**
-   ```yaml
-   # Good: Provides fallback
-   debug: {{ env.DEBUG | default('false') }}
-   
-   # Bad: May fail if DEBUG is not set
-   debug: {{ env.DEBUG }}
-   ```
-
-2. **Type Safety**
-   ```yaml
-   # Good: Ensures boolean
-   debug: {{ env.DEBUG | lower in ['true', '1', 'yes'] }}
-   
-   # Bad: Direct use may cause type issues
-   debug: {{ env.DEBUG }}
-   ```
-
-3. **Complex Logic**
-   ```yaml
-   # Good: Use intermediate variables
-   {% set is_valid = length > 0 and status == 'ready' %}
-   {% if is_valid %}
-   status: valid
-   {% endif %}
-   
-   # Bad: Complex inline conditions
-   {% if length > 0 and status == 'ready' %}
-   ```
-
-4. **Error Messages**
-   ```yaml
-   # Good: Clear error context
-   {% if not input_file %}
-   {{ raise('Input file is required') }}
-   {% endif %}
-   
-   # Bad: Unclear errors
-   {{ input_file }}  # Will raise UndefinedError
-   ```
-
-5. **Documentation**
-   ```yaml
-   # Good: Document expected variables
-   # Required variables:
-   # - input_file: Path to input file
-   # - env.API_KEY: API key for service
-   
-   # Bad: No documentation
-   {{ input_file }}
-   {{ env.API_KEY }}
-   ```
-
 ## Security Considerations
 
 1. **Input Validation**
@@ -298,16 +430,10 @@ steps:
     params:
       function: process_data
       args:
-        input_file: "{{ input_file }}"
-        options:
-          batch_size: {{ batch_size | default(100) }}
-          max_retries: {{ max_retries | default(3) }}
-          timeout: {{ timeout | default(30) }}
-        filters:
-          {% for filter in filters %}
-          - type: {{ filter.type }}
-            value: {{ filter.value }}
-          {% endfor %}
+        input: "{{ input_file }}"
+        config: 
+          debug: {{ env.DEBUG | lower }}
+          max_items: {{ max_items | default(100) }}
 ```
 
 ### Report Generation
