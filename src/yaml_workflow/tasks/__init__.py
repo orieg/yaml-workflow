@@ -21,10 +21,9 @@ R = TypeVar("R")
 
 # Type for task handlers
 TaskHandler = Callable[[Dict[str, Any], Dict[str, Any], Path], Any]
-ConfigTaskHandler = Callable[["TaskConfig"], Dict[str, Any]]
 
 # Registry of task handlers
-_task_handlers: Dict[str, TaskHandler | ConfigTaskHandler] = {}
+_task_handlers: Dict[str, TaskHandler] = {}
 
 
 class TaskConfig:
@@ -190,7 +189,7 @@ class TaskConfig:
         return "root"
 
 
-def register_task(name: str) -> Callable[[TaskHandler | ConfigTaskHandler], TaskHandler | ConfigTaskHandler]:
+def register_task(name: str) -> Callable[[TaskHandler], TaskHandler]:
     """
     Decorator to register a task handler.
 
@@ -198,10 +197,10 @@ def register_task(name: str) -> Callable[[TaskHandler | ConfigTaskHandler], Task
         name: Name of the task type
 
     Returns:
-        Callable: Decorator function that can handle both traditional and TaskConfig-based handlers
+        Callable: Decorator function that can handle traditional task handlers
     """
 
-    def decorator(func: TaskHandler | ConfigTaskHandler) -> TaskHandler | ConfigTaskHandler:
+    def decorator(func: TaskHandler) -> TaskHandler:
         _task_handlers[name] = func
         return func
 
