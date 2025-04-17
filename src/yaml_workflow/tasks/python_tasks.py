@@ -328,7 +328,7 @@ def python_task(config: TaskConfig) -> Dict[str, Any]:
         config: TaskConfig object containing task configuration
         
     Returns:
-        Dict containing the result of the operation/code
+        Dict containing the result of the operation/code and task metadata
         
     Raises:
         TemplateError: If task execution fails
@@ -368,30 +368,42 @@ def python_task(config: TaskConfig) -> Dict[str, Any]:
         # Process inputs first to handle any templates
         processed = config.process_inputs()
 
+        # Initialize result
+        result = None
+
         # Check for code execution mode
         if "code" in processed:
             if "operation" not in processed:
                 result = execute_code(processed["code"], config)
-                return {"result": result}
             elif processed["operation"] == "function":
                 result = execute_function(processed["code"], config)
-                return {"result": result}
-
-        # Operation mode
-        operation = processed.get("operation")
-
-        if not operation:
-            raise TemplateError("Either code or operation must be specified for Python task")
-
-        # Handle different operations
-        if operation == "multiply":
-            return handle_multiply_operation(config)
-        elif operation == "divide":
-            return handle_divide_operation(config)
-        elif operation == "custom":
-            return handle_custom_operation(config)
         else:
-            raise TemplateError(f"Unknown operation: {operation}")
+            # Operation mode
+            operation = processed.get("operation")
+            if not operation:
+                raise TemplateError("Either code or operation must be specified for Python task")
+
+            # Handle different operations
+            if operation == "multiply":
+                operation_result = handle_multiply_operation(config)
+                result = operation_result["result"]
+            elif operation == "divide":
+                operation_result = handle_divide_operation(config)
+                result = operation_result["result"]
+            elif operation == "custom":
+                operation_result = handle_custom_operation(config)
+                result = operation_result["result"]
+            else:
+                raise TemplateError(f"Unknown operation: {operation}")
+
+        # Return result with task metadata (following noop task pattern)
+        return {
+            "result": result,
+            "task_name": config.name,
+            "task_type": config.type,
+            "processed_inputs": processed,
+            "available_variables": config.get_available_variables()
+        }
 
     except Exception as e:
         log_task_error(logger, e)
