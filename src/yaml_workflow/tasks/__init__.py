@@ -7,7 +7,8 @@ Each module provides specific functionality that can be referenced in workflow Y
 
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional, ParamSpec, TypeVar, cast
+from typing import Any, Callable, Dict, List, Optional, ParamSpec, TypeVar, cast
+import re
 
 from jinja2 import Template, UndefinedError, StrictUndefined
 
@@ -24,6 +25,112 @@ TaskHandler = Callable[[Dict[str, Any], Dict[str, Any], Path], Any]
 _task_handlers: Dict[str, TaskHandler] = {}
 
 
+class TaskConfig:
+    """Configuration class for task handlers with namespace support."""
+    def __init__(self, step: Dict[str, Any], context: Dict[str, Any], workspace: Path):
+        """
+        Initialize task configuration.
+
+        Args:
+            step: Step configuration from workflow
+            context: Execution context with namespaces
+            workspace: Workspace path
+        """
+        self.name = step.get("name")
+        self.type = step.get("task")
+        self.inputs = step.get("inputs", {})
+        self._context = context
+        self.workspace = workspace
+        self._processed_inputs: Dict[str, Any] = {}
+
+    def get_variable(self, name: str, namespace: Optional[str] = None) -> Any:
+        """
+        Get a variable with namespace support.
+
+        Args:
+            name: Variable name
+            namespace: Optional namespace (args, env, steps)
+
+        Returns:
+            Any: Variable value if found
+        """
+        if namespace:
+            return self._context.get(namespace, {}).get(name)
+        return self._context.get(name)
+
+    def get_available_variables(self) -> Dict[str, List[str]]:
+        """
+        Get available variables by namespace.
+
+        Returns:
+            Dict[str, List[str]]: Available variables in each namespace
+        """
+        return {
+            "args": list(self._context.get("args", {}).keys()),
+            "env": list(self._context.get("env", {}).keys()),
+            "steps": list(self._context.get("steps", {}).keys()),
+            "root": [k for k in self._context.keys() if k not in ["args", "env", "steps"]]
+        }
+
+    def process_inputs(self) -> Dict[str, Any]:
+        """
+        Process task inputs with template resolution.
+
+        Returns:
+            Dict[str, Any]: Processed inputs with resolved templates
+        """
+        if not self._processed_inputs:
+            for key, value in self.inputs.items():
+                if isinstance(value, str):
+                    try:
+                        template = Template(value, undefined=StrictUndefined)
+                        self._processed_inputs[key] = template.render(**self._context)
+                    except UndefinedError as e:
+                        error_msg = str(e)
+                        namespace = self._get_undefined_namespace(error_msg)
+                        available = self.get_available_variables()
+                        raise TemplateError(
+                            f"Failed to resolve template variable in input '{key}' in namespace '{namespace}'. "
+                            f"Error: {error_msg}. Available variables: {available[namespace]}"
+                        )
+                else:
+                    self._processed_inputs[key] = value
+        return self._processed_inputs
+
+    def _get_undefined_namespace(self, error_msg: str) -> str:
+        """
+        Extract namespace from undefined variable error.
+
+        Args:
+            error_msg: Error message from UndefinedError
+
+        Returns:
+            str: Namespace name or 'root' if not found
+        """
+        # Check for direct variable access pattern (e.g., args.undefined)
+        for namespace in ["args", "env", "steps"]:
+            if f"{namespace}." in error_msg:
+                return namespace
+            
+        # Check for dictionary access pattern (e.g., 'dict object' has no attribute 'undefined')
+        # Extract the undefined attribute name from the error message
+        match = re.search(r"no attribute '(\w+)'", error_msg)
+        if match:
+            undefined_attr = match.group(1)
+            # Find which namespace was trying to access this attribute
+            for namespace in ["args", "env", "steps"]:
+                if namespace in self._context:
+                    template_str = next(
+                        (v for v in self.inputs.values() 
+                         if isinstance(v, str) and f"{namespace}.{undefined_attr}" in v),
+                        ""
+                    )
+                    if template_str:
+                        return namespace
+        
+        return "root"
+
+
 def register_task(name: str) -> Callable[[TaskHandler], TaskHandler]:
     """
     Decorator to register a task handler.
@@ -34,11 +141,9 @@ def register_task(name: str) -> Callable[[TaskHandler], TaskHandler]:
     Returns:
         Callable: Decorator function
     """
-
     def decorator(func: TaskHandler) -> TaskHandler:
         _task_handlers[name] = func
         return func
-
     return decorator
 
 
@@ -60,8 +165,8 @@ def create_task_handler(func: Callable[..., R]) -> TaskHandler:
     Create a task handler that wraps a basic function.
 
     This wrapper:
-    1. Extracts parameters from the step's inputs
-    2. Resolves template variables in string inputs using Jinja2
+    1. Creates a TaskConfig instance for namespace support
+    2. Processes inputs with template resolution
     3. Handles workspace paths if needed
 
     Args:
@@ -70,37 +175,11 @@ def create_task_handler(func: Callable[..., R]) -> TaskHandler:
     Returns:
         TaskHandler: Wrapped task handler
     """
-
     @wraps(func)
     def wrapper(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> R:
-        # Get inputs, defaulting to empty dict if not present
-        inputs = step.get("inputs", {})
-
-        # Process each input value
-        processed_inputs = {}
-        for key, value in inputs.items():
-            if isinstance(value, str):
-                # Resolve template variables in strings using Jinja2
-                try:
-                    template = Template(value, undefined=StrictUndefined)
-                    processed_inputs[key] = template.render(**context)
-                except UndefinedError as e:
-                    # Enhance error message with available variables
-                    available = {
-                        "args": list(context["args"].keys()) if "args" in context else [],
-                        "env": list(context["env"].keys()) if "env" in context else [],
-                        "steps": list(context["steps"].keys()) if "steps" in context else []
-                    }
-                    raise TemplateError(
-                        f"Failed to resolve template variable in input '{key}': {str(e)}. "
-                        f"Available variables: {available}"
-                    )
-            else:
-                processed_inputs[key] = value
-
-        # Call the function with processed inputs
+        config = TaskConfig(step, context, workspace)
+        processed_inputs = config.process_inputs()
         return func(**processed_inputs)
-
     return cast(TaskHandler, wrapper)
 
 
