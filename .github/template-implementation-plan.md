@@ -759,3 +759,90 @@ See detailed implementation in `.github/intermediate-implementation-plan.md`
      
      git commit -F commit.txt
      ```
+
+### Phase 3: Namespace-Aware Template Resolution
+
+1. Enhanced Template Engine
+   ```python
+   class TemplateEngine:
+       """Process Jinja2 templates with namespace support."""
+       
+       def __init__(self, cache_size: int = 128):
+           self.env = Environment(undefined=StrictUndefined)
+           self._compile_template = lru_cache(maxsize=cache_size)(self._compile_template_uncached)
+           
+       def process_template(self, template_str: str, context: Dict[str, Any]) -> str:
+           """Process template with namespace support."""
+           try:
+               template = self._compile_template(template_str)
+               return template.render(**self._prepare_context(context))
+           except UndefinedError as e:
+               namespace = self._get_undefined_namespace(str(e))
+               available = self._get_namespace_variables(context, namespace)
+               raise TemplateError(f"Variable not found in namespace '{namespace}'. Available: {available}")
+               
+       def _prepare_context(self, context: Dict[str, Any]) -> Dict[str, Any]:
+           """Prepare context with namespace support."""
+           return {
+               "args": context.get("args", {}),
+               "env": context.get("env", {}),
+               "steps": context.get("steps", {}),
+               **{k: v for k, v in context.items() if k not in ["args", "env", "steps"]}
+           }
+   ```
+
+2. Task Handler Updates
+   - [ ] Update all task handlers to use namespace-aware template resolution
+   - [ ] Add namespace validation in task handlers
+   - [ ] Update error messages with namespace context
+   - [ ] After implementation:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update task handlers with namespace support
+
+     - Add namespace-aware template resolution
+     - Add namespace validation
+     - Update error messages
+     - Add namespace tests
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+3. Testing Updates
+   - [ ] Add namespace-specific test cases:
+     - Variable isolation between namespaces
+     - Cross-namespace access patterns
+     - Namespace error handling
+     - Template resolution in each namespace
+   - [ ] After implementation:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Add namespace-aware template tests
+
+     - Add namespace isolation tests
+     - Add cross-namespace access tests
+     - Add namespace error tests
+     - Update template resolution tests
+     EOF
+     
+     git commit -F commit.txt
+     ```
+
+4. Documentation
+   - [ ] Document namespace best practices
+   - [ ] Update template resolution guide
+   - [ ] Add namespace troubleshooting guide
+   - [ ] After completion:
+     ```bash
+     cat > commit.txt << 'EOF'
+     Update documentation with namespace guidelines
+
+     - Add namespace best practices
+     - Update template guide
+     - Add troubleshooting section
+     - Add migration guide
+     EOF
+     
+     git commit -F commit.txt
+     ```
