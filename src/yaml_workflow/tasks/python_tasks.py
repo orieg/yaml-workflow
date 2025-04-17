@@ -10,29 +10,28 @@ from typing import Any, Callable, Dict, List, Optional, Union
 from jinja2 import Template, StrictUndefined, UndefinedError
 
 from ..exceptions import TemplateError
-from . import register_task
+from . import register_task, TaskConfig
 from .base import get_task_logger, log_task_error, log_task_execution, log_task_result
 
 logger = logging.getLogger(__name__)
 
 
-def execute_code(code: str, inputs: Dict[str, Any], context: Dict[str, Any]) -> Any:
-    """Execute Python code with given inputs and context.
-
+def execute_code(code: str, config: TaskConfig) -> Any:
+    """Execute Python code with TaskConfig support.
+    
     Args:
         code: Python code to execute
-        inputs: Input variables for the code
-        context: Context variables for the code
-
+        config: TaskConfig object for variable access
+        
     Returns:
-        The value of the 'result' variable after code execution, or None if not set
-
+        The value of the 'result' variable after code execution
+        
     Raises:
-        TemplateError: If template resolution or code execution fails
+        TemplateError: If code execution fails
     """
     # Create a new dictionary with a copy of the context to avoid modifying the original
-    local_vars = {"context": context}
-    local_vars.update(inputs)
+    local_vars = {"context": config._context}
+    local_vars.update(config.process_inputs())
 
     try:
         # Execute the code
@@ -82,18 +81,16 @@ def process_template_value(value: Any, context: Dict[str, Any]) -> Any:
         raise TemplateError(f"Failed to process template: {str(e)}")
 
 
-def execute_function(code: str, args: List[Any], kwargs: Dict[str, Any], context: Dict[str, Any]) -> Any:
-    """Execute a Python function with given arguments.
-
+def execute_function(code: str, config: TaskConfig) -> Any:
+    """Execute a Python function with TaskConfig support.
+    
     Args:
-        code: Python code containing the function definition
-        args: Positional arguments for the function
-        kwargs: Keyword arguments for the function
-        context: The context for template resolution
-
+        code: Python code containing function definition
+        config: TaskConfig object for variable access
+        
     Returns:
-        The result of the function call
-
+        Function result
+        
     Raises:
         TemplateError: If function execution fails
     """
@@ -108,20 +105,168 @@ def execute_function(code: str, args: List[Any], kwargs: Dict[str, Any], context
         if "process" not in local_vars or not callable(local_vars["process"]):
             raise ValueError("Function mode requires a 'process' function")
         
-        # Process template variables in arguments
-        processed_args = [process_template_value(arg, context) for arg in args]
-        processed_kwargs = {
-            k: process_template_value(v, context)
-            for k, v in kwargs.items()
-        }
+        # Get processed inputs
+        processed = config.process_inputs()
+        args = processed.get("args", [])
+        kwargs = processed.get("kwargs", {})
+        
+        # Convert string arguments to Python objects if needed
+        processed_args = []
+        for arg in args:
+            if isinstance(arg, str):
+                try:
+                    import ast
+                    processed_args.append(ast.literal_eval(arg))
+                except (ValueError, SyntaxError):
+                    processed_args.append(arg)
+            else:
+                processed_args.append(arg)
         
         # Call the function with processed arguments
-        result = local_vars["process"](*processed_args, **processed_kwargs)
+        result = local_vars["process"](*processed_args, **kwargs)
         return result
     except Exception as e:
         if isinstance(e, TemplateError):
             raise
         raise TemplateError(f"Failed to execute function: {str(e)}")
+
+
+def handle_multiply_operation(config: TaskConfig) -> Dict[str, Any]:
+    """Handle multiply operation with TaskConfig support.
+    
+    Args:
+        config: TaskConfig object containing operation parameters
+        
+    Returns:
+        Dict containing the multiplication result
+        
+    Raises:
+        TemplateError: If operation fails
+    """
+    processed = config.process_inputs()
+    
+    # Get numbers from inputs or context
+    numbers = processed.get("numbers", [])
+    if isinstance(numbers, str):
+        try:
+            import ast
+            numbers = ast.literal_eval(numbers)
+        except (ValueError, SyntaxError) as e:
+            raise TemplateError(f"Invalid numbers format: {str(e)}")
+    
+    if "item" in processed:
+        item = processed["item"]
+        if isinstance(item, (int, float)):
+            numbers = [float(item)]
+        elif isinstance(item, list):
+            numbers = [float(x) for x in item]
+        else:
+            raise TemplateError(f"Item must be a number or list of numbers, got {type(item)}")
+    if not numbers:
+        raise TemplateError("Numbers must be a non-empty list")
+
+    # Get factor from inputs
+    try:
+        factor = float(processed.get("factor", 1))
+    except (TypeError, ValueError) as e:
+        raise TemplateError(f"Invalid factor: {str(e)}")
+
+    try:
+        # If we're processing a batch item, multiply it by the factor
+        if "item" in processed:
+            results = [num * factor for num in numbers]
+            # Return single value if input was single value
+            if isinstance(processed["item"], (int, float)):
+                return {"result": float(results[0])}  # Ensure float type
+            return {"result": [float(r) for r in results]}  # Ensure float type
+
+        # Otherwise multiply all numbers together and then by the factor
+        multiply_result: float = 1.0  # Explicitly declare as float
+        for num in numbers:
+            multiply_result *= float(num)
+        multiply_result *= factor
+        return {"result": multiply_result}
+    except (TypeError, ValueError) as e:
+        raise TemplateError(f"Failed to multiply numbers: {str(e)}")
+
+
+def handle_divide_operation(config: TaskConfig) -> Dict[str, Any]:
+    """Handle divide operation with TaskConfig support.
+    
+    Args:
+        config: TaskConfig object containing operation parameters
+        
+    Returns:
+        Dict containing the division result
+        
+    Raises:
+        TemplateError: If operation fails
+    """
+    processed = config.process_inputs()
+    
+    # Get dividend from inputs or context
+    dividend = processed.get("dividend")
+    if "item" in processed:
+        dividend = processed["item"]
+    if dividend is None:
+        raise TemplateError("Dividend must be provided for divide operation")
+
+    # Get divisor from inputs
+    divisor = float(processed.get("divisor", 1))
+    if divisor == 0:
+        raise TemplateError("Division by zero")
+
+    try:
+        # Convert dividend to float and perform division
+        dividend = float(dividend)
+        if dividend == 0:
+            raise TemplateError("Cannot divide zero by a number")
+        division_result = dividend / divisor
+        return {"result": division_result}
+    except (TypeError, ValueError) as e:
+        raise TemplateError(f"Invalid input for division: {str(e)}")
+
+
+def handle_custom_operation(config: TaskConfig) -> Dict[str, Any]:
+    """Handle custom operation with TaskConfig support.
+    
+    Args:
+        config: TaskConfig object containing operation parameters
+        
+    Returns:
+        Dict containing the custom operation result
+        
+    Raises:
+        TemplateError: If operation fails
+    """
+    processed = config.process_inputs()
+    handler = processed.get("handler")
+    
+    if not handler or not callable(handler):
+        raise TemplateError("Custom handler must be a callable")
+
+    try:
+        # Prepare arguments
+        args = processed.get("args", [])
+        kwargs = processed.get("kwargs", {})
+
+        # Check if handler accepts item parameter
+        sig = inspect.signature(handler)
+        accepts_item = len(sig.parameters) > 0
+
+        # Pass item as first argument only if handler accepts parameters
+        if "item" in processed and accepts_item:
+            custom_result = handler(processed["item"], *args, **kwargs)
+        else:
+            custom_result = handler(*args, **kwargs)
+
+        if isinstance(custom_result, Exception):
+            raise custom_result
+        return {"result": custom_result}
+    except Exception as e:
+        if isinstance(e, TemplateError):
+            raise
+        raise TemplateError(f"Custom handler failed: {str(e)}")
 
 
 @register_task("print_vars")
@@ -166,148 +311,84 @@ def print_vars_task(
 
 
 @register_task("python")
-def python_task(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: Union[str, Path]
-) -> Dict[str, Any]:
+def python_task(config: TaskConfig) -> Dict[str, Any]:
     """Execute a Python task with the given operation and inputs.
-
+    
     The task supports two modes:
     1. Operation mode: Execute predefined operations (multiply, divide, custom)
     2. Code mode: Execute arbitrary Python code
-
+    
     Args:
-        step: The step configuration containing the operation/code and inputs
-        context: The execution context
-        workspace: The workspace path
-
+        config: TaskConfig object containing task configuration
+        
     Returns:
         Dict containing the result of the operation/code
-
+        
     Raises:
         TemplateError: If task execution fails
+        
+    Example YAML usage:
+        ```yaml
+        steps:
+          - name: multiply_numbers
+            task: python
+            inputs:
+              operation: multiply
+              numbers: [2, 3, 4]
+              factor: 2
+              
+          - name: execute_code
+            task: python
+            inputs:
+              code: |
+                x = 10
+                y = 20
+                result = x + y
+              
+          - name: function_mode
+            task: python
+            inputs:
+              operation: function
+              code: |
+                def process(x, y):
+                    return x + y
+              args: ["{{ args.x }}", "{{ args.y }}"]
+        ```
     """
     try:
-        logger = get_task_logger(workspace, step.get("name", "python"))
-        workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
-        log_task_execution(logger, step, context, workspace_path)
+        logger = get_task_logger(config.workspace, config.name)
+        log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+
+        # Process inputs first to handle any templates
+        processed = config.process_inputs()
 
         # Check for code execution mode
-        if "code" in step:
-            code = step["code"]
-            inputs = step.get("inputs", {})
-            result = execute_code(code, inputs, context)
-            return {"result": result}
+        if "code" in processed:
+            if "operation" not in processed:
+                result = execute_code(processed["code"], config)
+                return {"result": result}
+            elif processed["operation"] == "function":
+                result = execute_function(processed["code"], config)
+                return {"result": result}
 
         # Operation mode
-        inputs = step.get("inputs", {})
-        operation = inputs.get("operation")
+        operation = processed.get("operation")
 
         if not operation:
-            raise ValueError("Either code or operation must be specified for Python task")
+            raise TemplateError("Either code or operation must be specified for Python task")
 
+        # Handle different operations
         if operation == "multiply":
-            # Get numbers from inputs or context
-            numbers = inputs.get("numbers", [])
-            if "item" in inputs:
-                item = inputs["item"]
-                if isinstance(item, (int, float)):
-                    numbers = [float(item)]
-                elif isinstance(item, list):
-                    numbers = [float(x) for x in item]
-                else:
-                    raise ValueError(
-                        f"Item must be a number or list of numbers, got {type(item)}"
-                    )
-            if not numbers:
-                raise ValueError("Numbers must be a non-empty list")
-
-            # Get factor from inputs
-            factor = float(inputs.get("factor", 1))
-
-            # If we're processing a batch item, multiply it by the factor
-            if "item" in inputs:
-                results = [num * factor for num in numbers]
-                # Return single value if input was single value
-                if isinstance(inputs["item"], (int, float)):
-                    return {"result": float(results[0])}  # Ensure float type
-                return {"result": [float(r) for r in results]}  # Ensure float type
-
-            # Otherwise multiply all numbers together and then by the factor
-            multiply_result: float = 1.0  # Explicitly declare as float
-            for num in numbers:
-                multiply_result *= float(num)
-            multiply_result *= factor
-            return {"result": multiply_result}
-
+            return handle_multiply_operation(config)
         elif operation == "divide":
-            # Get dividend from inputs or context
-            dividend = inputs.get("dividend")
-            if "item" in inputs:
-                dividend = inputs["item"]
-            if dividend is None:
-                raise ValueError("Dividend must be provided for divide operation")
-
-            # Get divisor from inputs
-            divisor = float(inputs.get("divisor", 1))
-            if divisor == 0:
-                raise ValueError("Division by zero")
-
-            # Convert dividend to float and perform division
-            try:
-                dividend = float(dividend)
-                if dividend == 0:
-                    raise ValueError("Cannot divide zero by a number")
-                division_result = dividend / divisor
-                return {"result": division_result}
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"Invalid input for division: {e}")
-
+            return handle_divide_operation(config)
         elif operation == "custom":
-            handler = inputs.get("handler")
-            if not handler or not callable(handler):
-                raise ValueError("Custom handler must be a callable")
-
-            # Prepare arguments
-            args = inputs.get("args", [])
-            kwargs = inputs.get("kwargs", {})
-
-            # Check if handler accepts item parameter
-            sig = inspect.signature(handler)
-            accepts_item = len(sig.parameters) > 0
-
-            # Pass item as first argument only if handler accepts parameters
-            try:
-                if "item" in inputs and accepts_item:
-                    custom_result = handler(inputs["item"], *args, **kwargs)
-                else:
-                    custom_result = handler(*args, **kwargs)
-
-                if isinstance(custom_result, Exception):
-                    raise custom_result
-                return {"result": custom_result}
-            except Exception as e:
-                log_task_error(logger, e)  # Pass the actual exception
-                raise TemplateError(f"Custom handler failed: {str(e)}")
-
-        elif operation == "function":
-            # Get function code and arguments
-            if "code" not in inputs:
-                raise ValueError("Function mode requires 'code' parameter")
-            
-            code = inputs["code"]
-            args = inputs.get("args", [])
-            kwargs = inputs.get("kwargs", {})
-            
-            # Execute the function with context for template resolution
-            result = execute_function(code, args, kwargs, context)
-            return {"result": result}
-
+            return handle_custom_operation(config)
         else:
-            raise ValueError(f"Unknown operation: {operation}")
+            raise TemplateError(f"Unknown operation: {operation}")
 
-    except ValueError as e:
-        raise TemplateError(str(e))
     except Exception as e:
-        if not isinstance(e, TemplateError):
-            raise TemplateError(f"Python task failed: {str(e)}")
-        raise
+        log_task_error(logger, e)
+        if isinstance(e, TemplateError):
+            raise
+        raise TemplateError(f"Python task failed: {str(e)}")
