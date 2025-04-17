@@ -241,9 +241,10 @@ Key Benefits:
      ```
    
    Batch Task:
-   - [x] Remove direct template resolution
-   - [x] Use engine's resolution method
+   - [-] Remove direct template resolution (partially complete)
+   - [-] Use engine's resolution method (partially complete)
    - [x] Update tests
+   - [ ] TODO: Remove batch_processor.resolve_template and use engine.resolve_template
    - [ ] After tests pass:
      ```bash
      cat > commit.txt << 'EOF'
