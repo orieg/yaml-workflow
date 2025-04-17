@@ -103,7 +103,7 @@ def execute_function(code: str, config: TaskConfig) -> Any:
     """
     try:
         # Create a new dictionary for local variables
-        local_vars = {}
+        local_vars: Dict[str, Any] = {}
 
         # Execute the code to define the function
         exec(code, {}, local_vars)
@@ -367,7 +367,8 @@ def python_task(config: TaskConfig) -> Dict[str, Any]:
         ```
     """
     try:
-        logger = get_task_logger(config.workspace, config.name)
+        task_name = config.name if config.name is not None else "python_task"
+        logger = get_task_logger(config.workspace, task_name)
         log_task_execution(
             logger,
             {"name": config.name, "type": config.type},
