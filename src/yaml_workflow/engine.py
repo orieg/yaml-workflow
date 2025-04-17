@@ -26,7 +26,7 @@ from .exceptions import (
     TemplateError,
 )
 from .state import WorkflowState
-from .tasks import get_task_handler
+from .tasks import get_task_handler, TaskConfig
 from .workspace import create_workspace, get_workspace_info
 from .template import TemplateEngine
 
@@ -457,7 +457,7 @@ class WorkflowEngine:
                         self.state.mark_step_failed(name, str(e))
                         raise WorkflowError(f"Error in step {name}: {str(e)}") from e
 
-                result = handler(step, self.context, self.workspace)
+                result = self._call_task_handler(handler, step)
                 self.logger.debug(
                     f"Task returned result of type {type(result)}: {result}"
                 )
@@ -616,46 +616,78 @@ class WorkflowEngine:
         """
         return self.template_engine.process_value(inputs, self.context)
 
-    def execute_step(self, step: Dict[str, Any]) -> None:
+    def _call_task_handler(self, handler: Any, step: Dict[str, Any]) -> Any:
         """
-        Execute a single workflow step.
-
+        Call a task handler with the appropriate signature.
+        
+        This method checks if the handler accepts TaskConfig and calls it accordingly.
+        
         Args:
-            step: Step definition from workflow
+            handler: The task handler function
+            step: The step configuration
+            
+        Returns:
+            Any: The result from the task handler
         """
-        name = step.get("name", "unnamed_step")
-        self.logger.info(f"Running step: {name}")
-        self.current_step = step  # Set current step for error handling
+        # Get handler signature
+        sig = inspect.signature(handler)
+        params = list(sig.parameters.values())
+        
+        # Check if handler accepts TaskConfig
+        if len(params) == 1 and params[0].annotation == TaskConfig:
+            # Create TaskConfig and call handler
+            config = TaskConfig(step, self.context, self.workspace)
+            return handler(config)
+        else:
+            # Call with original signature
+            return handler(step, self.context, self.workspace)
+
+    def execute_step(self, step: Dict[str, Any]) -> None:
+        """Execute a single workflow step."""
+        name = step.get("name")
+        if not name:
+            raise WorkflowError("Step missing required 'name' field")
+
+        self.current_step = name
+        self.logger.info(f"Executing step: {name}")
 
         try:
-            # Import module
+            task_type = step.get("task")
+            if not task_type:
+                raise WorkflowError(f"No task type specified for step: {name}")
+
+            # Get task handler
+            handler = get_task_handler(task_type)
+            if not handler:
+                raise WorkflowError(f"Unknown task type: {task_type}")
+
+            # Run task with appropriate signature
+            self.logger.info(f"Running step {name}")
             try:
-                module = importlib.import_module(step["module"])
-            except ImportError as e:
-                raise ModuleNotFoundError(name, step["module"]) from e
+                # Call on_step_start callback if defined
+                if hasattr(self, "on_step_start") and self.on_step_start:
+                    try:
+                        self.on_step_start(name)
+                    except Exception as e:
+                        self.state.mark_step_failed(name, str(e))
+                        raise WorkflowError(f"Error in step {name}: {str(e)}") from e
 
-            # Get function
-            try:
-                func = getattr(module, step["function"])
-            except AttributeError as e:
-                raise FunctionNotFoundError(name, step["module"], step["function"]) from e
-
-            # Prepare inputs
-            inputs = self.resolve_inputs(step.get("inputs", {}))
-
-            # Add workspace to inputs if function accepts it
-            sig = inspect.signature(func)
-            if "workspace" in sig.parameters and self.workspace:
-                inputs["workspace"] = self.workspace
-
-            self.logger.info(f"Step inputs: {inputs}")
-
-            # Execute function
-            try:
-                result = func(**inputs)
-                self.logger.debug(f"Task returned result of type {type(result)}: {result}")
+                result = self._call_task_handler(handler, step)
+                self.logger.debug(
+                    f"Task returned result of type {type(result)}: {result}"
+                )
+                # Update context with step result
+                self.context[name] = result
+                # Update workflow state
+                self.state.mark_step_complete(name, {name: result})
             except Exception as e:
-                raise StepExecutionError(name, e) from e
+                # Handle error according to on_error configuration
+                result = self._handle_step_error(step, e)
+                if result is None:
+                    # Error handling indicated workflow should fail
+                    raise WorkflowError(f"Error in step {name}: {str(e)}") from e
+                # Error was handled, store result and continue
+                self.context[name] = result
 
             # Store outputs in context
             outputs: Union[List[str], str, None] = step.get("outputs")
@@ -718,84 +750,62 @@ class WorkflowEngine:
     def _handle_step_error(
         self, step: Dict[str, Any], error: Exception
     ) -> Optional[Dict[str, Any]]:
-        """
-        Handle step error according to on_error configuration.
+        """Handle step execution error according to on_error configuration."""
+        name = step.get("name", "unknown")
+        message = str(error)
 
-        Args:
-            step: Step definition from workflow
-            error: Exception that occurred
-
-        Returns:
-            Optional[Dict[str, Any]]: Step result if error was handled, None if workflow should fail
-        """
-        name = step.get("name", "unnamed_step")
+        # Get error handling configuration
         on_error = step.get("on_error", {})
         if not on_error:
             # No error handling configured, mark as failed and re-raise
-            self.state.mark_step_failed(name, str(error))
-            raise WorkflowError(f"Error in step {name}: {str(error)}")
+            self.state.mark_step_failed(name, message)
+            return None
 
+        # Get error handling action
         action = on_error.get("action", "fail")
-        message = on_error.get("message", str(error))
         next_step = on_error.get("next")
 
-        # Render error message template if it contains variables
-        if "{{" in message and "}}" in message:
+        # Handle error message template
+        error_message = on_error.get("message", message)
+        if isinstance(error_message, str):
             try:
-                message = self.template_engine.process_template(message, {**self.context, "error": str(error)})
+                template = Template(
+                    error_message,
+                    undefined=StrictUndefined
+                )
+                message = template.render(error=message)
             except Exception as e:
                 self.logger.warning(f"Failed to render error message template: {e}")
 
-        self.logger.error(f"Step '{name}' failed: {message}")
-
-        if action == "fail":
-            # Mark as failed and stop workflow
+        if action == "continue":
+            # Mark as failed but continue workflow
             self.state.mark_step_failed(name, message)
-            raise WorkflowError(message)
-        elif action == "continue" or action == "skip":
-            # Mark as failed but return empty result to continue
-            self.state.mark_step_failed(name, message)
-            return {}
+            return {"error": message}
         elif action == "retry":
-            # Check if retry configuration exists
+            # Get retry configuration
             retry_config = step.get("retry", {})
-            if not retry_config:
-                self.logger.warning(
-                    "Retry action specified but no retry configuration found"
-                )
-                self.state.mark_step_failed(name, message)
-                raise WorkflowError(f"No retry configuration found for step {name}")
-
             max_attempts = retry_config.get("max_attempts", 3)
-            delay = retry_config.get("delay", 5)
-            backoff = retry_config.get("backoff", 2)
+            delay = retry_config.get("delay", 0)
+            backoff = retry_config.get("backoff", 1)
 
-            # Get current attempt count from state
+            # Get current retry state
             retry_state = self.state.get_retry_state(name)
-            attempt = retry_state.get("attempt", 1)
-
-            if attempt >= max_attempts:
-                self.logger.error(f"Step '{name}' failed after {attempt} attempts")
-                error_message = f"{message} (after {attempt} attempts)"
-                # Mark step as failed and clear retry state
-                self.state.mark_step_failed(name, error_message)
-                self.state.clear_retry_state(name)
-                raise WorkflowError(f"Step {name} failed after {attempt} attempts: {message}")
+            attempt = retry_state + 1 if isinstance(retry_state, int) else 1
 
             # Update retry state
-            self.state.update_retry_state(
-                name,
-                {
-                    "attempt": attempt + 1,
-                    "last_error": message,
-                    "last_attempt": datetime.now().isoformat(),
-                },
-            )
+            self.state.update_retry_state(name, attempt)
 
-            # Wait before retry with exponential backoff
+            if attempt >= max_attempts:
+                # Max retries exceeded
+                error_message = f"Failed after {attempt} attempts: {message}"
+                self.state.mark_step_failed(name, error_message)
+                self.state.clear_retry_state(name)
+                return None
+
+            # Calculate wait time with exponential backoff
             wait_time = delay * (backoff ** (attempt - 1))
             self.logger.info(
-                f"Retrying step '{name}' in {wait_time} seconds (attempt {attempt + 1}/{max_attempts})"
+                f"Retrying step '{name}' in {wait_time} seconds (attempt {attempt}/{max_attempts})"
             )
             time.sleep(wait_time)
 
@@ -804,7 +814,7 @@ class WorkflowEngine:
                 handler = get_task_handler(step["task"])
                 if handler is None:
                     raise WorkflowError(f"Unknown task type: {step['task']}")
-                result = handler(step, self.context, self.workspace)
+                result = self._call_task_handler(handler, step)
                 # Clear retry state on success
                 self.state.clear_retry_state(name)
                 # Mark step as completed
@@ -813,7 +823,7 @@ class WorkflowEngine:
             except Exception as retry_error:
                 # Get updated retry state to check attempt count
                 retry_state = self.state.get_retry_state(name)
-                attempt = retry_state.get("attempt", 1)
+                attempt = retry_state if isinstance(retry_state, int) else 1
                 
                 if attempt >= max_attempts:
                     # If this was the last retry, mark as failed and clear retry state
@@ -843,11 +853,15 @@ class WorkflowEngine:
                         "message": message,
                         "error": str(error),
                     }
-                    handler(notify_step, self.context, self.workspace)
+                    # Execute notification task but still fail the workflow
+                    result = self._call_task_handler(handler, notify_step)
+                    self.context[name] = result
+                    self.state.mark_step_complete(name, {name: result})
                 except Exception as notify_error:
                     self.logger.error(
                         f"Failed to execute notification task: {notify_error}"
                     )
+            # Always raise WorkflowError after notification
             raise WorkflowError(message)
         else:
             self.logger.error(f"Unknown error action: {action}")

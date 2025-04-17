@@ -1,164 +1,139 @@
 """Template engine implementation using Jinja2."""
-from functools import lru_cache
-import hashlib
-from typing import Any, Dict, Optional
-from jinja2 import Environment, StrictUndefined, Template, TemplateError as Jinja2TemplateError
+from typing import Any, Dict, Iterator, Tuple
+from jinja2 import Environment, StrictUndefined, Template
 from jinja2.exceptions import UndefinedError, TemplateSyntaxError
 
 from .exceptions import TemplateError
 
 
+class AttrDict(dict):
+    """A dictionary that allows attribute access to its keys."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for k, v in list(super().items()):
+            if isinstance(v, dict) and not isinstance(v, AttrDict):
+                self[k] = AttrDict(v)
+            elif isinstance(v, (list, tuple)):
+                self[k] = [AttrDict(i) if isinstance(i, dict) else i for i in v]
+
+    def __getattr__(self, key: str) -> Any:
+        try:
+            # Always check the dictionary first
+            if key in self:
+                # print(f"DEBUG: Accessing key '{key}' with value: {self[key]}")
+                return self[key]
+            # If the key doesn't exist, try to get it as a method
+            if key in dir(dict):
+                # print(f"DEBUG: Accessing dict method '{key}' on AttrDict")
+                method = getattr(super(), key)
+                # If it's a callable method, call it immediately
+                if callable(method):
+                    result = method()
+                    # print(f"DEBUG: Method result: {result}")
+                    return result
+                return method
+            # print(f"DEBUG: Key '{key}' not found")
+            raise KeyError(key)
+        except KeyError as e:
+            # print(f"DEBUG: KeyError accessing '{key}': {str(e)}")
+            raise AttributeError(key)
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        self[key] = value
+
+    def items(self):
+        """Override items to ensure it returns a list of tuples."""
+        return list(super().items())
+
+
 class TemplateEngine:
-    """Process Jinja2 templates with caching."""
+    """Template engine for processing Jinja2 templates."""
 
-    def __init__(self, cache_size: int = 128):
-        """Initialize the template engine.
+    def __init__(self):
+        """Initialize the template engine with strict undefined behavior."""
+        self.env = Environment(
+            undefined=StrictUndefined,
+            autoescape=False,
+            trim_blocks=True,
+            lstrip_blocks=True
+        )
 
-        Args:
-            cache_size: Maximum number of templates to cache
-        """
-        self.env = Environment(undefined=StrictUndefined)
-        self._compile_template = lru_cache(maxsize=cache_size)(self._compile_template_uncached)
-
-    def _hash_template(self, template_str: str) -> str:
-        """Create a hash for the template string.
-
-        Args:
-            template_str: Template string to hash
-
-        Returns:
-            str: Hash of the template string
-        """
-        return hashlib.sha256(template_str.encode()).hexdigest()
-
-    def _compile_template_uncached(self, template_hash: str, template_str: str) -> Template:
-        """Compile a template string into a Template object.
-
-        Args:
-            template_hash: Hash of the template string
-            template_str: Template string to compile
-
-        Returns:
-            Template: Compiled template
-        """
-        try:
-            return self.env.from_string(template_str)
-        except TemplateSyntaxError as e:
-            raise TemplateError(f"Template syntax error at line {e.lineno}: {str(e)}")
-        except Jinja2TemplateError as e:
-            raise TemplateError(f"Failed to compile template: {str(e)}")
-
-    def _get_variables_with_types(self, variables: Dict[str, Any], prefix: str = "") -> Dict[str, str]:
-        """Get variables with their types.
-
-        Args:
-            variables: Dictionary of variables
-            prefix: Prefix for nested variables
-
-        Returns:
-            Dict[str, str]: Dictionary mapping variable names to their types
-        """
-        result = {}
-        for key, value in variables.items():
-            full_key = f"{prefix}{key}" if prefix else key
-            if isinstance(value, dict):
-                result[full_key] = f"dict[{len(value)} items]"
-                nested = self._get_variables_with_types(value, f"{full_key}.")
-                result.update(nested)
-            elif isinstance(value, str):
-                result[full_key] = f"str[{len(value)}]"
-            else:
-                result[full_key] = type(value).__name__
-        return result
-
-    def get_available_variables(self, variables: Dict[str, Any]) -> Dict[str, Any]:
-        """Get available variables.
-
-        Args:
-            variables: Dictionary of variables
-
-        Returns:
-            Dict[str, Any]: Dictionary of available variables
-        """
-        root_vars = {
-            "workflow_name": variables.get("workflow_name", ""),
-            "workspace": variables.get("workspace", ""),
-            "run_number": variables.get("run_number", ""),
-            "timestamp": variables.get("timestamp", ""),
-            "workflow_file": variables.get("workflow_file", "")
-        }
-        return {
-            "args": variables.get("args", {}),
-            "env": variables.get("env", {}),
-            "steps": variables.get("steps", {}),
-            "root": root_vars
-        }
-
-    def get_variables_with_types(self, variables: Dict[str, Any]) -> Dict[str, str]:
-        """Get variables with their types.
-
-        Args:
-            variables: Dictionary of variables
-
-        Returns:
-            Dict[str, str]: Dictionary mapping variable names to their types
-        """
-        return self._get_variables_with_types(variables)
-
-    def process_template(self, template_str: str, variables: Dict[str, Any]) -> str:
+    def process_template(self, template_str: str, variables: Dict[str, Any] = None) -> str:
         """Process a template string with the given variables.
-
+        
         Args:
-            template_str: The template string to process
-            variables: Dictionary of variables to use in template processing
-
+            template_str (str): The template string to process.
+            variables (dict, optional): Variables to use in template processing.
+                Defaults to None.
+        
         Returns:
-            str: The processed template string
-
+            str: The processed template string.
+        
         Raises:
-            TemplateError: If there is an error processing the template
+            TemplateError: If there is an error processing the template.
         """
         try:
-            template_hash = self._hash_template(template_str)
-            template = self._compile_template(template_hash, template_str)
-            return template.render(**variables)
-        except UndefinedError as e:
-            # Clear cache for failed templates
-            self._compile_template.cache_clear()
+            # Create a new template with the configured environment
+            template = self.env.from_string(template_str)
             
-            # Extract variable name from error message
-            error_str = str(e)
-            if "'is undefined'" in error_str:
-                # Handle direct undefined variable
-                var_parts = error_str.split("'")
-                var_name = var_parts[1] if len(var_parts) > 1 else "unknown"
+            # Convert variables to AttrDict for proper attribute access
+            context = AttrDict(variables or {})
+            # print(f"\nDEBUG: Template context:")
+            # for k, v in context.items():
+            #     print(f"  {k}: {type(v)} = {v}")
+            # if 'args' in context:
+            #     print("\nDEBUG: Args content:")
+            #     for k, v in context['args'].items():
+            #         print(f"  {k}: {type(v)} = {v}")
+            
+            # Process the template with the wrapped variables
+            return template.render(**context)
+
+        except UndefinedError as e:
+            # Extract the undefined variable name from the error message
+            error_msg = str(e)
+            if "'is undefined'" in error_msg:
+                var_name = error_msg.split("'")[1]
             else:
-                # Handle attribute error
-                var_parts = template_str.split("{{")[1].split("}}")[0].strip().split(".")
-                var_name = ".".join(var_parts)
+                # Handle attribute error (e.g., 'dict object' has no attribute 'nonexistent')
+                var_parts = error_msg.split("'")
+                if len(var_parts) >= 2:
+                    var_name = var_parts[-2]
+                else:
+                    var_name = "unknown"
 
-            namespace = var_name.split('.')[0] if '.' in var_name else None
+            # Get available variables in the relevant namespace
+            if variables:
+                # Extract namespace from template string
+                for line in template_str.split('\n'):
+                    if var_name in line:
+                        # Look for namespace.variable pattern
+                        parts = line.split('.')
+                        if len(parts) > 1:
+                            namespace = parts[0].split('{')[-1].strip()
+                            var_name = f"{namespace}.{var_name}"
+                            if namespace in variables:
+                                error_msg = (
+                                    f"Undefined variable '{var_name}'.\n"
+                                    f"Available variables in '{namespace}' namespace:\n"
+                                )
+                                for key in sorted(variables[namespace].keys()):
+                                    error_msg += f"  - {namespace}.{key}\n"
+                                raise TemplateError(error_msg)
+                            break
 
-            # Get available variables with types
-            available = self._get_variables_with_types(variables)
+            # If no namespace found or no variables provided
+            error_msg = f"Undefined variable '{var_name}'.\nAvailable variables:\n"
+            if variables:
+                for key in sorted(variables.keys()):
+                    error_msg += f"  - {key}\n"
+            raise TemplateError(error_msg)
 
-            # Build helpful error message
-            msg = f"Variable '{var_name}' is undefined."
-            if namespace and namespace in variables:
-                namespace_vars = self._get_variables_with_types(variables[namespace])
-                msg += f"\nAvailable variables in '{namespace}' namespace:"
-                for var, type_name in namespace_vars.items():
-                    msg += f"\n  '{var}': '{type_name}'"
-
-            msg += "\nAll available variables:"
-            for var, type_name in available.items():
-                msg += f"\n  '{var}': '{type_name}'"
-
-            raise TemplateError(msg)
         except TemplateSyntaxError as e:
-            # Clear cache for failed templates
-            self._compile_template.cache_clear()
-            raise TemplateError(f"Template syntax error at line {e.lineno}: {str(e)}")
+            raise TemplateError(f"Template syntax error: {str(e)}")
+        except Exception as e:
+            # print(f"\nDEBUG: Exception during template processing: {type(e)} - {str(e)}")
+            raise TemplateError(f"Error processing template: {str(e)}")
 
     def process_value(self, value: Any, variables: Dict[str, Any]) -> Any:
         """Process a value that may contain templates.
@@ -176,22 +151,4 @@ class TemplateEngine:
             return {k: self.process_value(v, variables) for k, v in value.items()}
         elif isinstance(value, list):
             return [self.process_value(item, variables) for item in value]
-        return value
-
-    def clear_cache(self) -> None:
-        """Clear the template cache."""
-        self._compile_template.cache_clear()
-
-    def get_cache_info(self) -> Dict[str, int]:
-        """Get information about the template cache.
-
-        Returns:
-            Dict[str, int]: Dictionary with cache statistics
-        """
-        info = self._compile_template.cache_info()
-        return {
-            "hits": info.hits,
-            "misses": info.misses,
-            "maxsize": info.maxsize,
-            "currsize": info.currsize
-        } 
+        return value 
