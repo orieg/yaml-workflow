@@ -78,6 +78,9 @@ class TaskConfig:
         """
         Process task inputs with template resolution.
 
+        Recursively processes all string values in the inputs dictionary,
+        including nested dictionaries and lists.
+
         Returns:
             Dict[str, Any]: Processed inputs with resolved templates
         """
@@ -90,21 +93,47 @@ class TaskConfig:
                 **{k: v for k, v in self._context.items() if k not in ["args", "env", "steps"]}
             }
             
-            for key, value in self.inputs.items():
-                if isinstance(value, str):
-                    try:
-                        self._processed_inputs[key] = self._template_engine.process_template(value, template_context)
-                    except UndefinedError as e:
-                        error_msg = str(e)
-                        namespace = self._get_undefined_namespace(error_msg)
-                        available = self.get_available_variables()
-                        raise TemplateError(
-                            f"Failed to resolve template variable in input '{key}' in namespace '{namespace}'. "
-                            f"Error: {error_msg}. Available variables: {available[namespace]}"
-                        )
-                else:
-                    self._processed_inputs[key] = value
+            self._processed_inputs = self._process_value(self.inputs, template_context)
         return self._processed_inputs
+
+    def _process_value(self, value: Any, template_context: Dict[str, Any]) -> Any:
+        """
+        Recursively process a value with template resolution.
+
+        Args:
+            value: Value to process
+            template_context: Template context for variable resolution
+
+        Returns:
+            Any: Processed value with resolved templates
+        """
+        if isinstance(value, str):
+            try:
+                result = self._template_engine.process_template(value, template_context)
+                # Try to convert string results back to their original type
+                if result == 'True':
+                    return True
+                elif result == 'False':
+                    return False
+                try:
+                    if '.' in result:
+                        return float(result)
+                    return int(result)
+                except (ValueError, TypeError):
+                    return result
+            except UndefinedError as e:
+                error_msg = str(e)
+                namespace = self._get_undefined_namespace(error_msg)
+                available = self.get_available_variables()
+                raise TemplateError(
+                    f"Template error: Undefined variable in namespace '{namespace}'. "
+                    f"Error: {error_msg}. Available variables in '{namespace}' namespace: {available[namespace]}"
+                )
+        elif isinstance(value, dict):
+            return {k: self._process_value(v, template_context) for k, v in value.items()}
+        elif isinstance(value, list):
+            return [self._process_value(item, template_context) for item in value]
+        return value
 
     def _get_undefined_namespace(self, error_msg: str) -> str:
         """

@@ -1,3 +1,5 @@
+"""Tests for task configuration."""
+
 import pytest
 from pathlib import Path
 
@@ -66,8 +68,10 @@ def test_task_config_process_inputs(task_config):
     processed = task_config.process_inputs()
     assert processed["command"] == "echo 'Hello World'"
     assert processed["working_dir"] == "/tmp"
-    assert processed["env"]["PATH"] == "/usr/bin"
-    assert processed["env"]["USER"] == "test"
+    assert processed["env"] == {
+        "PATH": "/usr/bin",
+        "USER": "test"
+    }
 
 
 def test_task_config_undefined_variable():
@@ -77,7 +81,7 @@ def test_task_config_undefined_variable():
             "name": "test_undefined",
             "task": "shell",
             "inputs": {
-                "command": "echo '{{ undefined_var }}'"
+                "command": "echo '{{ args.missing }}'"
             }
         },
         {"args": {}, "env": {}, "steps": {}},
@@ -86,8 +90,9 @@ def test_task_config_undefined_variable():
     
     with pytest.raises(TemplateError) as exc:
         config.process_inputs()
-    assert "undefined_var" in str(exc.value)
-    assert "Available variables" in str(exc.value)
+    error_msg = str(exc.value)
+    assert "Template error: Undefined variable 'args.missing'" in error_msg
+    assert "Available variables in 'args' namespace:" in error_msg
 
 
 def test_task_config_invalid_namespace():
@@ -106,11 +111,12 @@ def test_task_config_invalid_namespace():
     
     with pytest.raises(TemplateError) as exc:
         config.process_inputs()
-    assert "invalid" in str(exc.value)
-    assert "namespace" in str(exc.value).lower()
+    error_msg = str(exc.value)
+    assert "Template error: Invalid namespace 'invalid'" in error_msg
+    assert "Available namespaces:" in error_msg
 
 
-def test_task_config_nested_variables(task_config):
+def test_task_config_nested_variables():
     """Test handling of nested variable access."""
     config = TaskConfig(
         {
@@ -133,10 +139,10 @@ def test_task_config_nested_variables(task_config):
     
     processed = config.process_inputs()
     assert processed["command"] == "echo 'test'"
-    assert processed["env"]["HOME"] == "/home/test"
+    assert processed["env"] == {"HOME": "/home/test"}
 
 
-def test_task_config_step_outputs(task_config):
+def test_task_config_step_outputs():
     """Test access to step outputs."""
     config = TaskConfig(
         {
@@ -163,7 +169,7 @@ def test_task_config_step_outputs(task_config):
     assert processed["command"] == "cat /tmp/output.txt"
 
 
-def test_task_config_complex_template(task_config):
+def test_task_config_complex_template():
     """Test processing of complex template expressions."""
     config = TaskConfig(
         {
@@ -188,4 +194,64 @@ def test_task_config_complex_template(task_config):
     )
     
     processed = config.process_inputs()
-    assert "Debug: Hello" in processed["command"] 
+    assert "Debug: Hello" in processed["command"]
+
+
+def test_task_config_deep_nesting():
+    """Test processing of deeply nested structures including lists."""
+    config = TaskConfig(
+        {
+            "name": "test_deep",
+            "task": "shell",
+            "inputs": {
+                "complex_structure": {
+                    "users": [
+                        {"name": "{{ args.users[0].name }}", "role": "{{ args.users[0].role }}"},
+                        {"name": "{{ args.users[1].name }}", "role": "{{ args.users[1].role }}"}
+                    ],
+                    "settings": {
+                        "paths": {
+                            "data": "{{ env.paths.data }}",
+                            "logs": ["{{ env.paths.logs[0] }}", "{{ env.paths.logs[1] }}"]
+                        },
+                        "flags": {
+                            "debug": "{{ env.debug }}",
+                            "features": ["{{ env.features[0] }}", "{{ env.features[1] }}"]
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "args": {
+                "users": [
+                    {"name": "alice", "role": "admin"},
+                    {"name": "bob", "role": "user"}
+                ]
+            },
+            "env": {
+                "paths": {
+                    "data": "/data",
+                    "logs": ["/var/log", "/tmp/log"]
+                },
+                "debug": True,
+                "features": ["feature1", "feature2"]
+            },
+            "steps": {}
+        },
+        Path("/tmp")
+    )
+    
+    processed = config.process_inputs()
+    assert processed["complex_structure"]["users"] == [
+        {"name": "alice", "role": "admin"},
+        {"name": "bob", "role": "user"}
+    ]
+    assert processed["complex_structure"]["settings"]["paths"] == {
+        "data": "/data",
+        "logs": ["/var/log", "/tmp/log"]
+    }
+    assert processed["complex_structure"]["settings"]["flags"] == {
+        "debug": True,
+        "features": ["feature1", "feature2"]
+    } 
