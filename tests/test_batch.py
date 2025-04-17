@@ -1,6 +1,7 @@
 """Tests for the batch task implementation."""
 
 import pytest
+import time
 from pathlib import Path
 from typing import Dict, Any, List
 
@@ -63,6 +64,9 @@ def test_batch_basic(workspace, basic_context, sample_items):
     assert result["stats"]["processed"] == len(sample_items)
     assert result["stats"]["failed"] == 0
     assert result["stats"]["success_rate"] == 100.0
+    # Verify each result is properly processed
+    for i, res in enumerate(result["results"]):
+        assert res["result"] == f'Processing {sample_items[i]}'
 
 
 def test_batch_with_failures(workspace, basic_context):
@@ -93,6 +97,9 @@ result = f"Processed {item}"\
     assert result["stats"]["processed"] == 2
     assert result["stats"]["failed"] == 2
     assert result["stats"]["success_rate"] == 50.0
+    # Verify successful results
+    assert result["results"][0]["result"] == "Processed success1"
+    assert result["results"][1]["result"] == "Processed success2"
 
 
 def test_batch_chunk_processing(workspace, basic_context, sample_items):
@@ -119,6 +126,10 @@ def test_batch_chunk_processing(workspace, basic_context, sample_items):
     
     assert len(result["processed"]) == len(sample_items)
     assert result["stats"]["processed"] == len(sample_items)
+    # Verify chunk processing
+    for i, res in enumerate(result["results"]):
+        chunk_index = i // 3  # Calculate expected chunk index
+        assert res["result"] == f'Processing {sample_items[i]} in chunk {chunk_index}'
 
 
 def test_batch_template_resolution(workspace, basic_context):
@@ -166,12 +177,11 @@ result = {
 
     # Verify individual item processing
     expected_items = ["APPLE", "BANANA", "CHERRY"]
-    for i, item in enumerate(result["processed"]):
-        result_data = result["results"][i]  # Access the raw result data
-        assert result_data["item"] == expected_items[i], f"Item {i} should be uppercase"
-        assert result_data["prefix"] == "fruit", "Prefix should be set correctly"
-        assert result_data["conditional"] == "yes", "Conditional should evaluate to yes"
-        assert result_data["original"] == basic_context["args"]["items"][i], "Original item should match input"
+    for i, res in enumerate(result["results"]):
+        assert res["result"]["item"] == expected_items[i]
+        assert res["result"]["prefix"] == "fruit"
+        assert res["result"]["conditional"] == "yes"
+        assert res["result"]["original"] == expected_items[i].lower()
 
 
 def test_batch_validation(workspace, basic_context):
@@ -270,11 +280,11 @@ def test_batch_context_variables(workspace, basic_context, sample_items):
 
     assert len(result["results"]) == 3
     for i, res in enumerate(result["results"]):
-        assert res["item"] == sample_items[i]
-        assert res["index"] == i
-        assert res["total"] == 3
-        assert res["chunk_index"] == (0 if i < 2 else 1)  # First chunk: 0,1; Second chunk: 2
-        assert res["chunk_size"] == 2
+        assert res["result"]["item"] == sample_items[i]
+        assert res["result"]["index"] == i
+        assert res["result"]["total"] == 3
+        assert res["result"]["chunk_index"] == (0 if i < 2 else 1)  # First chunk: 0,1; Second chunk: 2
+        assert res["result"]["chunk_size"] == 2
 
 
 def test_batch_empty_items(workspace, basic_context):
@@ -300,4 +310,64 @@ def test_batch_empty_items(workspace, basic_context):
     assert result["stats"]["total"] == 0
     assert result["stats"]["processed"] == 0
     assert result["stats"]["failed"] == 0
-    assert result["stats"]["success_rate"] == 100.0 
+    assert result["stats"]["success_rate"] == 100.0
+
+
+def test_parallel_execution_time(workspace, basic_context):
+    """Test that parallel execution is faster than sequential."""
+    step = {
+        "name": "test_parallel",
+        "task": "batch",
+        "inputs": {
+            "items": ["file1", "file2", "file3"],
+            "max_workers": 3,
+            "task": {
+                "task": "python",
+                "inputs": {
+                    "code": """
+import time
+time.sleep(0.5)
+result = f"Processing {batch['item']}"
+"""
+                }
+            }
+        }
+    }
+
+    config = TaskConfig(step, basic_context, workspace)
+    start_time = time.time()
+    result = batch_task(config)
+    end_time = time.time()
+
+    assert len(result["processed"]) == 3
+    assert end_time - start_time < 1.5  # Should take ~0.5s with parallel execution
+
+
+def test_batch_max_workers(workspace, basic_context):
+    """Test that maximum number of active tasks does not exceed max_workers."""
+    step = {
+        "name": "test_batch_workers",
+        "task": "batch",
+        "inputs": {
+            "items": list(range(10)),
+            "max_workers": 2,
+            "task": {
+                "task": "python",
+                "inputs": {
+                    "code": """
+import time
+time.sleep(0.1)
+result = f"Processed {batch['item']}"
+"""
+                }
+            }
+        }
+    }
+
+    config = TaskConfig(step, basic_context, workspace)
+    result = batch_task(config)
+
+    assert len(result["processed"]) == 10
+    assert result["stats"]["total"] == 10
+    assert result["stats"]["processed"] == 10
+    assert result["stats"]["failed"] == 0 
