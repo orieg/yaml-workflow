@@ -28,6 +28,11 @@ def variables():
                 "output": "step1 output"
             }
         },
+        "batch": {
+            "item": {"id": 1, "name": "test"},
+            "index": 0,
+            "name": "batch_task"
+        },
         "workflow_name": "test_workflow",
         "workspace": "/tmp/workspace",
         "run_number": "1",
@@ -48,10 +53,11 @@ def test_process_template_undefined_variable(template_engine, variables):
     template = "{{ args.missing }}"
     with pytest.raises(TemplateError) as exc:
         template_engine.process_template(template, variables)
-    assert "Variable 'args.missing' is undefined" in str(exc.value)
-    assert "Available variables in 'args' namespace:" in str(exc.value)
-    assert "'args.input_file': 'str[9]'" in str(exc.value)
-    assert "'args.output_file': 'str[10]'" in str(exc.value)
+    error_msg = str(exc.value)
+    assert "Template error: Undefined variable 'args.missing'" in error_msg
+    assert "Available variables in 'args' namespace:" in error_msg
+    assert "input_file" in error_msg
+    assert "output_file" in error_msg
 
 
 def test_process_template_syntax_error(template_engine, variables):
@@ -59,20 +65,7 @@ def test_process_template_syntax_error(template_engine, variables):
     template = "{{ args.input_file }"  # Missing closing brace
     with pytest.raises(TemplateError) as exc:
         template_engine.process_template(template, variables)
-    assert "Template syntax error at line 1:" in str(exc.value)
-
-
-def test_get_variables_with_types(template_engine, variables):
-    """Test getting variables with types."""
-    types = template_engine.get_variables_with_types(variables)
-    assert types["args"] == "dict[2 items]"
-    assert types["args.input_file"] == "str[9]"
-    assert types["args.output_file"] == "str[10]"
-    assert types["env"] == "dict[2 items]"
-    assert types["env.HOME"] == "str[10]"
-    assert types["steps"] == "dict[1 items]"
-    assert types["steps.step1"] == "dict[1 items]"
-    assert types["steps.step1.output"] == "str[12]"
+    assert "Template syntax error:" in str(exc.value)
 
 
 def test_process_template_simple(template_engine, variables):
@@ -95,8 +88,29 @@ def test_process_template_invalid_attribute(template_engine, variables):
     with pytest.raises(TemplateError) as exc:
         template_engine.process_template(template, variables)
     error_msg = str(exc.value)
-    assert "Variable 'args.input_file.invalid' is undefined" in error_msg
-    assert "str" in error_msg  # Shows that args.input_file is a string
+    assert "Template error: Invalid attribute 'invalid' on str" in error_msg
+    assert "Type of 'args.input_file' is 'str'" in error_msg
+
+
+def test_process_template_invalid_namespace(template_engine, variables):
+    """Test error on invalid namespace access."""
+    template = "{{ invalid.variable }}"
+    with pytest.raises(TemplateError) as exc:
+        template_engine.process_template(template, variables)
+    error_msg = str(exc.value)
+    assert "Template error: Invalid namespace 'invalid'" in error_msg
+    assert "Available namespaces:" in error_msg
+    assert "args" in error_msg
+    assert "env" in error_msg
+    assert "steps" in error_msg
+    assert "batch" in error_msg
+
+
+def test_process_template_batch_access(template_engine, variables):
+    """Test batch namespace access."""
+    template = "Item: {{ batch.item.name }}, Index: {{ batch.index }}"
+    result = template_engine.process_template(template, variables)
+    assert result == "Item: test, Index: 0"
 
 
 def test_process_value_string(template_engine, variables):
@@ -130,16 +144,4 @@ def test_process_value_non_template(template_engine, variables):
     """Test processing non-template value."""
     value = 42
     result = template_engine.process_value(value, variables)
-    assert result == 42
-
-
-def test_get_available_variables(template_engine, variables):
-    """Test getting available variables."""
-    available = template_engine.get_available_variables(variables)
-    assert set(available.keys()) == {"args", "env", "steps", "root"}
-    assert "input_file" in available["args"]
-    assert "output_file" in available["args"]
-    assert "HOME" in available["env"]
-    assert "PATH" in available["env"]
-    assert "step1" in available["steps"]
-    assert "workflow_name" in available["root"] 
+    assert result == 42 

@@ -1,5 +1,6 @@
 """Template engine implementation using Jinja2."""
 from typing import Any, Dict, Iterator, Tuple
+import re
 from jinja2 import Environment, StrictUndefined, Template
 from jinja2.exceptions import UndefinedError, TemplateSyntaxError
 
@@ -20,22 +21,17 @@ class AttrDict(dict):
         try:
             # Always check the dictionary first
             if key in self:
-                # print(f"DEBUG: Accessing key '{key}' with value: {self[key]}")
                 return self[key]
             # If the key doesn't exist, try to get it as a method
             if key in dir(dict):
-                # print(f"DEBUG: Accessing dict method '{key}' on AttrDict")
                 method = getattr(super(), key)
                 # If it's a callable method, call it immediately
                 if callable(method):
                     result = method()
-                    # print(f"DEBUG: Method result: {result}")
                     return result
                 return method
-            # print(f"DEBUG: Key '{key}' not found")
             raise KeyError(key)
         except KeyError as e:
-            # print(f"DEBUG: KeyError accessing '{key}': {str(e)}")
             raise AttributeError(key)
 
     def __setattr__(self, key: str, value: Any) -> None:
@@ -58,6 +54,35 @@ class TemplateEngine:
             lstrip_blocks=True
         )
 
+    def _extract_variable_path(self, template_str: str, error_msg: str) -> str:
+        """Extract the full variable path from the template string.
+        
+        Args:
+            template_str: The template string being processed
+            error_msg: The error message from Jinja2
+            
+        Returns:
+            str: The full variable path
+        """
+        # Extract the undefined variable name from the error message
+        if "'is undefined'" in error_msg:
+            var_name = error_msg.split("'")[1]
+        else:
+            # Handle attribute error
+            var_parts = error_msg.split("'")
+            if len(var_parts) >= 2:
+                var_name = var_parts[-2]
+            else:
+                var_name = "unknown"
+
+        # Find the variable in the template string
+        pattern = r'{{\s*([^}]+)\s*}}'
+        matches = re.findall(pattern, template_str)
+        for match in matches:
+            if var_name in match:
+                return match.strip()
+        return var_name
+
     def process_template(self, template_str: str, variables: Dict[str, Any] = None) -> str:
         """Process a template string with the given variables.
         
@@ -78,53 +103,56 @@ class TemplateEngine:
             
             # Convert variables to AttrDict for proper attribute access
             context = AttrDict(variables or {})
-            # print(f"\nDEBUG: Template context:")
-            # for k, v in context.items():
-            #     print(f"  {k}: {type(v)} = {v}")
-            # if 'args' in context:
-            #     print("\nDEBUG: Args content:")
-            #     for k, v in context['args'].items():
-            #         print(f"  {k}: {type(v)} = {v}")
             
             # Process the template with the wrapped variables
             return template.render(**context)
 
         except UndefinedError as e:
-            # Extract the undefined variable name from the error message
-            error_msg = str(e)
-            if "'is undefined'" in error_msg:
-                var_name = error_msg.split("'")[1]
-            else:
-                # Handle attribute error (e.g., 'dict object' has no attribute 'nonexistent')
-                var_parts = error_msg.split("'")
-                if len(var_parts) >= 2:
-                    var_name = var_parts[-2]
-                else:
-                    var_name = "unknown"
+            # Get the full variable path from the template
+            var_path = self._extract_variable_path(template_str, str(e))
+            parts = var_path.split('.')
 
-            # Get available variables in the relevant namespace
-            if variables:
-                # Extract namespace from template string
-                for line in template_str.split('\n'):
-                    if var_name in line:
-                        # Look for namespace.variable pattern
-                        parts = line.split('.')
-                        if len(parts) > 1:
-                            namespace = parts[0].split('{')[-1].strip()
-                            var_name = f"{namespace}.{var_name}"
-                            if namespace in variables:
-                                error_msg = (
-                                    f"Undefined variable '{var_name}'.\n"
-                                    f"Available variables in '{namespace}' namespace:\n"
-                                )
-                                for key in sorted(variables[namespace].keys()):
-                                    error_msg += f"  - {namespace}.{key}\n"
-                                raise TemplateError(error_msg)
-                            break
+            # Handle invalid namespace
+            if len(parts) > 0:
+                namespace = parts[0]
+                if namespace not in variables:
+                    error_msg = (
+                        f"Template error: Invalid namespace '{namespace}'\n"
+                        f"Available namespaces:\n"
+                    )
+                    for ns in sorted(variables.keys()):
+                        if isinstance(variables[ns], dict):
+                            error_msg += f"  - {ns}\n"
+                    raise TemplateError(error_msg)
 
-            # If no namespace found or no variables provided
-            error_msg = f"Undefined variable '{var_name}'.\nAvailable variables:\n"
+                # Handle invalid attribute access
+                if len(parts) > 2:
+                    try:
+                        current = variables[namespace]
+                        for part in parts[1:-1]:
+                            current = current[part]
+                        error_msg = (
+                            f"Template error: Invalid attribute '{parts[-1]}' on {type(current).__name__}\n"
+                            f"Type of '{'.'.join(parts[:-1])}' is '{type(current).__name__}'"
+                        )
+                        raise TemplateError(error_msg)
+                    except (KeyError, AttributeError):
+                        pass
+
+                # Handle undefined variable in namespace
+                error_msg = (
+                    f"Template error: Undefined variable '{var_path}'\n"
+                    f"Available variables in '{namespace}' namespace:\n"
+                )
+                if namespace in variables and isinstance(variables[namespace], dict):
+                    for key in sorted(variables[namespace].keys()):
+                        error_msg += f"  - {key}\n"
+                raise TemplateError(error_msg)
+
+            # Handle root level undefined variable
+            error_msg = f"Template error: Undefined variable '{var_path}'\n"
             if variables:
+                error_msg += "Available variables:\n"
                 for key in sorted(variables.keys()):
                     error_msg += f"  - {key}\n"
             raise TemplateError(error_msg)
@@ -132,7 +160,6 @@ class TemplateEngine:
         except TemplateSyntaxError as e:
             raise TemplateError(f"Template syntax error: {str(e)}")
         except Exception as e:
-            # print(f"\nDEBUG: Exception during template processing: {type(e)} - {str(e)}")
             raise TemplateError(f"Error processing template: {str(e)}")
 
     def process_value(self, value: Any, variables: Dict[str, Any]) -> Any:
