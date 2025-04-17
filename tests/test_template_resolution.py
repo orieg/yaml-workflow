@@ -35,7 +35,7 @@ def test_resolve_nested_dict(engine):
         "name": "{{ name }}",
         "complex": {
             "number": "{{ value }}",
-            "nested": "{{ nested.key }}"
+            "nested": '{{ nested["key"] }}'
         }
     }
     
@@ -75,9 +75,9 @@ def test_resolve_inputs_with_namespaces(engine):
     })
     
     inputs = {
-        "from_args": "{{ args.input1 }}",
-        "from_env": "{{ env.PATH }}",
-        "from_steps": "{{ steps.previous.output }}"
+        "from_args": '{{ args["input1"] }}',
+        "from_env": '{{ env["PATH"] }}',
+        "from_steps": '{{ steps["previous"]["output"] }}'
     }
     
     result = engine.resolve_inputs(inputs)
@@ -130,9 +130,9 @@ def test_resolve_inputs_type_preservation(engine):
         "raw_number": 42,
         "raw_bool": True,
         "raw_list": [1, 2, 3],
-        "template_number": "{{ args.number }}",
-        "template_flag": "{{ args.flag }}",
-        "template_list": "{{ args.list }}"
+        "template_number": '{{ args["number"] }}',
+        "template_flag": '{{ args["flag"] }}',
+        "template_list": '{{ args["list"] }}'
     }
     
     result = engine.resolve_inputs(inputs)
@@ -157,7 +157,7 @@ def test_resolve_nested_namespaces(engine):
         }
     })
     
-    template = "{{ steps.step1.outputs.nested.value }}"
+    template = '{{ steps["step1"]["outputs"]["nested"]["value"] }}'
     result = engine.resolve_value(template)
     assert result == "found"
 

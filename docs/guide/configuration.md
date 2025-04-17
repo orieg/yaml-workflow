@@ -44,6 +44,24 @@ steps:
     task: file_check
     params:
       path: "{{ args.input_file }}"
+  - name: process_batch
+    task: batch
+    inputs:
+      # Input items to process
+      items: "{{ steps.get_items.output }}"
+      
+      # Processing configuration
+      chunk_size: 10
+      max_workers: 4
+      
+      # Processing task
+      task:
+        task: python
+        inputs:
+          code: "process_item()"
+      
+      # Optional argument name for items (defaults to "item")
+      arg_name: data_item
 ```
 
 ### Environment Variables

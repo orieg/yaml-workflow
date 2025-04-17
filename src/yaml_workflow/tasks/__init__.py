@@ -116,10 +116,16 @@ class TaskConfig:
                 elif result == 'False':
                     return False
                 try:
-                    if '.' in result:
-                        return float(result)
-                    return int(result)
-                except (ValueError, TypeError):
+                    # First try to evaluate as a Python literal (for lists, dicts, etc.)
+                    import ast
+                    try:
+                        return ast.literal_eval(result)
+                    except (ValueError, SyntaxError):
+                        # If not a valid Python literal, try numeric conversion
+                        if '.' in result:
+                            return float(result)
+                        return int(result)
+                except (ValueError, TypeError, SyntaxError):
                     return result
             except UndefinedError as e:
                 error_msg = str(e)
@@ -224,7 +230,7 @@ def create_task_handler(func: Callable[..., R]) -> TaskHandler:
 # Import task modules
 from . import (
     basic_tasks,
-    batch_processor,
+    batch,
     file_tasks,
     python_tasks,
     shell_tasks,
@@ -256,5 +262,5 @@ register_task("template")(template_tasks.render_template)
 # Register Python tasks
 register_task("python")(python_tasks.python_task)
 
-# Register batch processor
-register_task("batch")(batch_processor.process_batch)
+# Register batch task (using new implementation)
+register_task("batch")(batch.batch_task)
