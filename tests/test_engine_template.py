@@ -66,7 +66,7 @@ def test_resolve_template_undefined(engine):
     with pytest.raises(TemplateError) as exc:
         engine.resolve_template("{{ args.missing }}")
     error_msg = str(exc.value)
-    assert "Variable 'args.missing' is undefined" in error_msg
+    assert "Template error: Undefined variable 'args.missing'" in error_msg
     assert "Available variables in 'args' namespace" in error_msg
 
 

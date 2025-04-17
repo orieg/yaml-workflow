@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .state import METADATA_FILE, WorkflowState
+from yaml_workflow.exceptions import WorkflowError
 
 def sanitize_name(name: str) -> str:
     """
@@ -200,3 +201,130 @@ def get_workspace_info(workspace: Path) -> Dict[str, Any]:
         "size": total_size,
         "files": file_count,
     }
+
+
+class BatchState:
+    """State manager for batch processing with namespace support."""
+    def __init__(self, workspace: Path, name: str):
+        """Initialize batch state.
+        
+        Args:
+            workspace: Path to workspace directory
+            name: Name of the batch process
+        """
+        self.workspace = workspace
+        self.name = name
+        self.state_dir = workspace / ".batch_state"
+        self.state_file = self.state_dir / f"{name}_state.json"
+        
+        self.state = {
+            "processed": [],  # Keep order for resume
+            "failed": {},     # item -> error info
+            "template_errors": {},  # Track template resolution failures
+            "namespaces": {   # Track namespace states
+                "args": {},
+                "env": {},
+                "steps": {},
+                "batch": {}
+            },
+            "stats": {
+                "total": 0,
+                "processed": 0,
+                "failed": 0,
+                "template_failures": 0,
+                "retried": 0
+            }
+        }
+        
+        self._load_state()
+        
+    def _load_state(self) -> None:
+        """Load state from file if it exists."""
+        if self.state_file.exists():
+            try:
+                self.state = json.loads(self.state_file.read_text())
+            except json.JSONDecodeError as e:
+                raise WorkflowError(f"Failed to load batch state: {e}")
+                
+    def save(self) -> None:
+        """Save current state to file."""
+        self.state_dir.mkdir(exist_ok=True)
+        self.state_file.write_text(json.dumps(self.state, indent=2))
+        
+    def mark_processed(self, item: Any, result: Dict[str, Any]) -> None:
+        """Mark an item as successfully processed.
+        
+        Args:
+            item: The processed item
+            result: Processing result
+        """
+        if item not in self.state["processed"]:
+            self.state["processed"].append(item)
+            self.state["stats"]["processed"] += 1
+            
+    def mark_failed(self, item: Any, error: str) -> None:
+        """Mark an item as failed.
+        
+        Args:
+            item: The failed item
+            error: Error message
+        """
+        self.state["failed"][str(item)] = {
+            "error": error,
+            "timestamp": str(datetime.now())
+        }
+        self.state["stats"]["failed"] += 1
+        
+    def mark_template_error(self, item: Any, error: str) -> None:
+        """Mark an item as having a template error.
+        
+        Args:
+            item: The item with template error
+            error: Template error message
+        """
+        self.state["template_errors"][str(item)] = {
+            "error": error,
+            "timestamp": str(datetime.now())
+        }
+        self.state["stats"]["template_failures"] += 1
+        
+    def update_namespace(self, namespace: str, data: Dict[str, Any]) -> None:
+        """Update namespace data.
+        
+        Args:
+            namespace: Name of the namespace
+            data: Namespace data to update
+        """
+        if namespace in self.state["namespaces"]:
+            self.state["namespaces"][namespace].update(data)
+            
+    def get_stats(self) -> Dict[str, int]:
+        """Get processing statistics.
+        
+        Returns:
+            Dict containing processing statistics
+        """
+        return self.state["stats"]
+        
+    def reset(self) -> None:
+        """Reset batch state."""
+        self.state = {
+            "processed": [],
+            "failed": {},
+            "template_errors": {},
+            "namespaces": {
+                "args": {},
+                "env": {},
+                "steps": {},
+                "batch": {}
+            },
+            "stats": {
+                "total": 0,
+                "processed": 0,
+                "failed": 0,
+                "template_failures": 0,
+                "retried": 0
+            }
+        }
+        if self.state_file.exists():
+            self.state_file.unlink()
