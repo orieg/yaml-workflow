@@ -1,13 +1,14 @@
 """Tests for the batch task implementation."""
 
-import pytest
 import time
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Any, Dict, List
 
+import pytest
+
+from yaml_workflow.exceptions import TaskExecutionError, TemplateError
 from yaml_workflow.tasks import TaskConfig
 from yaml_workflow.tasks.batch import batch_task
-from yaml_workflow.exceptions import TaskExecutionError, TemplateError
 
 
 @pytest.fixture
@@ -24,11 +25,11 @@ def basic_context() -> Dict[str, Any]:
             "test_arg": "value1",
             "debug": True,
             "items": ["apple", "banana", "cherry"],
-            "count": 3
+            "count": 3,
         },
         "env": {"test_env": "value2"},
         "steps": {"previous_step": {"output": "value3"}},
-        "root_var": "value4"
+        "root_var": "value4",
     }
 
 
@@ -47,16 +48,14 @@ def test_batch_basic(workspace, basic_context, sample_items):
             "items": sample_items,
             "task": {
                 "task": "python",
-                "inputs": {
-                    "code": "result = f'Processing {item}'"
-                }
-            }
-        }
+                "inputs": {"code": "result = f'Processing {item}'"},
+            },
+        },
     }
-    
+
     config = TaskConfig(step, basic_context, workspace)
     result = batch_task(config)
-    
+
     assert len(result["processed"]) == len(sample_items)
     assert len(result["failed"]) == 0
     assert len(result["results"]) == len(sample_items)
@@ -66,7 +65,7 @@ def test_batch_basic(workspace, basic_context, sample_items):
     assert result["stats"]["success_rate"] == 100.0
     # Verify each result is properly processed
     for i, res in enumerate(result["results"]):
-        assert res["result"] == f'Processing {sample_items[i]}'
+        assert res["result"] == f"Processing {sample_items[i]}"
 
 
 def test_batch_with_failures(workspace, basic_context):
@@ -84,14 +83,14 @@ def test_batch_with_failures(workspace, basic_context):
     raise ValueError(f"Failed to process {item}")
 result = f"Processed {item}"\
 """
-                }
-            }
-        }
+                },
+            },
+        },
     }
-    
+
     config = TaskConfig(step, basic_context, workspace)
     result = batch_task(config)
-    
+
     assert len(result["processed"]) == 2
     assert len(result["failed"]) == 2
     assert result["stats"]["processed"] == 2
@@ -116,20 +115,20 @@ def test_batch_chunk_processing(workspace, basic_context, sample_items):
                 "inputs": {
                     "code": """result = f'Processing {item} in chunk {batch["chunk_index"]}'\
 """
-                }
-            }
-        }
+                },
+            },
+        },
     }
-    
+
     config = TaskConfig(step, basic_context, workspace)
     result = batch_task(config)
-    
+
     assert len(result["processed"]) == len(sample_items)
     assert result["stats"]["processed"] == len(sample_items)
     # Verify chunk processing
     for i, res in enumerate(result["results"]):
         chunk_index = i // 3  # Calculate expected chunk index
-        assert res["result"] == f'Processing {sample_items[i]} in chunk {chunk_index}'
+        assert res["result"] == f"Processing {sample_items[i]} in chunk {chunk_index}"
 
 
 def test_batch_template_resolution(workspace, basic_context):
@@ -162,9 +161,9 @@ result = {
     'conditional': '{{ "yes" if args["condition"] else "no" }}',
     'original': original
 }"""
-                }
-            }
-        }
+                },
+            },
+        },
     }
 
     config = TaskConfig(step, basic_context, workspace)
@@ -190,31 +189,24 @@ def test_batch_validation(workspace, basic_context):
     step = {
         "name": "test_batch_validation",
         "task": "batch",
-        "inputs": {
-            "task": {
-                "task": "python",
-                "inputs": {"code": "result = 'test'"}
-            }
-        }
+        "inputs": {"task": {"task": "python", "inputs": {"code": "result = 'test'"}}},
     }
-    
+
     config = TaskConfig(step, basic_context, workspace)
     with pytest.raises(ValueError, match="items parameter is required"):
         batch_task(config)
-    
+
     # Test missing task config
     step = {
         "name": "test_batch_validation",
         "task": "batch",
-        "inputs": {
-            "items": ["item1", "item2"]
-        }
+        "inputs": {"items": ["item1", "item2"]},
     }
-    
+
     config = TaskConfig(step, basic_context, workspace)
     with pytest.raises(ValueError, match="task configuration is required"):
         batch_task(config)
-    
+
     # Test invalid chunk size
     step = {
         "name": "test_batch_validation",
@@ -222,17 +214,14 @@ def test_batch_validation(workspace, basic_context):
         "inputs": {
             "items": ["item1", "item2"],
             "chunk_size": 0,
-            "task": {
-                "task": "python",
-                "inputs": {"code": "result = 'test'"}
-            }
-        }
+            "task": {"task": "python", "inputs": {"code": "result = 'test'"}},
+        },
     }
-    
+
     config = TaskConfig(step, basic_context, workspace)
     with pytest.raises(ValueError, match="chunk_size must be greater than 0"):
         batch_task(config)
-    
+
     # Test invalid max_workers
     step = {
         "name": "test_batch_validation",
@@ -240,13 +229,10 @@ def test_batch_validation(workspace, basic_context):
         "inputs": {
             "items": ["item1", "item2"],
             "max_workers": 0,
-            "task": {
-                "task": "python",
-                "inputs": {"code": "result = 'test'"}
-            }
-        }
+            "task": {"task": "python", "inputs": {"code": "result = 'test'"}},
+        },
     }
-    
+
     config = TaskConfig(step, basic_context, workspace)
     with pytest.raises(ValueError, match="max_workers must be greater than 0"):
         batch_task(config)
@@ -270,9 +256,9 @@ def test_batch_context_variables(workspace, basic_context, sample_items):
         'chunk_index': batch['chunk_index'],
         'chunk_size': batch['chunk_size']
     }"""
-                }
-            }
-        }
+                },
+            },
+        },
     }
 
     config = TaskConfig(step, basic_context, workspace)
@@ -283,7 +269,9 @@ def test_batch_context_variables(workspace, basic_context, sample_items):
         assert res["result"]["item"] == sample_items[i]
         assert res["result"]["index"] == i
         assert res["result"]["total"] == 3
-        assert res["result"]["chunk_index"] == (0 if i < 2 else 1)  # First chunk: 0,1; Second chunk: 2
+        assert res["result"]["chunk_index"] == (
+            0 if i < 2 else 1
+        )  # First chunk: 0,1; Second chunk: 2
         assert res["result"]["chunk_size"] == 2
 
 
@@ -294,16 +282,13 @@ def test_batch_empty_items(workspace, basic_context):
         "task": "batch",
         "inputs": {
             "items": [],
-            "task": {
-                "task": "python",
-                "inputs": {"code": "result = 'test'"}
-            }
-        }
+            "task": {"task": "python", "inputs": {"code": "result = 'test'"}},
+        },
     }
-    
+
     config = TaskConfig(step, basic_context, workspace)
     result = batch_task(config)
-    
+
     assert len(result["processed"]) == 0
     assert len(result["failed"]) == 0
     assert len(result["results"]) == 0
@@ -329,9 +314,9 @@ import time
 time.sleep(0.5)
 result = f"Processing {batch['item']}"
 """
-                }
-            }
-        }
+                },
+            },
+        },
     }
 
     config = TaskConfig(step, basic_context, workspace)
@@ -359,9 +344,9 @@ import time
 time.sleep(0.1)
 result = f"Processed {batch['item']}"
 """
-                }
-            }
-        }
+                },
+            },
+        },
     }
 
     config = TaskConfig(step, basic_context, workspace)
@@ -370,4 +355,4 @@ result = f"Processed {batch['item']}"
     assert len(result["processed"]) == 10
     assert result["stats"]["total"] == 10
     assert result["stats"]["processed"] == 10
-    assert result["stats"]["failed"] == 0 
+    assert result["stats"]["failed"] == 0

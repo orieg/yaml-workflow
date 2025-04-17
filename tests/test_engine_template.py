@@ -1,7 +1,9 @@
 """Tests for template handling in WorkflowEngine."""
 
-import pytest
 from pathlib import Path
+
+import pytest
+
 from yaml_workflow.engine import WorkflowEngine
 from yaml_workflow.exceptions import TemplateError, WorkflowError
 
@@ -11,22 +13,16 @@ def workflow_definition():
     """Create a test workflow definition."""
     return {
         "name": "test_workflow",
-        "params": {
-            "input_file": {"default": "test.txt"},
-            "mode": "read"
-        },
+        "params": {"input_file": {"default": "test.txt"}, "mode": "read"},
         "steps": [
             {
                 "name": "step1",
                 "module": "yaml_workflow.tasks.file_tasks",
                 "function": "read_file",
-                "inputs": {
-                    "path": "{{ args.input_file }}",
-                    "mode": "{{ args.mode }}"
-                },
-                "outputs": "content"
+                "inputs": {"path": "{{ args.input_file }}", "mode": "{{ args.mode }}"},
+                "outputs": "content",
             }
-        ]
+        ],
     }
 
 
@@ -38,7 +34,7 @@ def engine(workflow_definition, tmp_path):
         "args": {"input_file": "test.txt", "mode": "read"},
         "env": {"HOME": "/home/user"},
         "steps": {},
-        "workflow_name": "test_workflow"
+        "workflow_name": "test_workflow",
     }
     return engine
 
@@ -72,7 +68,9 @@ def test_resolve_template_undefined(engine):
 
 def test_resolve_template_with_multiple_vars(engine):
     """Test template with multiple variables."""
-    result = engine.resolve_template("File '{{ args.input_file }}' in mode '{{ args.mode }}'")
+    result = engine.resolve_template(
+        "File '{{ args.input_file }}' in mode '{{ args.mode }}'"
+    )
     assert result == "File 'test.txt' in mode 'read'"
 
 
@@ -84,7 +82,9 @@ def test_resolve_template_with_env_vars(engine):
 
 def test_resolve_template_with_whitespace(engine):
     """Test template with various whitespace."""
-    result = engine.resolve_template("{{args.input_file}} {{ args.mode}} {{args.mode }}")
+    result = engine.resolve_template(
+        "{{args.input_file}} {{ args.mode}} {{args.mode }}"
+    )
     assert result == "test.txt read read"
 
 
@@ -122,15 +122,9 @@ def test_resolve_value_string(engine):
 
 def test_resolve_value_dict(engine):
     """Test resolving dictionary value."""
-    value = {
-        "file": "{{ args.input_file }}",
-        "mode": "{{ args.mode }}"
-    }
+    value = {"file": "{{ args.input_file }}", "mode": "{{ args.mode }}"}
     result = engine.resolve_value(value)
-    assert result == {
-        "file": "test.txt",
-        "mode": "read"
-    }
+    assert result == {"file": "test.txt", "mode": "read"}
 
 
 def test_resolve_value_list(engine):
@@ -145,19 +139,13 @@ def test_resolve_inputs(engine):
     inputs = {
         "path": "{{ args.input_file }}",
         "mode": "{{ args.mode }}",
-        "options": {
-            "encoding": "utf-8",
-            "name": "{{ workflow_name }}"
-        }
+        "options": {"encoding": "utf-8", "name": "{{ workflow_name }}"},
     }
     result = engine.resolve_inputs(inputs)
     assert result == {
         "path": "test.txt",
         "mode": "read",
-        "options": {
-            "encoding": "utf-8",
-            "name": "test_workflow"
-        }
+        "options": {"encoding": "utf-8", "name": "test_workflow"},
     }
 
 
@@ -167,12 +155,12 @@ def test_error_message_template(engine):
         "name": "test_step",
         "on_error": {
             "action": "fail",
-            "message": "Failed to process {{ args.input_file }}: {{ error }}"
-        }
+            "message": "Failed to process {{ args.input_file }}: {{ error }}",
+        },
     }
     error = ValueError("Invalid input")
-    
+
     with pytest.raises(WorkflowError) as exc:
         engine._handle_step_error(step, error)
-    
-    assert str(exc.value) == "Failed to process test.txt: Invalid input" 
+
+    assert str(exc.value) == "Failed to process test.txt: Invalid input"

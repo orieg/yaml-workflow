@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import yaml
-from jinja2 import Template, StrictUndefined, UndefinedError
+from jinja2 import StrictUndefined, Template, UndefinedError
 
+from ..exceptions import TaskExecutionError, TemplateError
 from ..workspace import resolve_path
-from ..exceptions import TemplateError, TaskExecutionError
-from . import register_task, TaskConfig
+from . import TaskConfig, register_task
 from .base import get_task_logger, log_task_error, log_task_execution, log_task_result
 
 
@@ -23,14 +23,16 @@ def ensure_directory(file_path: Path) -> None:
 
     Args:
         file_path: Path to the file
-    
+
     Raises:
         TaskExecutionError: If directory cannot be created
     """
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        raise TaskExecutionError(f"Failed to create directory '{file_path.parent}': {str(e)}")
+        raise TaskExecutionError(
+            f"Failed to create directory '{file_path.parent}': {str(e)}"
+        )
 
 
 # Direct file operations
@@ -83,14 +85,8 @@ def read_file_direct(file_path: str, workspace: Path, encoding: str = "utf-8") -
             return f.read().decode(encoding)
     except (IOError, UnicodeDecodeError) as e:
         if isinstance(e, FileNotFoundError):
-            raise TaskExecutionError(
-                step_name="read_file",
-                original_error=e
-            )
-        raise TaskExecutionError(
-            step_name="read_file",
-            original_error=e
-        )
+            raise TaskExecutionError(step_name="read_file", original_error=e)
+        raise TaskExecutionError(step_name="read_file", original_error=e)
 
 
 def append_file_direct(
@@ -143,7 +139,9 @@ def copy_file_direct(source: str, destination: str, workspace: Path) -> str:
     except (IOError, shutil.Error) as e:
         if isinstance(e, FileNotFoundError):
             raise TaskExecutionError(f"Source file not found: '{source}'")
-        raise TaskExecutionError(f"Failed to copy file from '{source}' to '{destination}': {str(e)}")
+        raise TaskExecutionError(
+            f"Failed to copy file from '{source}' to '{destination}': {str(e)}"
+        )
 
 
 def move_file_direct(source: str, destination: str, workspace: Path) -> str:
@@ -169,7 +167,9 @@ def move_file_direct(source: str, destination: str, workspace: Path) -> str:
     except (IOError, shutil.Error) as e:
         if isinstance(e, FileNotFoundError):
             raise TaskExecutionError(f"Source file not found: '{source}'")
-        raise TaskExecutionError(f"Failed to move file from '{source}' to '{destination}': {str(e)}")
+        raise TaskExecutionError(
+            f"Failed to move file from '{source}' to '{destination}': {str(e)}"
+        )
 
 
 def delete_file_direct(file_path: str, workspace: Path) -> str:
@@ -201,15 +201,23 @@ def delete_file_direct(file_path: str, workspace: Path) -> str:
 def write_file_task(config: TaskConfig) -> Dict[str, Any]:
     """Task handler for writing files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         # Process inputs with template resolution
         try:
             processed = config.process_inputs()
         except TemplateError as e:
-            raise TaskExecutionError(f"Failed to resolve template in write_file task: {str(e)}", original_error=e)
-        
+            raise TaskExecutionError(
+                f"Failed to resolve template in write_file task: {str(e)}",
+                original_error=e,
+            )
+
         file_path = processed.get("file_path")
         content = processed.get("content")
         encoding = processed.get("encoding", "utf-8")
@@ -221,11 +229,7 @@ def write_file_task(config: TaskConfig) -> Dict[str, Any]:
 
         try:
             result = write_file_direct(file_path, content, config.workspace, encoding)
-            task_result = {
-                "path": result,
-                "encoding": encoding,
-                "size": len(content)
-            }
+            task_result = {"path": result, "encoding": encoding, "size": len(content)}
             log_task_result(logger, task_result)
             return task_result
         except TaskExecutionError as e:
@@ -244,15 +248,23 @@ def write_file_task(config: TaskConfig) -> Dict[str, Any]:
 def read_file_task(config: TaskConfig) -> Dict[str, Any]:
     """Task handler for reading files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         # Process inputs with template resolution
         try:
             processed = config.process_inputs()
         except TemplateError as e:
-            raise TaskExecutionError(f"Failed to resolve template in read_file task: {str(e)}", original_error=e)
-        
+            raise TaskExecutionError(
+                f"Failed to resolve template in read_file task: {str(e)}",
+                original_error=e,
+            )
+
         file_path = processed.get("file_path")
         encoding = processed.get("encoding", "utf-8")
 
@@ -265,7 +277,7 @@ def read_file_task(config: TaskConfig) -> Dict[str, Any]:
                 "path": str(resolve_path(config.workspace, file_path)),
                 "content": content,
                 "encoding": encoding,
-                "size": len(content)
+                "size": len(content),
             }
             log_task_result(logger, task_result)
             return task_result
@@ -285,15 +297,23 @@ def read_file_task(config: TaskConfig) -> Dict[str, Any]:
 def append_file_task(config: TaskConfig) -> Dict[str, Any]:
     """Task handler for appending to files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         # Process inputs with template resolution
         try:
             processed = config.process_inputs()
         except TemplateError as e:
-            raise TaskExecutionError(f"Failed to resolve template in append_file task: {str(e)}", original_error=e)
-        
+            raise TaskExecutionError(
+                f"Failed to resolve template in append_file task: {str(e)}",
+                original_error=e,
+            )
+
         file_path = processed.get("file_path")
         content = processed.get("content")
         encoding = processed.get("encoding", "utf-8")
@@ -305,11 +325,7 @@ def append_file_task(config: TaskConfig) -> Dict[str, Any]:
 
         try:
             result = append_file_direct(file_path, content, config.workspace, encoding)
-            task_result = {
-                "path": result,
-                "encoding": encoding,
-                "size": len(content)
-            }
+            task_result = {"path": result, "encoding": encoding, "size": len(content)}
             log_task_result(logger, task_result)
             return task_result
         except TaskExecutionError as e:
@@ -328,15 +344,23 @@ def append_file_task(config: TaskConfig) -> Dict[str, Any]:
 def copy_file_task(config: TaskConfig) -> Dict[str, Any]:
     """Task handler for copying files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         # Process inputs with template resolution
         try:
             processed = config.process_inputs()
         except TemplateError as e:
-            raise TaskExecutionError(f"Failed to resolve template in copy_file task: {str(e)}", original_error=e)
-        
+            raise TaskExecutionError(
+                f"Failed to resolve template in copy_file task: {str(e)}",
+                original_error=e,
+            )
+
         source = processed.get("source")
         destination = processed.get("destination")
 
@@ -349,7 +373,7 @@ def copy_file_task(config: TaskConfig) -> Dict[str, Any]:
             result = copy_file_direct(source, destination, config.workspace)
             task_result = {
                 "source": str(resolve_path(config.workspace, source)),
-                "destination": result
+                "destination": result,
             }
             log_task_result(logger, task_result)
             return task_result
@@ -369,15 +393,23 @@ def copy_file_task(config: TaskConfig) -> Dict[str, Any]:
 def move_file_task(config: TaskConfig) -> Dict[str, Any]:
     """Task handler for moving files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         # Process inputs with template resolution
         try:
             processed = config.process_inputs()
         except TemplateError as e:
-            raise TaskExecutionError(f"Failed to resolve template in move_file task: {str(e)}", original_error=e)
-        
+            raise TaskExecutionError(
+                f"Failed to resolve template in move_file task: {str(e)}",
+                original_error=e,
+            )
+
         source = processed.get("source")
         destination = processed.get("destination")
 
@@ -390,7 +422,7 @@ def move_file_task(config: TaskConfig) -> Dict[str, Any]:
             result = move_file_direct(source, destination, config.workspace)
             task_result = {
                 "source": str(resolve_path(config.workspace, source)),
-                "destination": result
+                "destination": result,
             }
             log_task_result(logger, task_result)
             return task_result
@@ -410,15 +442,23 @@ def move_file_task(config: TaskConfig) -> Dict[str, Any]:
 def delete_file_task(config: TaskConfig) -> Dict[str, Any]:
     """Task handler for deleting files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         # Process inputs with template resolution
         try:
             processed = config.process_inputs()
         except TemplateError as e:
-            raise TaskExecutionError(f"Failed to resolve template in delete_file task: {str(e)}", original_error=e)
-        
+            raise TaskExecutionError(
+                f"Failed to resolve template in delete_file task: {str(e)}",
+                original_error=e,
+            )
+
         file_path = processed.get("file_path")
 
         if not file_path:
@@ -426,9 +466,7 @@ def delete_file_task(config: TaskConfig) -> Dict[str, Any]:
 
         try:
             result = delete_file_direct(file_path, config.workspace)
-            task_result = {
-                "path": result
-            }
+            task_result = {"path": result}
             log_task_result(logger, task_result)
             return task_result
         except TaskExecutionError as e:
@@ -447,11 +485,16 @@ def delete_file_task(config: TaskConfig) -> Dict[str, Any]:
 def read_json_task(config: TaskConfig) -> Union[Dict[str, Any], List[Any]]:
     """Task handler for reading JSON files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         processed = config.process_inputs()
-        
+
         file_path = processed.get("file_path")
 
         if not file_path:
@@ -470,11 +513,16 @@ def read_json_task(config: TaskConfig) -> Union[Dict[str, Any], List[Any]]:
 def write_json_task(config: TaskConfig) -> str:
     """Task handler for writing JSON files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         processed = config.process_inputs()
-        
+
         file_path = processed.get("file_path")
         data = processed.get("data")
         indent = processed.get("indent", 2)
@@ -497,11 +545,16 @@ def write_json_task(config: TaskConfig) -> str:
 def read_yaml_task(config: TaskConfig) -> Dict[str, Any]:
     """Task handler for reading YAML files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         processed = config.process_inputs()
-        
+
         file_path = processed.get("file_path")
 
         if not file_path:
@@ -520,11 +573,16 @@ def read_yaml_task(config: TaskConfig) -> Dict[str, Any]:
 def write_yaml_task(config: TaskConfig) -> str:
     """Task handler for writing YAML files."""
     logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
+    log_task_execution(
+        logger,
+        {"name": config.name, "type": config.type},
+        config._context,
+        config.workspace,
+    )
 
     try:
         processed = config.process_inputs()
-        
+
         file_path = processed.get("file_path")
         data = processed.get("data")
 
@@ -576,7 +634,9 @@ def process_templates(data: Any, context: Dict[str, Any]) -> Any:
     return data
 
 
-def read_json(file_path: str, workspace: Path, encoding: str = "utf-8") -> Dict[str, Any]:
+def read_json(
+    file_path: str, workspace: Path, encoding: str = "utf-8"
+) -> Dict[str, Any]:
     """Read JSON content from a file.
 
     Args:
@@ -594,10 +654,7 @@ def read_json(file_path: str, workspace: Path, encoding: str = "utf-8") -> Dict[
         content = read_file_direct(file_path, workspace, encoding)
         return json.loads(content)
     except json.JSONDecodeError as e:
-        raise TaskExecutionError(
-            step_name="read_json",
-            original_error=e
-        )
+        raise TaskExecutionError(step_name="read_json", original_error=e)
 
 
 def write_json(
@@ -632,7 +689,9 @@ def write_json(
         raise TemplateError(f"Failed to write JSON file '{file_path}': {str(e)}")
 
 
-def read_yaml(file_path: str, workspace: Path, encoding: str = "utf-8") -> Dict[str, Any]:
+def read_yaml(
+    file_path: str, workspace: Path, encoding: str = "utf-8"
+) -> Dict[str, Any]:
     """Read YAML content from a file.
 
     Args:
@@ -650,10 +709,7 @@ def read_yaml(file_path: str, workspace: Path, encoding: str = "utf-8") -> Dict[
         content = read_file_direct(file_path, workspace, encoding)
         return yaml.safe_load(content)
     except yaml.YAMLError as e:
-        raise TaskExecutionError(
-            step_name="read_yaml",
-            original_error=e
-        )
+        raise TaskExecutionError(step_name="read_yaml", original_error=e)
 
 
 def write_yaml(

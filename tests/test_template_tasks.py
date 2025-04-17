@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from yaml_workflow.tasks.template_tasks import render_template
 from yaml_workflow.tasks import TaskConfig
+from yaml_workflow.tasks.template_tasks import render_template
 
 
 @pytest.fixture
@@ -21,10 +21,7 @@ def test_simple_template_rendering(temp_workspace):
     step = {
         "name": "test_template",
         "task": "template",
-        "inputs": {
-            "template": "Hello, {{ name }}!",
-            "output": "greeting.txt"
-        }
+        "inputs": {"template": "Hello, {{ name }}!", "output": "greeting.txt"},
     }
 
     config = TaskConfig(step, {"name": "Alice"}, temp_workspace)
@@ -45,8 +42,8 @@ def test_template_with_loops(temp_workspace, template_context):
 {% for item in items %}
 - {{ item }}
 {% endfor %}""",
-            "output": "items.txt"
-        }
+            "output": "items.txt",
+        },
     }
 
     config = TaskConfig(step, template_context, temp_workspace)
@@ -77,8 +74,8 @@ Color is not blue
 Size is large
 {% endif %}
 """,
-            "output": "settings.txt"
-        }
+            "output": "settings.txt",
+        },
     }
 
     config = TaskConfig(step, template_context, temp_workspace)
@@ -103,14 +100,14 @@ def test_template_filters(temp_workspace):
 {{ items | join(', ') }}
 {{ number | float | round(2) }}
 """,
-            "output": "filtered.txt"
-        }
+            "output": "filtered.txt",
+        },
     }
 
     config = TaskConfig(
         step,
         {"name": "Alice", "items": ["a", "b", "c"], "number": 3.14159},
-        temp_workspace
+        temp_workspace,
     )
     result = render_template(config)
 
@@ -128,10 +125,7 @@ def test_template_error_handling(temp_workspace):
     step = {
         "name": "test_template",
         "task": "template",
-        "inputs": {
-            "template": "{{ undefined_variable }}",
-            "output": "error.txt"
-        }
+        "inputs": {"template": "{{ undefined_variable }}", "output": "error.txt"},
     }
 
     config = TaskConfig(step, {}, temp_workspace)
@@ -144,10 +138,7 @@ def test_template_whitespace_control(temp_workspace):
     step = {
         "name": "test_template",
         "task": "template",
-        "inputs": {
-            "template": "{{ items|join('\n') }}",
-            "output": "whitespace.txt"
-        }
+        "inputs": {"template": "{{ items|join('\n') }}", "output": "whitespace.txt"},
     }
 
     config = TaskConfig(step, {"items": ["a", "b", "c"]}, temp_workspace)
@@ -170,8 +161,8 @@ def test_template_from_file(temp_workspace):
         "task": "template",
         "inputs": {
             "template": template_file.read_text(),  # Read template content directly since render_template doesn't support template_file
-            "output": "welcome.txt"
-        }
+            "output": "welcome.txt",
+        },
     }
 
     config = TaskConfig(step, {"name": "Bob", "role": "Admin"}, temp_workspace)

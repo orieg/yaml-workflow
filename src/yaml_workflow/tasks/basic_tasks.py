@@ -2,8 +2,9 @@
 Basic task functions for demonstration and testing.
 """
 
-from typing import Dict, Any
-from jinja2 import Template, StrictUndefined, UndefinedError
+from typing import Any, Dict
+
+from jinja2 import StrictUndefined, Template, UndefinedError
 
 from ..exceptions import TemplateError
 from . import register_task
@@ -98,7 +99,7 @@ def create_greeting(name: str, context: Dict[str, Any]) -> str:
             "name": name,
             "args": list(context["args"].keys()) if "args" in context else [],
             "env": list(context["env"].keys()) if "env" in context else [],
-            "steps": list(context["steps"].keys()) if "steps" in context else []
+            "steps": list(context["steps"].keys()) if "steps" in context else [],
         }
         raise TemplateError(f"{str(e)}. Available variables: {available}")
     except Exception as e:

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from yaml_workflow.engine import WorkflowEngine
-from yaml_workflow.workspace import WorkflowState, BatchState
+from yaml_workflow.workspace import BatchState, WorkflowState
 
 
 @pytest.fixture
@@ -87,7 +87,7 @@ def test_workflow_state_initialization(workflow_state):
         "args": {},
         "env": {},
         "steps": {},
-        "batch": {}
+        "batch": {},
     }
 
 
@@ -96,7 +96,7 @@ def test_namespace_state_isolation(workflow_state):
     workflow_state.update_namespace("args", {"key": "value"})
     workflow_state.update_namespace("env", {"PATH": "/usr/bin"})
     workflow_state.update_namespace("steps", {"step1": {"output": "result"}})
-    
+
     state = workflow_state.get_state()
     assert state["namespaces"]["args"]["key"] == "value"
     assert state["namespaces"]["env"]["PATH"] == "/usr/bin"
@@ -109,7 +109,7 @@ def test_namespace_variable_access(workflow_state):
     """Test variable access across namespaces."""
     workflow_state.update_namespace("args", {"input": "test"})
     workflow_state.update_namespace("steps", {"step1": {"output": "{{ args.input }}"}})
-    
+
     assert workflow_state.get_variable("input", "args") == "test"
     assert workflow_state.get_variable("step1", "steps")["output"] == "{{ args.input }}"
     assert workflow_state.get_variable("nonexistent", "args") is None
@@ -170,7 +170,7 @@ def test_retry_state_management(workflow_state):
         "attempt": 1,
         "last_error": "Test error",
         "last_attempt": "2024-01-01T00:00:00",
-        "namespace": "steps"
+        "namespace": "steps",
     }
     workflow_state.update_retry_state("step1", retry_state)
 
@@ -194,7 +194,7 @@ def test_state_reset(workflow_state):
         "args": {},
         "env": {},
         "steps": {},
-        "batch": {}
+        "batch": {},
     }
 
 
