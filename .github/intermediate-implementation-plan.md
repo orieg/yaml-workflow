@@ -20,265 +20,256 @@ This plan builds upon the completed work in template engine centralization:
 - Builds on the enhanced state management system
 - Preserves namespace isolation (args, env, steps)
 
-### Tasks
+### Current Progress
 
-#### 1. Standardize Task Interface with Namespace Support ✓
-```python
-# In tasks/__init__.py
-class TaskConfig:
-    """Configuration class for task handlers with namespace support."""
-    def __init__(self, step: Dict[str, Any], context: Dict[str, Any], workspace: Path):
-        self.name = step.get("name")
-        self.type = step.get("task")
-        self.inputs = step.get("inputs", {})
-        self._context = context
-        self.workspace = workspace
-        self._processed_inputs: Dict[str, Any] = {}
+#### 1. Task Interface Foundation ✓
+- Implemented `TaskConfig` class with namespace support
+- Added comprehensive test suite
+- Implemented template resolution
+- Added error handling with context
+- All tests passing with 100% coverage
 
-    def get_variable(self, name: str, namespace: Optional[str] = None) -> Any:
-        """Get a variable with namespace support."""
-        if namespace:
-            return self._context.get(namespace, {}).get(name)
-        return self._context.get(name)
+#### 2. Task Handler Updates
 
-    def get_available_variables(self) -> Dict[str, List[str]]:
-        """Get available variables by namespace."""
-        return {
-            "args": list(self._context.get("args", {}).keys()),
-            "env": list(self._context.get("env", {}).keys()),
-            "steps": list(self._context.get("steps", {}).keys()),
-            "root": [k for k in self._context.keys() if k not in ["args", "env", "steps"]]
-        }
+1. [✓] Noop Task (Reference Implementation)
+   - Updated to use TaskConfig
+   - Added proper error handling
+   - Added namespace support
+   - Added comprehensive tests
+   - Demonstrates best practices for other handlers
 
-    def process_inputs(self) -> Dict[str, Any]:
-        """Process task inputs with template resolution."""
-        if not self._processed_inputs:
-            for key, value in self.inputs.items():
-                if isinstance(value, str):
-                    try:
-                        template = Template(value, undefined=StrictUndefined)
-                        self._processed_inputs[key] = template.render(**self._context)
-                    except UndefinedError as e:
-                        error_msg = str(e)
-                        namespace = self._get_undefined_namespace(error_msg)
-                        available = self.get_available_variables()
-                        raise TemplateError(
-                            f"Failed to resolve template variable in input '{key}' in namespace '{namespace}'. "
-                            f"Error: {error_msg}. Available variables: {available[namespace]}"
-                        )
-                else:
-                    self._processed_inputs[key] = value
-        return self._processed_inputs
-```
+2. [ ] Python Task Handler
+   ```python
+   @register_task("python")
+   def python_task(config: TaskConfig) -> Dict[str, Any]:
+       """Execute Python code with namespace support."""
+       processed = config.process_inputs()
+       
+       # Create execution context with namespace support
+       local_vars = {
+           "args": config._context.get("args", {}),
+           "env": config._context.get("env", {}),
+           "steps": config._context.get("steps", {}),
+           "batch": config._context.get("batch", {})
+       }
+       
+       # Execute code with proper error handling
+       try:
+           exec(processed["code"], {}, local_vars)
+           return {
+               "result": local_vars.get("result"),
+               "task_name": config.name,
+               "task_type": config.type,
+               "available_variables": config.get_available_variables()
+           }
+       except Exception as e:
+           raise TemplateError(f"Failed to execute Python code: {str(e)}")
+   ```
+   Next Steps:
+   1. Update handler signature to use TaskConfig
+   2. Add proper namespace support in execution context
+   3. Improve error handling with context
+   4. Add tests:
+      - Template resolution in code blocks
+      - Variable access from different namespaces
+      - Error messages with context
+      - Operation handling with processed inputs
 
-1. ✓ Define standard task configuration
-   - Added namespace-aware variable access
-   - Implemented consistent error reporting with namespace context
-   - Created type-safe configuration object
-   - Added comprehensive test suite in `tests/test_task_interface.py`
-   - All tests passing with 100% coverage for TaskConfig
+3. [ ] Shell Task Handler
+   ```python
+   @register_task("shell")
+   def shell_task(config: TaskConfig) -> Dict[str, Any]:
+       """Execute shell commands with namespace support."""
+       processed = config.process_inputs()
+       
+       # Process command with proper escaping
+       command = processed["command"]
+       
+       # Handle working directory
+       cwd = config.workspace
+       if "working_dir" in processed:
+           cwd = config.workspace / processed["working_dir"]
+       
+       # Execute with proper environment
+       env = os.environ.copy()
+       if "env" in processed:
+           env.update(processed["env"])
+       
+       try:
+           result = subprocess.run(
+               command,
+               shell=True,
+               cwd=cwd,
+               env=env,
+               capture_output=True,
+               text=True
+           )
+           return {
+               "stdout": result.stdout,
+               "stderr": result.stderr,
+               "exit_code": result.returncode,
+               "task_name": config.name,
+               "task_type": config.type,
+               "available_variables": config.get_available_variables()
+           }
+       except Exception as e:
+           raise TaskExecutionError(f"Shell command failed: {str(e)}")
+   ```
+   Next Steps:
+   1. Update handler signature to use TaskConfig
+   2. Add proper working directory handling
+   3. Improve environment variable handling
+   4. Add tests:
+      - Command template resolution
+      - Working directory with namespaces
+      - Environment variable handling
+      - Error messages with context
 
-2. Update task handlers to use standard interface
-   - [ ] Python task handler (using TaskConfig)
-     ```python
-     @register_task("python")
-     def python_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Any:
-         """Execute Python code with namespace support."""
-         config = TaskConfig(step, context, workspace)
-         processed = config.process_inputs()
-         
-         # Handle code execution
-         if "code" in processed:
-             return execute_code(processed["code"], config._context)
-         
-         # Handle operations (multiply, divide, etc.)
-         if "operation" in processed:
-             return handle_operation(processed["operation"], processed)
-     ```
-     Steps:
-     1. Update handler to use TaskConfig
-     2. Move template resolution to config.process_inputs()
-     3. Update error handling to use namespace context
-     4. Add tests:
-        - Template resolution in code blocks
-        - Variable access from different namespaces
-        - Error messages with namespace context
-        - Operation handling with processed inputs
-     5. Verify:
-        ```bash
-        python -m pytest tests/test_python_tasks.py -v
-        ```
+4. [ ] File Task Handler
+   ```python
+   @register_task("write_file")
+   def write_file_task(config: TaskConfig) -> Dict[str, str]:
+       """Write file with namespace support."""
+       processed = config.process_inputs()
+       
+       # Resolve file path
+       target_path = config.workspace / processed["path"]
+       
+       # Process content with template support
+       content = processed.get("content", "")
+       
+       try:
+           target_path.parent.mkdir(parents=True, exist_ok=True)
+           target_path.write_text(content)
+           return {
+               "path": str(target_path),
+               "task_name": config.name,
+               "task_type": config.type,
+               "available_variables": config.get_available_variables()
+           }
+       except Exception as e:
+           raise TaskExecutionError(f"Failed to write file: {str(e)}")
+   ```
+   Next Steps:
+   1. Update handler signature to use TaskConfig
+   2. Add proper path handling with workspace
+   3. Add tests:
+      - Path template resolution
+      - Content template processing
+      - Error messages with context
 
-   - [ ] Shell task handler (using TaskConfig)
-     ```python
-     @register_task("shell")
-     def shell_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, Any]:
-         """Execute shell commands with namespace support."""
-         config = TaskConfig(step, context, workspace)
-         processed = config.process_inputs()
-         
-         # Process command with proper escaping
-         command = process_command(processed["command"])
-         
-         # Handle working directory
-         cwd = workspace
-         if "working_dir" in processed:
-             cwd = workspace / processed["working_dir"]
-         
-         return execute_command(command, cwd)
-     ```
-     Steps:
-     1. Update handler to use TaskConfig
-     2. Move command processing to config.process_inputs()
-     3. Update working directory handling
-     4. Add tests:
-        - Command template resolution
-        - Working directory with namespaces
-        - Environment variable handling
-        - Error messages with context
-     5. Verify:
-        ```bash
-        python -m pytest tests/test_shell_tasks.py -v
-        ```
+#### 3. Batch Processing Updates
 
-   - [ ] File task handler (using TaskConfig)
-     ```python
-     @register_task("write_file")
-     def write_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, str]:
-         """Write file with namespace support."""
-         config = TaskConfig(step, context, workspace)
-         processed = config.process_inputs()
-         
-         # Resolve file path
-         target_path = resolve_path(processed["path"], workspace)
-         
-         # Process content with template support
-         content = processed.get("content", "")
-         if isinstance(content, (dict, list)):
-             content = process_structured_content(content, config)
-         
-         return write_file(target_path, content)
-     ```
-     Steps:
-     1. Update handler to use TaskConfig
-     2. Move path resolution to config.process_inputs()
-     3. Update content processing for structured data
-     4. Add tests:
-        - Path template resolution
-        - Content template processing
-        - Structured data handling
-        - Error messages with context
-     5. Verify:
-        ```bash
-        python -m pytest tests/test_file_tasks.py -v
-        ```
+1. [ ] Update BatchContext
+   ```python
+   class BatchContext:
+       """Context manager for batch processing with namespace support."""
+       def __init__(self, config: TaskConfig):
+           self.name = config.name
+           self.workspace = config.workspace
+           self.retry_config = config.inputs.get("retry", {})
+           self._context = config._context
 
-   - [ ] Test: `python -m pytest tests/test_task_handlers.py`
+       def create_item_context(self, item: Any, index: int) -> Dict[str, Any]:
+           """Create context for a batch item while preserving namespaces."""
+           return {
+               "args": self._context.get("args", {}),
+               "env": self._context.get("env", {}),
+               "steps": self._context.get("steps", {}),
+               "batch": {
+                   "item": item,
+                   "index": index,
+                   "name": self.name
+               }
+           }
+   ```
 
-Implementation Strategy for Each Handler:
-1. Create handler-specific test file if not exists
-2. Add namespace-aware test cases
-3. Update handler implementation
-4. Verify existing functionality
-5. Add namespace-specific error handling
-6. Run full test suite
+2. [ ] Update Batch Task Handler
+   ```python
+   @register_task("batch")
+   def batch_task(config: TaskConfig) -> Dict[str, Any]:
+       """Process multiple items in parallel with namespace support."""
+       processed = config.process_inputs()
+       items = processed.get("items", [])
+       
+       # Initialize batch context
+       batch_ctx = BatchContext(config)
+       
+       # Process items with proper error handling and state tracking
+       results = []
+       for index, item in enumerate(items):
+           try:
+               item_context = batch_ctx.create_item_context(item, index)
+               item_config = TaskConfig(processed["task"], item_context, config.workspace)
+               result = process_item(item_config)
+               results.append({"index": index, "result": result})
+           except Exception as e:
+               results.append({"index": index, "error": str(e)})
+       
+       return {
+           "results": results,
+           "task_name": config.name,
+           "task_type": config.type,
+           "available_variables": config.get_available_variables()
+       }
+   ```
 
-Success Criteria for Handlers:
-- Uses TaskConfig for all template resolution
-- Preserves existing functionality
-- Provides clear namespace-aware error messages
-- Handles structured data appropriately
-- Maintains backward compatibility
-- Passes all tests with >80% coverage
+#### Next Steps (Prioritized)
 
-✓ Checkpoint: Task interface implementation complete
-✓ Checkpoint: Task interface tests passing
+1. Implement Python task handler with TaskConfig
+   - Update handler signature
+   - Add namespace support
+   - Add tests
+   - Verify error handling
 
-#### 2. Enhanced Batch Context
-```python
-class BatchContext:
-    """Context manager for batch processing with namespace support."""
-    def __init__(self, config: TaskConfig):
-        self.name = config.name
-        self.engine = config.get_variable("engine")
-        self.workspace = config.workspace
-        self.retry_config = config.inputs.get("retry", {})
-        self._context = config._context
+2. Implement Shell task handler
+   - Update handler signature
+   - Add working directory support
+   - Add environment handling
+   - Add tests
 
-    def create_item_context(self, item: Any, index: int) -> Dict[str, Any]:
-        """Create context for a batch item while preserving namespaces."""
-        return {
-            "args": self._context.get("args", {}),
-            "env": self._context.get("env", {}),
-            "steps": self._context.get("steps", {}),
-            "batch": {
-                "item": item,
-                "index": index,
-                "name": self.name
-            }
-        }
+3. Implement File task handler
+   - Update handler signature
+   - Add path handling
+   - Add tests
 
-    def get_error_context(self, error: Exception) -> Dict[str, Any]:
-        """Get error context with namespace information."""
-        return {
-            "error": str(error),
-            "available_variables": self.get_available_variables(),
-            "namespaces": list(self._context.keys())
-        }
-```
+4. Update batch processing
+   - Update BatchContext
+   - Update batch task handler
+   - Add tests
 
-1. Standardize batch context
-   - Namespace-aware variable access
-   - Type-safe batch operations
-   - Consistent error context
-   - Test: `python -m pytest tests/test_batch_context.py`
+5. Update documentation
+   - Add namespace examples
+   - Document error handling
+   - Add batch processing guide
 
-2. Update batch processor
-   - Use enhanced batch context
-   - Preserve namespace isolation
-   - Improve error handling
-   - Test: `python -m pytest tests/test_batch_processor.py`
+#### Success Criteria
+- All task handlers use TaskConfig interface
+- Comprehensive test coverage
+- Clear error messages with context
+- Proper namespace isolation
+- Consistent return format
+- Updated documentation
 
-✓ Checkpoint: Batch context tests pass
+#### Testing Strategy
 
-#### 3. Simplified State Management
-```python
-class BatchState:
-    """State manager for batch processing with namespace support."""
-    def __init__(self, workspace: Path, name: str):
-        self.state = {
-            "processed": [],  # Keep order for resume
-            "failed": {},     # item -> error info
-            "template_errors": {},  # Track template resolution failures
-            "namespaces": {   # Track namespace states
-                "args": {},
-                "env": {},
-                "steps": {},
-                "batch": {}
-            },
-            "stats": {
-                "total": 0,
-                "processed": 0,
-                "failed": 0,
-                "template_failures": 0,
-                "retried": 0
-            }
-        }
-```
+1. Unit Tests
+   - Test each task handler with TaskConfig
+   - Verify namespace isolation
+   - Check error handling with context
+   - Validate template resolution
 
-1. Standardize state format
-   - Namespace-aware state tracking
-   - Simple statistics tracking
-   - Template resolution state tracking
-   - Test: `python -m pytest tests/test_state.py`
+2. Integration Tests
+   - Test task combinations
+   - Verify state preservation
+   - Check batch processing
+   - Validate error recovery
 
-2. Integrate with engine state
-   - Update WorkflowState integration
-   - Keep state format simple
-   - Preserve namespace states
-   - Test: `python -m pytest tests/test_state_integration.py`
-
-✓ Checkpoint: State management tests pass
+3. Documentation
+   - Update task handler docs
+   - Add namespace examples
+   - Document error handling
+   - Add batch processing guide
 
 ### Implementation Strategy
 
