@@ -234,3 +234,133 @@ else:
     }
     result = python_task(step, context, workspace)
     assert result["result"] == "big"
+
+
+def test_python_task_function_mode(context, workspace):
+    """Test Python task in function mode with template variables."""
+    context.update({
+        "args": {
+            "x": 10,
+            "y": 5
+        },
+        "env": {
+            "multiplier": 2
+        }
+    })
+    
+    step = {
+        "name": "function_mode",
+        "inputs": {
+            "operation": "function",
+            "code": """
+def process(x, y, multiplier):
+    return (x + y) * multiplier
+""",
+            "args": ["{{ args.x }}", "{{ args.y }}", "{{ env.multiplier }}"]
+        }
+    }
+    
+    result = python_task(step, context, workspace)
+    assert result["result"] == 30  # (10 + 5) * 2
+
+
+def test_python_task_function_mode_with_defaults(context, workspace):
+    """Test function mode with default arguments."""
+    step = {
+        "name": "function_defaults",
+        "inputs": {
+            "operation": "function",
+            "code": """
+def process(x, y=5, multiplier=2):
+    return (x + y) * multiplier
+""",
+            "args": [10]  # Only provide first argument
+        }
+    }
+    
+    result = python_task(step, context, workspace)
+    assert result["result"] == 30  # (10 + 5) * 2
+
+
+def test_python_task_function_mode_invalid_signature(context, workspace):
+    """Test error handling for invalid function signature."""
+    step = {
+        "name": "invalid_function",
+        "inputs": {
+            "operation": "function",
+            "code": """
+def wrong_name(x, y):  # Function must be named 'process'
+    return x + y
+""",
+            "args": [1, 2]
+        }
+    }
+    
+    with pytest.raises(TemplateError, match="Function mode requires a 'process' function"):
+        python_task(step, context, workspace)
+
+
+def test_python_task_function_mode_with_kwargs(context, workspace):
+    """Test function mode with keyword arguments."""
+    step = {
+        "name": "function_kwargs",
+        "inputs": {
+            "operation": "function",
+            "code": """
+def process(x, y, *, multiplier=1):
+    return (x + y) * multiplier
+""",
+            "args": [2, 3],
+            "kwargs": {"multiplier": 4}
+        }
+    }
+    
+    result = python_task(step, context, workspace)
+    assert result["result"] == 20  # (2 + 3) * 4
+
+
+def test_python_task_function_mode_template_error(context, workspace):
+    """Test error handling for undefined template variables in function mode."""
+    context.update({"args": {}})
+    
+    step = {
+        "name": "function_template_error",
+        "inputs": {
+            "operation": "function",
+            "code": """
+def process(x):
+    return x * 2
+""",
+            "args": ["{{ args.missing }}"]
+        }
+    }
+    
+    with pytest.raises(TemplateError, match="Undefined variable"):
+        python_task(step, context, workspace)
+
+
+def test_python_task_function_mode_complex_types(context, workspace):
+    """Test function mode with complex argument types."""
+    context.update({
+        "args": {
+            "data": {
+                "numbers": [1, 2, 3],
+                "factor": 2
+            }
+        }
+    })
+    
+    step = {
+        "name": "function_complex",
+        "inputs": {
+            "operation": "function",
+            "code": """
+def process(data):
+    return sum(x * data['factor'] for x in data['numbers'])
+""",
+            "args": ["{{ args.data }}"]
+        }
+    }
+    
+    result = python_task(step, context, workspace)
+    assert result["result"] == 12  # (1 + 2 + 3) * 2

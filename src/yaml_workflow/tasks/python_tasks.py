@@ -43,6 +43,87 @@ def execute_code(code: str, inputs: Dict[str, Any], context: Dict[str, Any]) -> 
         raise TemplateError(f"Failed to execute Python code: {str(e)}")
 
 
+def process_template_value(value: Any, context: Dict[str, Any]) -> Any:
+    """Process a template value using the given context.
+
+    Args:
+        value: The value to process (can be a string template or any other type)
+        context: The context for template resolution
+
+    Returns:
+        The processed value with preserved type
+
+    Raises:
+        TemplateError: If template resolution fails or if a variable is undefined
+    """
+    if not isinstance(value, str):
+        return value
+
+    try:
+        # Check if the value is a template
+        if "{{" in value and "}}" in value:
+            # Process the template with StrictUndefined to catch undefined variables
+            template = Template(value, undefined=StrictUndefined)
+            try:
+                result = template.render(context)
+            except UndefinedError as e:
+                raise TemplateError(f"Undefined variable in template: {str(e)}")
+            
+            # Try to evaluate the result as a Python literal
+            try:
+                import ast
+                return ast.literal_eval(result)
+            except (ValueError, SyntaxError):
+                return result
+        return value
+    except Exception as e:
+        if isinstance(e, TemplateError):
+            raise
+        raise TemplateError(f"Failed to process template: {str(e)}")
+
+
+def execute_function(code: str, args: List[Any], kwargs: Dict[str, Any], context: Dict[str, Any]) -> Any:
+    """Execute a Python function with given arguments.
+
+    Args:
+        code: Python code containing the function definition
+        args: Positional arguments for the function
+        kwargs: Keyword arguments for the function
+        context: The context for template resolution
+
+    Returns:
+        The result of the function call
+
+    Raises:
+        TemplateError: If function execution fails
+    """
+    try:
+        # Create a new dictionary for local variables
+        local_vars = {}
+        
+        # Execute the code to define the function
+        exec(code, {}, local_vars)
+        
+        # Check if the process function exists
+        if "process" not in local_vars or not callable(local_vars["process"]):
+            raise ValueError("Function mode requires a 'process' function")
+        
+        # Process template variables in arguments
+        processed_args = [process_template_value(arg, context) for arg in args]
+        processed_kwargs = {
+            k: process_template_value(v, context)
+            for k, v in kwargs.items()
+        }
+        
+        # Call the function with processed arguments
+        result = local_vars["process"](*processed_args, **processed_kwargs)
+        return result
+    except Exception as e:
+        if isinstance(e, TemplateError):
+            raise
+        raise TemplateError(f"Failed to execute function: {str(e)}")
+
+
 @register_task("print_vars")
 def print_vars_task(
     step: Dict[str, Any], context: Dict[str, Any], workspace: Union[str, Path]
@@ -207,6 +288,19 @@ def python_task(
             except Exception as e:
                 log_task_error(logger, e)  # Pass the actual exception
                 raise TemplateError(f"Custom handler failed: {str(e)}")
+
+        elif operation == "function":
+            # Get function code and arguments
+            if "code" not in inputs:
+                raise ValueError("Function mode requires 'code' parameter")
+            
+            code = inputs["code"]
+            args = inputs.get("args", [])
+            kwargs = inputs.get("kwargs", {})
+            
+            # Execute the function with context for template resolution
+            result = execute_function(code, args, kwargs, context)
+            return {"result": result}
 
         else:
             raise ValueError(f"Unknown operation: {operation}")
