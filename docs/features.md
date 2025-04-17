@@ -6,60 +6,101 @@ YAML Workflow provides a rich set of features for building and executing workflo
 
 ### YAML-Driven Configuration
 
-Define workflows using simple YAML syntax:
+Define workflows using simple YAML syntax with standardized task configuration:
 
 ```yaml
 name: data_processing
 description: Process and transform data files
 version: "1.0.0"
 
+args:
+  input_file:
+    type: string
+    description: Input file to process
+    default: input.csv
+  
+env:
+  WORKSPACE: /data/processing
+  API_KEY: "{{ args.api_key }}"
+
 steps:
-  - name: read_data
+  read_data:
+    name: read_data
     task: read_file
-    params:
-      file_path: input.csv
+    inputs:
+      file_path: "{{ args.input_file }}"
+      encoding: utf-8
 
-  - name: transform
+  transform:
+    name: transform
     task: python
-    params:
-      function: transform_data
-      params:
-        data: "{{ read_data.output }}"
+    inputs:
+      code: |
+        # Access data through namespaces
+        data = steps['read_data']['result']
+        workspace = env['WORKSPACE']
+        
+        # Process data
+        result = transform_data(data)
 ```
 
-### Dynamic Variable Resolution
+### Namespace Support
 
-Use Jinja2 templates for dynamic values. For comprehensive documentation on templating features and best practices, see the [Templating Guide](guide/templating.md).
+Access variables through isolated namespaces:
+
+- `args`: Command-line arguments and workflow parameters
+- `env`: Environment variables
+- `steps`: Results from previous steps
+- `batch`: Batch processing context (in batch tasks)
+- `current`: Information about the current task
+
+Example:
+```yaml
+steps:
+  process_data:
+    name: process_data
+    task: shell
+    inputs:
+      command: |
+        # Access from different namespaces
+        echo "Input: {{ args.input_file }}"
+        echo "API Key: {{ env.API_KEY }}"
+        echo "Previous: {{ steps.previous.result }}"
+        echo "Current: {{ steps.current.name }}"
+```
+
+### Error Handling
+
+Standardized error handling through TaskConfig:
 
 ```yaml
 steps:
-  - name: generate_report
-    task: template
-    params:
-      template: |
-        Report generated on {{ now() }}
-        Data processed: {{ input_file }}
-        Results: {{ previous_step.output }}
-      variables:
-        input_file: data.csv
+  api_call:
+    name: api_call
+    task: shell
+    inputs:
+      command: "curl {{ env.API_URL }}"
+    retry:
+      max_attempts: 3
+      delay: 5
+      backoff: 2
 ```
 
-### Flow Control
-
-Define multiple execution paths:
-
-```yaml
-flows:
-  default: process_all
-  definitions:
-    - process_all: [validate, transform, save]
-    - validate_only: [validate]
-    - transform_only: [transform]
-```
+Error types:
+- `TaskExecutionError`: Task execution failures
+  - Contains step name and original error
+  - Provides execution context
+  - Lists available variables
+- `TemplateError`: Template resolution failures
+  - Shows undefined variable details
+  - Lists available variables by namespace
+  - Provides template context
 
 ## Task System
 
 ### Built-in Tasks
+
+All tasks use the standardized TaskConfig interface:
 
 Basic Tasks:
 - Echo (`echo`)
@@ -89,215 +130,236 @@ Other Tasks:
 
 ### Custom Task Creation
 
-Create your own task types:
+Create tasks using the TaskConfig interface:
 
 ```python
-from yaml_workflow.tasks import register_task
+from yaml_workflow.tasks import register_task, TaskConfig
+from yaml_workflow.exceptions import TaskExecutionError
 
 @register_task("custom_task")
-def custom_task_handler(step, context, workspace):
+def custom_task_handler(config: TaskConfig) -> Dict[str, Any]:
     """
-    Custom task implementation.
+    Custom task implementation using TaskConfig.
     
     Args:
-        step (dict): Step configuration from YAML
-        context (dict): Workflow context
-        workspace (Path): Workspace directory
+        config: TaskConfig object containing:
+               - name: Task name
+               - type: Task type
+               - inputs: Task inputs
+               - workspace: Workspace path
+               - _context: Variable context
     
     Returns:
-        Any: Task result
+        Dict containing:
+        - result: Task result
+        - task_name: Name of the task
+        - task_type: Type of task
+        - available_variables: Variables accessible to the task
     """
-    params = step.get("params", {})
-    # Process inputs and perform task
-    return {"result": "Task completed"}
+    try:
+        # Process inputs with template resolution
+        processed = config.process_inputs()
+        
+        # Access variables from different namespaces
+        input_value = config.get_variable('value', namespace='args')
+        env_var = config.get_variable('API_KEY', namespace='env')
+        
+        # Process data
+        result = process_data(input_value, env_var)
+        
+        return {
+            "result": result,
+            "task_name": config.name,
+            "task_type": config.type,
+            "available_variables": config.get_available_variables()
+        }
+    except Exception as e:
+        raise TaskExecutionError(
+            message=f"Custom task failed: {str(e)}",
+            step_name=config.name,
+            original_error=e
+        )
 ```
 
-### Task Features
+## Batch Processing
 
-1. **Parameter Management**
-   - Type validation
-   - Automatic conversion
-   - Output capturing
-
-2. **Error Handling**
-   - Retry mechanisms
-   - Error recovery
-   - Custom error actions
-
-3. **Progress Tracking**
-   - Step completion
-   - Time estimation
-   - Resource monitoring
-
-## Parallel Processing
-
-### Batch Operations
-
-Process items in parallel:
+Process items in parallel with proper error handling and state tracking:
 
 ```yaml
 steps:
-  - name: process_files
+  process_files:
+    name: process_files
     task: batch
-    params:
-      iterate_over: ["file1.txt", "file2.txt"]
-      parallel: true
-      max_workers: 4
-      processing_task:
+    inputs:
+      items: "{{ args.files }}"
+      chunk_size: 10          # Process 10 items at a time
+      max_workers: 4          # Use 4 parallel workers
+      retry:
+        max_attempts: 3       # Retry failed items up to 3 times
+        delay: 5              # Wait 5 seconds between retries
+      task:
         task: shell
-        params:
-          command: "echo 'Processing {{ item }}'"
+        inputs:
+          command: |
+            echo "Processing {{ batch.item }}"
+            echo "Progress: {{ batch.index + 1 }}/{{ batch.total }}"
+            echo "Task: {{ batch.name }}"
+            ./process.sh "{{ batch.item }}"
+          working_dir: "{{ env.WORKSPACE }}"
+          timeout: 300        # Timeout after 5 minutes
+
+  check_results:
+    name: check_results
+    task: python
+    inputs:
+      code: |
+        results = steps['process_files']['results']
+        
+        # Analyze results
+        completed = [r for r in results if 'result' in r]
+        failed = [r for r in results if 'error' in r]
+        
+        result = {
+            'total': len(results),
+            'completed': len(completed),
+            'failed': len(failed),
+            'success_rate': len(completed) / len(results) * 100,
+            'failed_items': [r['item'] for r in failed]
+        }
 ```
 
-### Worker Management
+### Batch Features
 
-- Dynamic worker allocation
-- Resource limiting
-- Progress monitoring
+1. **Chunk Processing**
+   - Configurable chunk sizes
+   - Memory optimization
+   - Progress tracking
 
-## State Management
+2. **Parallel Execution**
+   - Dynamic worker pools
+   - Resource management
+   - Timeout handling
 
-### Persistence
+3. **Error Handling**
+   - Per-item retry
+   - Batch-level retry
+   - Detailed error reporting
 
-- Workflow state tracking
-- Step output storage
-- Variable persistence
-
-### Resume Capability
-
-- Restart from failures
-- Skip completed steps
-- State validation
+4. **State Tracking**
+   - Progress monitoring
+   - Result aggregation
+   - Failure analysis
 
 ## Template System
 
-### Variable Substitution
+### Variable Resolution
+
+Access variables through namespaces:
 
 ```yaml
 steps:
-  - name: create_file
+  create_file:
+    name: create_file
     task: write_file
-    params:
-      content: "Hello, {{ user }}!"
-      file_path: "{{ output_dir }}/greeting.txt"
+    inputs:
+      content: |
+        User: {{ args.user }}
+        Environment: {{ env.ENV_NAME }}
+        Previous Result: {{ steps.previous.result }}
+        Current Task: {{ steps.current.name }}
+      file_path: "{{ env.OUTPUT_DIR }}/report.txt"
 ```
 
 ### Built-in Functions
 
-- Date/time manipulation
-- String operations
-- Math functions
-- Path handling
+Template functions with namespace awareness:
+- Date/time manipulation: `now()`, `format_date()`
+- String operations: `trim()`, `upper()`, `lower()`
+- Math functions: `sum()`, `min()`, `max()`
+- Path handling: `join_paths()`, `basename()`
 
 ### Custom Functions
 
-Register custom template functions:
+Register template functions with namespace support:
 
 ```python
 from yaml_workflow.template import register_function
 
 @register_function
-def custom_format(value, format_spec):
-    return format(value, format_spec)
+def format_with_context(value: str, context: Dict[str, Any]) -> str:
+    """Format string with context awareness."""
+    return value.format(**context)
 ```
 
-## Error Handling
+## State Management
 
-### Retry Mechanism
+### Task Results
 
+All tasks maintain consistent result format:
+- `result`: Task output
+- `task_name`: Name of the task
+- `task_type`: Type of task
+- `available_variables`: Variables accessible to the task
+
+Access results through the steps namespace:
 ```yaml
 steps:
-  - name: api_call
+  first_step:
+    name: first_step
     task: shell
-    retry:
-      max_attempts: 3
-      delay: 5
-      backoff: 2
-    params:
-      command: "curl http://api.example.com"
+    inputs:
+      command: "echo 'Hello'"
+
+  second_step:
+    name: second_step
+    task: shell
+    inputs:
+      command: |
+        # Access previous results
+        echo "Output: {{ steps.first_step.stdout }}"
+        echo "Exit Code: {{ steps.first_step.exit_code }}"
+        
+        # Access current task
+        echo "Task: {{ steps.current.name }}"
+        echo "Type: {{ steps.current.type }}"
 ```
 
-### Error Actions
+### Error Recovery
 
-- Skip failed steps
-- Retry with backoff
-- Custom error handlers
-- Notification integration
-
-## Logging and Monitoring
-
-### Log Levels
-
-- DEBUG: Detailed debugging
-- INFO: General information
-- WARNING: Potential issues
-- ERROR: Error conditions
-
-### Output Formats
-
-- Text logs
-- JSON structured
-- Custom formatters
-
-### Monitoring
-
-- Progress tracking
-- Resource usage
-- Performance metrics
-- Status reporting
-
-## Security Features
-
-### Environment Isolation
-
-- Workspace containment
-- Environment variable control
-- Resource limitations
-
-### Credential Management
-
-- Secure variable handling
-- Environment variable integration
-- Token management
-
-## Development Tools
-
-### CLI Tools
-
-- Workflow validation
-- State inspection
-- Log analysis
-- Performance profiling
-
-### Testing Support
-
-- Mock tasks
-- State simulation
-- Error injection
-- Performance testing
+Standardized error handling and recovery:
+- Automatic retries with configurable backoff
+- Detailed error context for debugging
+- State preservation during failures
+- Resume capability from last successful point
 
 ## Best Practices
 
-1. **Workflow Design**
-   - Modular steps
-   - Clear dependencies
-   - Error handling
-   - Progress tracking
+1. **Task Design**
+   - Use TaskConfig interface
+   - Implement proper error handling
+   - Maintain namespace isolation
+   - Return standardized results
 
-2. **Resource Management**
-   - Worker pools
-   - Memory usage
-   - File handles
-   - Network connections
+2. **Error Handling**
+   - Use TaskExecutionError for task failures
+   - Include context in error messages
+   - Implement retry mechanisms
+   - Clean up resources on failure
 
-3. **Error Handling**
-   - Retry strategies
-   - Fallback options
-   - Clean up
-   - Logging
+3. **Batch Processing**
+   - Choose appropriate chunk sizes
+   - Monitor resource usage
+   - Handle errors gracefully
+   - Track progress effectively
 
-4. **Security**
-   - Credential protection
-   - Input validation
-   - Resource limits
-   - Audit logging 
+4. **Template Usage**
+   - Use proper namespace access
+   - Validate variable existence
+   - Handle undefined variables
+   - Document available variables
+
+For more detailed information:
+- [Task Types](tasks.md)
+- [Templating Guide](guide/templating.md)
+- [Batch Processing Guide](guide/batch-tasks.md)
+- [Error Handling Guide](guide/error-handling.md) 

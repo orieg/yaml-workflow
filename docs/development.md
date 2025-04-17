@@ -22,6 +22,182 @@ black src/ tests/ && isort --profile black src/ tests/
 mypy src/
 ```
 
+## Task Development
+
+### TaskConfig Interface
+
+All tasks in YAML Workflow use the `TaskConfig` interface for standardized configuration and error handling:
+
+```python
+from yaml_workflow.tasks import register_task, TaskConfig
+from yaml_workflow.exceptions import TaskExecutionError
+
+@register_task("my_task")
+def my_task_handler(config: TaskConfig) -> Dict[str, Any]:
+    """
+    Task implementation using TaskConfig.
+    
+    Args:
+        config: TaskConfig object containing:
+               - name: Task name
+               - type: Task type
+               - inputs: Task inputs
+               - workspace: Workspace path
+               - _context: Variable context
+    
+    Returns:
+        Dict containing:
+        - result: Task result
+        - task_name: Name of the task
+        - task_type: Type of task
+        - available_variables: Variables accessible to the task
+    """
+    try:
+        # Process inputs with template resolution
+        processed = config.process_inputs()
+        
+        # Access variables from different namespaces
+        input_value = config.get_variable('value', namespace='args')
+        env_var = config.get_variable('API_KEY', namespace='env')
+        
+        # Access batch context if available
+        batch_ctx = config.get_variable('item', namespace='batch')
+        
+        # Perform task logic
+        result = process_data(input_value, env_var)
+        
+        return {
+            "result": result,
+            "task_name": config.name,
+            "task_type": config.type,
+            "available_variables": config.get_available_variables()
+        }
+    except Exception as e:
+        raise TaskExecutionError(
+            message=f"Task failed: {str(e)}",
+            step_name=config.name,
+            original_error=e
+        )
+```
+
+### Error Handling
+
+Tasks should use standardized error handling through `TaskExecutionError`:
+
+```python
+from yaml_workflow.exceptions import TaskExecutionError
+
+def process_with_error_handling(config: TaskConfig) -> Dict[str, Any]:
+    try:
+        # Process task
+        result = process_data()
+        return {"result": result}
+    except ValueError as e:
+        raise TaskExecutionError(
+            message="Invalid input data",
+            step_name=config.name,
+            original_error=e
+        )
+    except IOError as e:
+        raise TaskExecutionError(
+            message="Failed to read/write data",
+            step_name=config.name,
+            original_error=e
+        )
+    except Exception as e:
+        raise TaskExecutionError(
+            message=f"Unexpected error: {str(e)}",
+            step_name=config.name,
+            original_error=e
+        )
+```
+
+### Template Resolution
+
+Tasks should use `config.process_inputs()` for template resolution:
+
+```python
+@register_task("template_task")
+def template_task_handler(config: TaskConfig) -> Dict[str, Any]:
+    # Process inputs with template resolution
+    processed = config.process_inputs()
+    
+    # Access resolved values
+    template = processed.get("template")
+    variables = processed.get("variables", {})
+    
+    try:
+        # Use resolved values
+        result = render_template(template, variables)
+        return {"result": result}
+    except Exception as e:
+        raise TaskExecutionError(
+            message="Template rendering failed",
+            step_name=config.name,
+            original_error=e
+        )
+```
+
+### Batch Processing
+
+Tasks can access batch context when used in batch operations:
+
+```python
+@register_task("batch_aware_task")
+def batch_aware_task_handler(config: TaskConfig) -> Dict[str, Any]:
+    # Get batch context if available
+    batch_item = config.get_variable('item', namespace='batch')
+    batch_index = config.get_variable('index', namespace='batch')
+    batch_total = config.get_variable('total', namespace='batch')
+    
+    if batch_item is not None:
+        # We're in a batch context
+        print(f"Processing item {batch_index + 1}/{batch_total}")
+        result = process_batch_item(batch_item)
+    else:
+        # Regular task execution
+        result = process_single_item()
+    
+    return {"result": result}
+```
+
+### Testing Tasks
+
+Create comprehensive tests for tasks:
+
+```python
+def test_my_task():
+    # Create test config
+    config = TaskConfig(
+        name="test_task",
+        task_type="my_task",
+        inputs={
+            "value": "test_value",
+            "api_key": "test_key"
+        },
+        context={
+            "args": {"value": "test_value"},
+            "env": {"API_KEY": "test_key"},
+            "steps": {}
+        },
+        workspace=Path("/tmp/test")
+    )
+    
+    # Execute task
+    result = my_task_handler(config)
+    
+    # Verify result
+    assert result["task_name"] == "test_task"
+    assert result["task_type"] == "my_task"
+    assert "result" in result
+    
+    # Test error handling
+    config.inputs["value"] = None
+    with pytest.raises(TaskExecutionError) as exc_info:
+        my_task_handler(config)
+    assert "Invalid input" in str(exc_info.value)
+```
+
 ## Building and Distribution
 
 1. Ensure you have the latest build tools:

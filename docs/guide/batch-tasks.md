@@ -7,263 +7,288 @@ This guide covers how to effectively use batch processing capabilities in YAML W
 Batch processing allows you to:
 - Process large datasets in manageable chunks
 - Track progress and maintain state between runs
-- Handle errors gracefully with retry mechanisms
+- Handle errors gracefully with standardized error handling
 - Process items in parallel for improved performance
 - Resume processing from the last successful point
+- Access batch-specific context variables
 
 ## Basic Batch Processing
 
 Here's a simple example of a batch processing workflow:
 
 ```yaml
-name: process-numbers
-description: Process a list of numbers in batches
+name: process-items
+description: Process a list of items in batches
 version: '1.0'
 
-params:
-  numbers:
+args:
+  items:
     type: list
-    description: List of numbers to process
-    default: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-  batch_size:
+    description: List of items to process
+    default: ["item1", "item2", "item3", "item4", "item5"]
+  chunk_size:
     type: integer
     description: Size of each batch
-    default: 3
+    default: 2
 
 steps:
-  split_into_batches:
-    type: python
+  process_items:
+    name: process_items
+    task: batch
     inputs:
-      code: |
-        numbers = params['numbers']
-        batch_size = params['batch_size']
-        batches = [numbers[i:i + batch_size] for i in range(0, len(numbers), batch_size)]
-        result = batches
-
-  process_batches:
-    type: python
-    for_each: "{{ steps.split_into_batches.result }}"
-    inputs:
-      operation: multiply
-      item: "{{ item }}"
-      factor: 2
-    retry:
-      max_attempts: 3
-      delay: 5
+      items: "{{ args.items }}"
+      chunk_size: "{{ args.chunk_size }}"
+      max_workers: 2  # Process up to 2 chunks in parallel
+      task:  # Task configuration for processing each item
+        task: shell
+        inputs:
+          command: |
+            echo "Processing item {{ batch.item }} ({{ batch.index + 1 }}/{{ batch.total }})"
+            ./process.sh "{{ batch.item }}"
 ```
 
-## Chunk Processing
+## Batch Context
 
-Chunk processing helps manage memory usage and processing time by breaking large datasets into smaller pieces:
+Each item in a batch has access to these context variables:
+
+- `batch.item`: The current item being processed
+- `batch.index`: Zero-based index of the current item
+- `batch.total`: Total number of items in the batch
+- `batch.name`: Name of the batch task
+
+Example using batch context:
 
 ```yaml
 steps:
-  read_large_dataset:
-    type: python
+  process_files:
+    name: process_files
+    task: batch
     inputs:
-      code: |
-        # Example: Reading a large dataset in chunks
-        chunk_size = 1000
-        total_chunks = len(data) // chunk_size + 1
-        chunks = []
-        for i in range(total_chunks):
-          start = i * chunk_size
-          end = start + chunk_size
-          chunks.append(data[start:end])
-        result = chunks
-
-  process_chunks:
-    type: python
-    for_each: "{{ steps.read_large_dataset.result }}"
-    inputs:
-      operation: custom
-      handler: process_chunk
-      item: "{{ item }}"
-```
-
-## State Management
-
-The workflow engine maintains state between runs, allowing for resumption of interrupted processing:
-
-```yaml
-steps:
-  track_progress:
-    type: python
-    inputs:
-      code: |
-        # Store progress in context
-        context['processed_count'] = context.get('processed_count', 0) + len(item)
-        context['total_items'] = len(params['numbers'])
-        result = {
-          'processed': context['processed_count'],
-          'total': context['total_items'],
-          'progress': f"{(context['processed_count'] / context['total_items']) * 100:.2f}%"
-        }
-```
-
-## Progress Tracking
-
-Monitor batch processing progress using built-in tracking capabilities:
-
-```yaml
-steps:
-  process_with_progress:
-    type: python
-    for_each: "{{ steps.split_into_batches.result }}"
-    inputs:
-      operation: custom
-      handler: process_items
-      item: "{{ item }}"
-      on_progress: |
-        def update_progress(items_processed, total_items):
-          print(f"Progress: {items_processed}/{total_items} items processed")
+      items: "{{ args.files }}"
+      task:
+        task: python
+        inputs:
+          code: |
+            # Access batch context
+            current_file = batch['item']
+            progress = f"{batch['index'] + 1}/{batch['total']}"
+            task_name = batch['name']
+            
+            print(f"[{task_name}] Processing {current_file} ({progress})")
+            result = process_file(current_file)
 ```
 
 ## Error Handling
 
-Implement robust error handling for batch operations:
+Batch tasks use standardized error handling:
 
 ```yaml
 steps:
-  process_with_error_handling:
-    type: python
-    for_each: "{{ steps.split_into_batches.result }}"
+  process_with_retries:
+    name: process_with_retries
+    task: batch
     inputs:
-      operation: custom
-      handler: process_batch
-      item: "{{ item }}"
-    retry:
-      max_attempts: 3
-      delay: 5
-    on_error:
-      action: continue
-      save_error: true
-      
-  handle_failed_items:
-    type: python
-    if: "{{ steps.process_with_error_handling.failed_items|length > 0 }}"
+      items: "{{ args.items }}"
+      retry:
+        max_attempts: 3
+        delay: 5
+      task:
+        task: shell
+        inputs:
+          command: "./process.sh {{ batch.item }}"
+          
+  handle_results:
+    name: handle_results
+    task: python
     inputs:
       code: |
-        failed_items = steps['process_with_error_handling']['failed_items']
-        print(f"Failed items: {failed_items}")
-        # Handle failed items (e.g., save to error log, notify, etc.)
+        results = steps['process_with_retries']['results']
+        
+        # Check each result
+        for result in results:
+          if 'error' in result:
+            print(f"Item {result['index']} failed: {result['error']}")
+          else:
+            print(f"Item {result['index']} succeeded: {result['result']}")
 ```
 
-## Parallel Processing
+## State Tracking
 
-Leverage parallel processing for improved performance:
+The batch processor maintains detailed state information:
 
 ```yaml
 steps:
-  parallel_process:
-    type: python
-    for_each: "{{ steps.split_into_batches.result }}"
-    parallel:
-      max_parallel: 4  # Process up to 4 batches simultaneously
+  process_items:
+    name: process_items
+    task: batch
     inputs:
-      operation: custom
-      handler: process_batch
-      item: "{{ item }}"
+      items: "{{ args.items }}"
+      task:
+        task: python
+        inputs:
+          code: |
+            # Process item and update state
+            result = process_item(batch['item'])
+            
+            # Results are automatically tracked
+            return {
+              'item': batch['item'],
+              'status': 'completed',
+              'output': result
+            }
+            
+  check_progress:
+    name: check_progress
+    task: python
+    inputs:
+      code: |
+        batch_results = steps['process_items']['results']
+        
+        # Analyze results
+        completed = [r for r in batch_results if 'result' in r]
+        failed = [r for r in batch_results if 'error' in r]
+        
+        print(f"Completed: {len(completed)}/{len(batch_results)}")
+        print(f"Failed: {len(failed)}/{len(batch_results)}")
+```
+
+## Performance Optimization
+
+Optimize batch processing with these features:
+
+```yaml
+steps:
+  optimized_processing:
+    name: optimized_processing
+    task: batch
+    inputs:
+      items: "{{ args.items }}"
+      chunk_size: 10          # Process 10 items at a time
+      max_workers: 4          # Use 4 parallel workers
+      retry:
+        max_attempts: 3       # Retry failed items up to 3 times
+        delay: 5              # Wait 5 seconds between retries
+      task:
+        task: shell
+        inputs:
+          command: "./process.sh {{ batch.item }}"
+          timeout: 300        # Timeout after 5 minutes
+          working_dir: "{{ env.WORKSPACE }}/{{ batch.item }}"
 ```
 
 ## Best Practices
 
-1. **Chunk Size**: Choose appropriate chunk sizes based on:
-   - Available memory
-   - Processing complexity
-   - Required processing time
-   
-2. **State Management**:
-   - Store progress information in the context
-   - Use checkpoints for long-running operations
-   - Implement resume capabilities
+1. **Chunk Size**:
+   - Balance memory usage and performance
+   - Consider item processing complexity
+   - Test with different sizes for optimization
 
-3. **Error Handling**:
-   - Implement retry mechanisms
-   - Log failed items
-   - Provide cleanup steps
+2. **Error Handling**:
+   - Always implement retry mechanisms
+   - Use standardized error handling
+   - Track failed items for analysis
+   - Provide meaningful error messages
+
+3. **State Management**:
+   - Use the built-in state tracking
+   - Monitor progress regularly
+   - Implement proper cleanup
+   - Handle interruptions gracefully
 
 4. **Performance**:
-   - Use parallel processing when appropriate
+   - Use appropriate chunk sizes
+   - Enable parallel processing when suitable
    - Monitor resource usage
-   - Optimize batch sizes based on performance metrics
+   - Set reasonable timeouts
 
-5. **Monitoring**:
-   - Track progress regularly
-   - Log important metrics
-   - Implement alerting for failures
+5. **Context Usage**:
+   - Use batch context variables
+   - Maintain namespace isolation
+   - Follow variable naming conventions
+   - Document context requirements
 
-## Example: Complete Batch Processing Workflow
+## Complete Example
 
-Here's a complete example combining all the features:
+Here's a comprehensive batch processing workflow:
 
 ```yaml
 name: process-dataset
 description: Process a large dataset with full features
 version: '1.0'
 
-params:
-  input_data:
+args:
+  input_files:
     type: list
-    description: Data to process
+    description: Files to process
   chunk_size:
     type: integer
-    default: 1000
-  max_parallel:
+    default: 10
+  max_workers:
     type: integer
     default: 4
 
+env:
+  WORKSPACE: "/data/processing"
+  API_KEY: "{{ args.api_key }}"
+
 steps:
-  prepare_chunks:
-    type: python
+  validate_inputs:
+    name: validate_inputs
+    task: python
     inputs:
       code: |
-        data = params['input_data']
-        chunk_size = params['chunk_size']
-        chunks = [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
-        result = chunks
-
-  process_chunks:
-    type: python
-    for_each: "{{ steps.prepare_chunks.result }}"
-    parallel:
-      max_parallel: "{{ params.max_parallel }}"
+        files = args['input_files']
+        if not files:
+          raise TaskExecutionError("No input files provided")
+        result = [f for f in files if os.path.exists(f)]
+        
+  process_files:
+    name: process_files
+    task: batch
     inputs:
-      operation: custom
-      handler: process_chunk
-      item: "{{ item }}"
-    retry:
-      max_attempts: 3
-      delay: 5
-    on_error:
-      action: continue
-      save_error: true
-
-  track_progress:
-    type: python
+      items: "{{ steps.validate_inputs.result }}"
+      chunk_size: "{{ args.chunk_size }}"
+      max_workers: "{{ args.max_workers }}"
+      retry:
+        max_attempts: 3
+        delay: 5
+      task:
+        task: shell
+        inputs:
+          command: |
+            echo "[{{ batch.index + 1 }}/{{ batch.total }}] Processing {{ batch.item }}"
+            ./process.sh \
+              --input "{{ batch.item }}" \
+              --output "{{ env.WORKSPACE }}/output/{{ batch.index }}" \
+              --api-key "{{ env.API_KEY }}"
+          working_dir: "{{ env.WORKSPACE }}"
+          timeout: 300
+          
+  generate_report:
+    name: generate_report
+    task: python
     inputs:
       code: |
-        processed = len(steps['process_chunks']['completed_items'])
-        total = len(params['input_data'])
-        failed = len(steps['process_chunks']['failed_items'])
-        result = {
-          'processed': processed,
-          'total': total,
-          'failed': failed,
-          'success_rate': f"{((processed - failed) / total) * 100:.2f}%"
+        results = steps['process_files']['results']
+        
+        # Analyze results
+        completed = [r for r in results if 'result' in r]
+        failed = [r for r in results if 'error' in r]
+        
+        # Generate report
+        report = {
+          'total': len(results),
+          'completed': len(completed),
+          'failed': len(failed),
+          'success_rate': len(completed) / len(results) * 100,
+          'failed_items': [r['item'] for r in failed]
         }
-
-  handle_failures:
-    type: python
-    if: "{{ steps.process_chunks.failed_items|length > 0 }}"
-    inputs:
-      code: |
-        failed_items = steps['process_chunks']['failed_items']
-        # Log failures and send notifications
-        result = {
-          'failed_count': len(failed_items),
-          'failed_items': failed_items
-        }
+        
+        # Save report
+        with open('report.json', 'w') as f:
+          json.dump(report, f, indent=2)
+        
+        result = report
 ```
 
 This documentation provides a comprehensive guide to batch processing capabilities, focusing on real-world usage patterns and best practices. 
