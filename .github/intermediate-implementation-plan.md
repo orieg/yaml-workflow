@@ -10,6 +10,7 @@ This document outlines focused improvements to the YAML Workflow Engine's batch 
 - Add basic progress tracking
 - Keep the system lightweight and maintainable
 - Ensure seamless integration with centralized template engine
+- Standardize namespace handling across components
 
 ### Integration with Template Engine Centralization
 This plan builds upon the completed work in template engine centralization:
@@ -17,104 +18,123 @@ This plan builds upon the completed work in template engine centralization:
 - Maintains consistent Jinja2 feature support
 - Leverages improved error handling for template resolution
 - Builds on the enhanced state management system
+- Preserves namespace isolation (args, env, steps)
 
 ### Tasks
 
-#### 1. Standardize Task Interface
+#### 1. Standardize Task Interface with Namespace Support
 ```python
 # In tasks/__init__.py
-def create_batch_task_handler(func):
-    """Decorator to standardize batch task handling."""
-    def wrapper(step: Dict[str, Any], context: Dict[str, Any], workspace: Path):
-        # Standard pre-processing
-        items = step.get("items") or step.get("iterate_over")
-        if not items:
-            raise ValueError("No items provided for batch processing")
-            
-        # Create consistent batch context with template engine access
-        batch_context = {
-            "workspace": workspace,
-            "engine": context.get("engine"),  # Used for centralized template resolution
-            "batch_name": step.get("name", "unnamed_batch"),
-            "retry_config": step.get("retry", {}),
-            "template_context": context.get("template_context", {})  # Template variables
+class TaskConfig:
+    """Configuration class for task handlers with namespace support."""
+    def __init__(self, step: Dict[str, Any], context: Dict[str, Any], workspace: Path):
+        self.name = step.get("name")
+        self.type = step.get("task")
+        self.inputs = step.get("inputs", {})
+        self._context = context  # Keep original context structure
+        self.workspace = workspace
+
+    def get_variable(self, name: str, namespace: Optional[str] = None) -> Any:
+        """Get a variable with namespace support."""
+        if namespace:
+            return self._context.get(namespace, {}).get(name)
+        return self._context.get(name)
+
+    def get_available_variables(self) -> Dict[str, List[str]]:
+        """Get available variables by namespace."""
+        return {
+            "args": list(self._context.get("args", {}).keys()),
+            "env": list(self._context.get("env", {}).keys()),
+            "steps": list(self._context.get("steps", {}).keys()),
+            "root": list(k for k in self._context.keys() 
+                        if k not in ["args", "env", "steps"])
         }
-        
-        # Execute batch processing
-        return func(items, step, batch_context)
+
+def create_task_handler(func: Callable[..., R]) -> TaskHandler:
+    """Create a task handler with namespace-aware configuration."""
+    @wraps(func)
+    def wrapper(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> R:
+        config = TaskConfig(step, context, workspace)
+        return func(config)
     return wrapper
 ```
 
-1. Define standard batch context
-   - Consistent access to workspace and engine
-   - Standard retry configuration
-   - Integration with template engine context
+1. Define standard task configuration
+   - Namespace-aware variable access
+   - Consistent error reporting with namespace context
+   - Type-safe configuration object
    - Test: `python -m pytest tests/test_task_interface.py`
 
 2. Update task handlers to use standard interface
-   - Python task handler (using engine.resolve_template)
-   - Shell task handler (using engine.resolve_template)
-   - File task handler (using engine.resolve_template)
+   - Python task handler (using TaskConfig)
+   - Shell task handler (using TaskConfig)
+   - File task handler (using TaskConfig)
    - Test: `python -m pytest tests/test_task_handlers.py`
 
 ✓ Checkpoint: Task interface tests pass
 
-#### 2. Consistent Error Handling
+#### 2. Enhanced Batch Context
 ```python
-# In batch_processor.py
-def process_item(self, item: Any, task_config: Dict[str, Any], context: Dict[str, Any]):
-    try:
-        # Process item using task handler with template resolution
-        resolved_config = context["engine"].resolve_template(
-            task_config,
-            {"item": item, **context.get("template_context", {})}
-        )
-        result = self.task_handler(item, resolved_config, context)
-        return {"success": True, "result": result}
-    except TemplateError as te:
-        error_info = {
-            "success": False,
-            "error": str(te),
-            "item": item,
-            "template_context": te.context,  # Include available variables
-            "retryable": False
+class BatchContext:
+    """Context manager for batch processing with namespace support."""
+    def __init__(self, config: TaskConfig):
+        self.name = config.name
+        self.engine = config.get_variable("engine")
+        self.workspace = config.workspace
+        self.retry_config = config.inputs.get("retry", {})
+        self._context = config._context
+
+    def create_item_context(self, item: Any, index: int) -> Dict[str, Any]:
+        """Create context for a batch item while preserving namespaces."""
+        return {
+            "args": self._context.get("args", {}),
+            "env": self._context.get("env", {}),
+            "steps": self._context.get("steps", {}),
+            "batch": {
+                "item": item,
+                "index": index,
+                "name": self.name
+            }
         }
-        self.logger.error(f"Template error processing item {item}: {te}", extra=error_info)
-        return error_info
-    except Exception as e:
-        error_info = {
-            "success": False,
-            "error": str(e),
-            "item": item,
-            "retryable": isinstance(e, (IOError, TimeoutError))
+
+    def get_error_context(self, error: Exception) -> Dict[str, Any]:
+        """Get error context with namespace information."""
+        return {
+            "error": str(error),
+            "available_variables": self.get_available_variables(),
+            "namespaces": list(self._context.keys())
         }
-        self.logger.error(f"Failed to process item {item}: {e}", extra=error_info)
-        return error_info
 ```
 
-1. Standardize error format
-   - Common error structure
-   - Consistent retry hints
-   - Template-specific error handling
-   - Test: `python -m pytest tests/test_error_handling.py`
+1. Standardize batch context
+   - Namespace-aware variable access
+   - Type-safe batch operations
+   - Consistent error context
+   - Test: `python -m pytest tests/test_batch_context.py`
 
-2. Update engine integration
-   - Use standard error handling in WorkflowEngine
-   - Consistent retry behavior
-   - Template resolution error propagation
-   - Test: `python -m pytest tests/test_engine_integration.py`
+2. Update batch processor
+   - Use enhanced batch context
+   - Preserve namespace isolation
+   - Improve error handling
+   - Test: `python -m pytest tests/test_batch_processor.py`
 
-✓ Checkpoint: Error handling tests pass
+✓ Checkpoint: Batch context tests pass
 
 #### 3. Simplified State Management
 ```python
-# In batch_processor.py
-class BatchProcessor:
+class BatchState:
+    """State manager for batch processing with namespace support."""
     def __init__(self, workspace: Path, name: str):
         self.state = {
             "processed": [],  # Keep order for resume
             "failed": {},     # item -> error info
             "template_errors": {},  # Track template resolution failures
+            "namespaces": {   # Track namespace states
+                "args": {},
+                "env": {},
+                "steps": {},
+                "batch": {}
+            },
             "stats": {
                 "total": 0,
                 "processed": 0,
@@ -126,7 +146,7 @@ class BatchProcessor:
 ```
 
 1. Standardize state format
-   - Common state structure
+   - Namespace-aware state tracking
    - Simple statistics tracking
    - Template resolution state tracking
    - Test: `python -m pytest tests/test_state.py`
@@ -134,7 +154,7 @@ class BatchProcessor:
 2. Integrate with engine state
    - Update WorkflowState integration
    - Keep state format simple
-   - Preserve template context for resume
+   - Preserve namespace states
    - Test: `python -m pytest tests/test_state_integration.py`
 
 ✓ Checkpoint: State management tests pass
@@ -142,56 +162,56 @@ class BatchProcessor:
 ### Implementation Strategy
 
 1. Task Interface (2 days)
-   - Implement standard batch context
-   - Update task handlers to use engine.resolve_template
-   - Verify template resolution consistency
+   - Implement TaskConfig with namespace support
+   - Update task handlers
+   - Verify namespace isolation
    ```bash
    python -m pytest tests/test_task_*.py
    ```
 
-2. Error Handling (2 days)
-   - Implement consistent error format
-   - Update engine integration
-   - Add template-specific error cases
+2. Batch Context (2 days)
+   - Implement enhanced BatchContext
+   - Update batch processor
+   - Add namespace-aware error handling
    ```bash
-   python -m pytest tests/test_error_*.py
+   python -m pytest tests/test_batch_*.py
    ```
 
 3. State Management (1 day)
-   - Implement standard state format
+   - Implement BatchState
    - Update state integration
-   - Add template resolution state
+   - Add namespace state tracking
    ```bash
    python -m pytest tests/test_state_*.py
    ```
 
 4. Integration (2 days)
-   - Verify consistency across components
-   - Test template resolution in batch context
+   - Verify namespace consistency
+   - Test template resolution
    - Run full test suite
    ```bash
    python -m pytest tests/
    ```
 
 ### Success Criteria
-- All task handlers follow the same interface and use engine.resolve_template
-- Error handling is consistent across components, including template errors
-- State management is uniform and simple
+- All task handlers use TaskConfig interface
+- Batch processing preserves namespace isolation
+- Error handling includes namespace context
+- State management tracks namespace states
 - Changes maintain backward compatibility
 - System remains lightweight and practical
-- Template resolution is consistent across all batch operations
 
 ### Documentation Updates
-- [ ] Document standard batch task interface
-- [ ] Update error handling examples, including template errors
-- [ ] Add state management guide
-- [ ] Update troubleshooting section with template resolution examples
-- [ ] Add migration guide for template resolution changes
+- [ ] Document TaskConfig interface
+- [ ] Update error handling examples with namespace context
+- [ ] Add state management guide with namespace support
+- [ ] Update troubleshooting section
+- [ ] Add namespace best practices guide
 
 ### Timeline
 Week 1:
-- Days 1-2: Task interface standardization and template integration
-- Days 3-4: Error handling consistency
+- Days 1-2: TaskConfig implementation
+- Days 3-4: BatchContext implementation
 - Day 5: State management updates
 
 Week 2:
@@ -200,13 +220,13 @@ Week 2:
 - Day 5: Final review and cleanup
 
 ### Test Requirements
-- Each component must follow standard interfaces
-- Error handling must be consistent
-- State management must be uniform
+- Each component must use TaskConfig
+- Error handling must include namespace context
+- State management must track namespaces
 - Coverage >80% for new code
-- Tests should verify consistency
+- Tests should verify namespace isolation
 - Template resolution tests must cover:
-  - Variable substitution in batch items
+  - Variable substitution in each namespace
   - Error handling for undefined variables
   - State preservation during resume
   - Complex template expressions
@@ -218,3 +238,4 @@ Week 2:
 - Document interface changes
 - Keep state file format simple
 - Ensure template resolution follows engine standards
+- Preserve existing namespace behavior
