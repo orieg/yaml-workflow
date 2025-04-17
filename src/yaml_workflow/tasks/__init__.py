@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, ParamSpec, TypeVar, cast
 import re
 
-from jinja2 import Template, UndefinedError, StrictUndefined
+from jinja2 import UndefinedError, StrictUndefined
 
 from ..exceptions import TemplateError
+from ..template import TemplateEngine
 
 # Type variables for task function signatures
 P = ParamSpec("P")
@@ -42,6 +43,7 @@ class TaskConfig:
         self._context = context
         self.workspace = workspace
         self._processed_inputs: Dict[str, Any] = {}
+        self._template_engine = TemplateEngine()
 
     def get_variable(self, name: str, namespace: Optional[str] = None) -> Any:
         """
@@ -80,11 +82,18 @@ class TaskConfig:
             Dict[str, Any]: Processed inputs with resolved templates
         """
         if not self._processed_inputs:
+            # Create a flattened context for template processing
+            template_context = {
+                "args": self._context.get("args", {}),
+                "env": self._context.get("env", {}),
+                "steps": self._context.get("steps", {}),
+                **{k: v for k, v in self._context.items() if k not in ["args", "env", "steps"]}
+            }
+            
             for key, value in self.inputs.items():
                 if isinstance(value, str):
                     try:
-                        template = Template(value, undefined=StrictUndefined)
-                        self._processed_inputs[key] = template.render(**self._context)
+                        self._processed_inputs[key] = self._template_engine.process_template(value, template_context)
                     except UndefinedError as e:
                         error_msg = str(e)
                         namespace = self._get_undefined_namespace(error_msg)
