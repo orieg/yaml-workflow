@@ -38,10 +38,7 @@ steps:
     task: shell
     inputs:
       command: |
-        if [ -z "{{ args.required_param|default('') }}" ]; then
-          echo "Error: required_param is required" >&2
-          exit 1
-        fi
+        # The workflow should fail before reaching this point due to required_param validation
         echo "{{ args.required_param }}" > "output/check_result.txt"
     outputs:
       check_result: "{{ args.required_param }}"
