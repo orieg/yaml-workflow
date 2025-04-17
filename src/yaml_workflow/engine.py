@@ -588,20 +588,21 @@ class WorkflowEngine:
 
     def resolve_value(self, value: Any) -> Any:
         """
-        Resolve a single value, handling template strings.
-
+        Resolve a single value that might contain templates.
+        
         Args:
-            value: Value to resolve, may be a template string
-
+            value: Value to resolve, can be any type
+            
         Returns:
-            Any: Resolved value
+            Resolved value with templates replaced
         """
-        try:
-            return self.template_engine.process_value(value, self.context)
-        except Exception as e:
-            if isinstance(self.current_step, dict) and "name" in self.current_step:
-                self.state.mark_step_failed(self.current_step["name"], str(e))
-            raise
+        if isinstance(value, str):
+            return self.template_engine.process_template(value, self.context)
+        elif isinstance(value, dict):
+            return {k: self.resolve_value(v) for k, v in value.items()}
+        elif isinstance(value, (list, tuple)):
+            return [self.resolve_value(v) for v in value]
+        return value
 
     def resolve_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
