@@ -29,6 +29,7 @@ from .state import WorkflowState
 from .tasks import get_task_handler, TaskConfig
 from .workspace import create_workspace, get_workspace_info
 from .template import TemplateEngine
+from .utils.yaml_utils import get_safe_loader
 
 
 def setup_logging(workspace: Path, name: str) -> logging.Logger:
@@ -118,7 +119,7 @@ class WorkflowEngine:
             # Load workflow from file
             try:
                 with open(self.workflow_file) as f:
-                    self.workflow = yaml.safe_load(f)
+                    self.workflow = yaml.load(f, Loader=get_safe_loader())
             except yaml.YAMLError as e:
                 raise WorkflowError(f"Invalid YAML in workflow file: {e}")
 

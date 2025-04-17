@@ -83,7 +83,7 @@ class TemplateEngine:
                 return match.strip()
         return var_name
 
-    def process_template(self, template_str: str, variables: Dict[str, Any] = None) -> str:
+    def process_template(self, template_str: str, variables: Dict[str, Any] = None) -> Any:
         """Process a template string with the given variables.
         
         Args:
@@ -92,12 +92,25 @@ class TemplateEngine:
                 Defaults to None.
         
         Returns:
-            str: The processed template string.
+            Any: The processed template value, preserving the original type.
         
         Raises:
             TemplateError: If there is an error processing the template.
         """
         try:
+            # If the template is just a variable reference, try to return the raw value
+            if template_str.strip().startswith('{{') and template_str.strip().endswith('}}'):
+                var_path = template_str.strip()[2:-2].strip()
+                if '.' in var_path:
+                    parts = var_path.split('.')
+                    current = variables
+                    for part in parts:
+                        if current is None or not isinstance(current, dict):
+                            break
+                        current = current.get(part)
+                    if current is not None:
+                        return current
+
             # Create a new template with the configured environment
             template = self.env.from_string(template_str)
             

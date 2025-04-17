@@ -30,7 +30,13 @@ def execute_code(code: str, config: TaskConfig) -> Any:
         TemplateError: If code execution fails
     """
     # Create a new dictionary with a copy of the context to avoid modifying the original
-    local_vars = {"context": config._context}
+    local_vars = {
+        "context": config._context,
+        "args": config._context.get("args", {}),
+        "env": config._context.get("env", {}),
+        "steps": config._context.get("steps", {}),
+        "batch": config._context.get("batch", {})
+    }
     local_vars.update(config.process_inputs())
 
     try:

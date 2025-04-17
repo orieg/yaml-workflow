@@ -120,13 +120,16 @@ steps:
 ```yaml
 steps:
   - name: batch_process
-    task: batch_processor
-    params:
+    task: batch
+    inputs:
       items: "{{ steps.get_items.output }}"
-      options:
-        {% for opt in args.options %}
-        {{ opt.name }}: {{ opt.value }}
-        {% endfor %}
+      task:
+        task: python
+        inputs:
+          code: |
+            {% for opt in args.options %}
+            options["{{ opt.name }}"] = "{{ opt.value }}"
+            {% endfor %}
 ```
 
 ## Task-Specific Usage
@@ -176,22 +179,21 @@ steps:
 ```yaml
 steps:
   - name: process_items
-    task: batch_processor
-    params:
+    task: batch
+    inputs:
       # Input configuration
       items: "{{ steps.get_items.output }}"
       chunk_size: "{{ args.chunk_size }}"
+      max_workers: "{{ args.max_workers }}"
       
-      # Processing
-      task: python
-      function: process_item
+      # Processing task
+      task:
+        task: python
+        inputs:
+          code: "process_item()"
       
-      # Error handling
-      on_error: continue
-      error_handler: "{{ args.error_handler }}"
-      
-      # Results
-      aggregator: "{{ args.aggregator }}"
+      # Optional argument name for items (defaults to "item")
+      arg_name: data_item
 ```
 
 ## Best Practices
@@ -354,115 +356,4 @@ steps:
 Jinja2 provides several built-in filters to transform data:
 
 ### String Filters
-```yaml
-{{ name | upper }}  # Convert to uppercase
-{{ name | lower }}  # Convert to lowercase
-{{ name | title }}  # Title case
-{{ text | trim }}   # Remove whitespace
 ```
-
-### Default Values
-```yaml
-{{ optional_var | default('fallback') }}  # Use fallback if undefined
-```
-
-### Number Filters
-```yaml
-{{ number | round }}     # Round number
-{{ number | abs }}       # Absolute value
-{{ number | int }}       # Convert to integer
-```
-
-### List Filters
-```yaml
-{{ list | join(', ') }}  # Join list items
-{{ list | first }}       # Get first item
-{{ list | last }}        # Get last item
-{{ list | length }}      # Get list length
-```
-
-## Security Considerations
-
-1. **Input Validation**
-   - Always validate user-provided input before using in templates
-   - Use the `escape` filter for user-provided content
-
-2. **Environment Variables**
-   - Don't expose sensitive environment variables in template output
-   - Use appropriate permissions for output files
-
-3. **File Paths**
-   - Validate and sanitize file paths
-   - Use workspace-relative paths when possible
-
-## Examples
-
-### Configuration Template
-```yaml
-steps:
-  - name: generate_config
-    task: template
-    template: |
-      # Application Configuration
-      # Generated: {{ timestamp }}
-      
-      [app]
-      name: {{ app_name }}
-      environment: {{ env.ENVIRONMENT }}
-      debug: {{ env.DEBUG | default('false') | lower }}
-      
-      [database]
-      host: {{ env.DB_HOST }}
-      port: {{ env.DB_PORT | default('5432') }}
-      name: {{ env.DB_NAME }}
-      
-      [logging]
-      level: {{ env.LOG_LEVEL | default('INFO') | upper }}
-      file: {{ workspace }}/logs/app.log
-    output: config.ini
-```
-
-### Data Processing
-```yaml
-steps:
-  - name: process_data
-    task: python
-    params:
-      function: process_data
-      args:
-        input: "{{ input_file }}"
-        config: 
-          debug: {{ env.DEBUG | lower }}
-          max_items: {{ max_items | default(100) }}
-```
-
-### Report Generation
-```yaml
-steps:
-  - name: generate_report
-    task: template
-    template: |
-      # Processing Report
-      Generated: {{ timestamp }}
-      Run: #{{ run_number }}
-      
-      ## Input Files
-      {% for file in input_files %}
-      - {{ file.name }}: {{ file.status }}
-      {% endfor %}
-      
-      ## Statistics
-      - Processed: {{ stats.processed }}
-      - Succeeded: {{ stats.succeeded }}
-      - Failed: {{ stats.failed }}
-      
-      ## Errors
-      {% if errors %}
-      {% for error in errors %}
-      - {{ error.message }} ({{ error.code }})
-      {% endfor %}
-      {% else %}
-      No errors reported.
-      {% endif %}
-    output: report.md
-``` 
