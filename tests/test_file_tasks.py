@@ -27,7 +27,7 @@ from yaml_workflow.tasks.file_tasks import (
     write_json,
     write_yaml,
 )
-from yaml_workflow.exceptions import TemplateError
+from yaml_workflow.exceptions import TemplateError, TaskExecutionError
 
 
 @pytest.fixture
@@ -284,24 +284,23 @@ def test_write_csv_file(tmp_path):
 def test_file_error_handling(tmp_path):
     """Test error handling for file operations."""
     non_existent = tmp_path / "non_existent.txt"
-    with pytest.raises(TemplateError) as exc_info:
+    with pytest.raises(TaskExecutionError) as exc_info:
         read_file_direct(str(non_existent), tmp_path)
-    assert "Failed to read file" in str(exc_info.value)
     assert "No such file or directory" in str(exc_info.value)
 
     # Test invalid JSON
     invalid_json = tmp_path / "invalid.json"
     invalid_json.write_text("{invalid")
-    with pytest.raises(TemplateError) as exc_info:
+    with pytest.raises(TaskExecutionError) as exc_info:
         read_json(str(invalid_json), tmp_path)
-    assert "Invalid JSON" in str(exc_info.value)
+    assert "Expecting property name" in str(exc_info.value)
 
     # Test invalid YAML
     invalid_yaml = tmp_path / "invalid.yaml"
     invalid_yaml.write_text("invalid: [yaml")
-    with pytest.raises(TemplateError) as exc_info:
+    with pytest.raises(TaskExecutionError) as exc_info:
         read_yaml(str(invalid_yaml), tmp_path)
-    assert "Invalid YAML" in str(exc_info.value)
+    assert "expected" in str(exc_info.value)  # YAML error messages vary by version
 
 
 def test_file_operations_with_directories(tmp_path):

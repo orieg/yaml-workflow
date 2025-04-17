@@ -76,7 +76,7 @@ This plan builds upon the completed work in template engine centralization:
       - Operation handling with processed inputs
       - Batch processing with result format
 
-3. [ ] Shell Task Handler
+3. [✓] Shell Task Handler
    ```python
    @register_task("shell")
    def shell_task(config: TaskConfig) -> Dict[str, Any]:
@@ -116,17 +116,23 @@ This plan builds upon the completed work in template engine centralization:
        except Exception as e:
            raise TaskExecutionError(f"Shell command failed: {str(e)}")
    ```
-   Next Steps:
-   1. Update handler signature to use TaskConfig
-   2. Add proper working directory handling
-   3. Improve environment variable handling
-   4. Add tests:
-      - Command template resolution
-      - Working directory with namespaces
+   Completed:
+   - ✓ Updated handler signature to use TaskConfig
+   - ✓ Added proper working directory handling with workspace support
+   - ✓ Improved environment variable handling
+   - ✓ Added proper error handling with TaskExecutionError
+   - ✓ Added comprehensive tests:
+      - Basic command execution
+      - Variable substitution
+      - Working directory handling
       - Environment variable handling
       - Error messages with context
+      - Command timeout handling
+      - Batch context support
+      - Special character handling
+      - Complex command execution
 
-4. [ ] File Task Handler
+4. [✓] File Task Handler
    ```python
    @register_task("write_file")
    def write_file_task(config: TaskConfig) -> Dict[str, str]:
@@ -151,13 +157,18 @@ This plan builds upon the completed work in template engine centralization:
        except Exception as e:
            raise TaskExecutionError(f"Failed to write file: {str(e)}")
    ```
-   Next Steps:
-   1. Update handler signature to use TaskConfig
-   2. Add proper path handling with workspace
-   3. Add tests:
+   Completed:
+   - ✓ Updated handler signature to use TaskConfig
+   - ✓ Added proper path handling with workspace
+   - ✓ Added proper error handling with TaskExecutionError
+   - ✓ Added tests:
       - Path template resolution
       - Content template processing
       - Error messages with context
+      - File operations (read, write, append, copy, move, delete)
+      - JSON/YAML handling
+      - Special characters and encoding
+      - Directory operations
 
 #### 3. Batch Processing Updates
 
@@ -302,69 +313,4 @@ This plan builds upon the completed work in template engine centralization:
    - Implement enhanced BatchContext
    - Update batch processor
    - Add namespace-aware error handling
-   ```bash
-   python -m pytest tests/test_batch_*.py
    ```
-
-3. State Management (1 day)
-   - Implement BatchState
-   - Update state integration
-   - Add namespace state tracking
-   ```bash
-   python -m pytest tests/test_state_*.py
-   ```
-
-4. Integration (2 days)
-   - Verify namespace consistency
-   - Test template resolution
-   - Run full test suite
-   ```bash
-   python -m pytest tests/
-   ```
-
-### Success Criteria
-- All task handlers use TaskConfig interface
-- Batch processing preserves namespace isolation
-- Error handling includes namespace context
-- State management tracks namespace states
-- Changes maintain backward compatibility
-- System remains lightweight and practical
-
-### Documentation Updates
-- [ ] Document TaskConfig interface
-- [ ] Update error handling examples with namespace context
-- [ ] Add state management guide with namespace support
-- [ ] Update troubleshooting section
-- [ ] Add namespace best practices guide
-
-### Timeline
-Week 1:
-- Days 1-2: TaskConfig implementation
-- Days 3-4: BatchContext implementation
-- Day 5: State management updates
-
-Week 2:
-- Days 1-2: Integration and testing
-- Days 3-4: Documentation and examples
-- Day 5: Final review and cleanup
-
-### Test Requirements
-- Each component must use TaskConfig
-- Error handling must include namespace context
-- State management must track namespaces
-- Coverage >80% for new code
-- Tests should verify namespace isolation
-- Template resolution tests must cover:
-  - Variable substitution in each namespace
-  - Error handling for undefined variables
-  - State preservation during resume
-  - Complex template expressions
-  - Nested variable access
-
-### Compatibility
-- Maintain backward compatibility
-- Provide migration examples
-- Document interface changes
-- Keep state file format simple
-- Ensure template resolution follows engine standards
-- Preserve existing namespace behavior
