@@ -327,6 +327,30 @@ class WorkflowEngine:
             for name, value in params.items():
                 self.logger.info(f"  {name}: {value}")
 
+        # Handle resume from parameter validation failure
+        if resume_from and self.state.metadata["execution_state"]["failed_step"] and \
+           self.state.metadata["execution_state"]["failed_step"]["step_name"] == "parameter_validation":
+            # Reset state but keep the failed status
+            self.state.reset_state()
+            self.state.metadata["execution_state"]["status"] = "failed"
+            resume_from = None
+
+        # Validate required parameters
+        workflow_params = self.workflow.get("params", {})
+        for param_name, param_config in workflow_params.items():
+            if isinstance(param_config, dict):
+                if param_config.get("required", False):
+                    if param_name not in self.context["args"] or self.context["args"][param_name] is None:
+                        error_msg = f"Required parameter '{param_name}' is undefined"
+                        self.state.mark_step_failed("parameter_validation", error_msg)
+                        raise WorkflowError(error_msg)
+                    if "minLength" in param_config:
+                        value = str(self.context["args"][param_name])
+                        if len(value) < param_config["minLength"]:
+                            error_msg = f"Parameter '{param_name}' must be at least {param_config['minLength']} characters long"
+                            self.state.mark_step_failed("parameter_validation", error_msg)
+                            raise WorkflowError(error_msg)
+
         # Get flow configuration
         flows = self.workflow.get("flows", {})
 
