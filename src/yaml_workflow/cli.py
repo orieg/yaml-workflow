@@ -183,17 +183,39 @@ def run_workflow(args):
 
         # Print step outputs in a clean format
         if results.get("outputs"):
-            print("\n=== Step Outputs ===")
+            print("=== Step Outputs ===")
+            first_step = True
             for step_name, output in results["outputs"].items():
                 # Skip empty outputs or None values
                 if output is None or (isinstance(output, str) and not output.strip()):
                     continue
-                print(f"\n• {step_name}:")
-                if isinstance(output, (dict, list)):
-                    formatted_output = json.dumps(output, indent=2)
-                    print("  " + formatted_output.replace("\n", "\n  "))
+                
+                # Print step name without extra newlines
+                if first_step:
+                    print(f"• {step_name}:")
+                    first_step = False
                 else:
-                    print("  " + str(output).replace("\n", "\n  "))
+                    print(f"\n• {step_name}:")
+                
+                if isinstance(output, dict):
+                    # Clean up string values in the dictionary
+                    cleaned_output = {}
+                    for k, v in output.items():
+                        if isinstance(v, str):
+                            # Remove leading/trailing whitespace and normalize line endings
+                            lines = v.strip().split('\n')
+                            # Remove common indentation from all lines
+                            cleaned_lines = []
+                            for line in lines:
+                                cleaned_lines.append(line.strip())
+                            cleaned_output[k] = '\n'.join(cleaned_lines)
+                        else:
+                            cleaned_output[k] = v
+                    output = cleaned_output
+                
+                # Use YAML format for structured data
+                formatted_output = yaml.dump(output, default_flow_style=False, sort_keys=False,default_style='|' ).strip()
+                sys.stdout.write(formatted_output)
 
         print("\n=== Workspace Info ===")
         print(f"• Location: {engine.workspace}")
