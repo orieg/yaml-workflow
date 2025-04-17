@@ -123,9 +123,9 @@ def test_process_inputs_undefined_variable(basic_step, context_with_namespaces, 
         config.process_inputs()
     
     error_msg = str(exc_info.value)
-    assert "undefined" in error_msg
-    assert "namespace 'args'" in error_msg
-    assert "Available variables" in error_msg
+    assert "Undefined variable 'args.undefined'" in error_msg
+    assert "Available variables in 'args' namespace" in error_msg
+    assert "count" in error_msg  # Should show available variables
     assert "name" in error_msg  # Should show available variables
 
 
@@ -177,4 +177,143 @@ def test_nested_variable_access(basic_step, context_with_namespaces, workspace):
     config.inputs["nested"] = "{{ steps.previous['output'] }}"
     
     processed = config.process_inputs()
-    assert processed["nested"] == "success" 
+    assert processed["nested"] == "success"
+
+
+def test_nested_type_preservation(basic_step, context_with_namespaces, workspace):
+    """Test type preservation in nested template structures."""
+    config = TaskConfig(
+        {
+            "name": "test_types",
+            "task": "test_task",
+            "inputs": {
+                "nested_data": {
+                    "boolean": "{{ env.is_enabled }}",
+                    "number": "{{ args.value }}",
+                    "array": [
+                        "{{ env.numbers[0] }}",
+                        "{{ env.numbers[1] }}"
+                    ],
+                    "object": {
+                        "flag": "{{ env.debug_flag }}",
+                        "count": "{{ args.item_count }}"
+                    }
+                }
+            }
+        },
+        {
+            "args": {
+                "value": 42,
+                "item_count": 100
+            },
+            "env": {
+                "is_enabled": True,
+                "numbers": [1, 2],
+                "debug_flag": False
+            },
+            "steps": {}
+        },
+        workspace
+    )
+    
+    processed = config.process_inputs()
+    nested = processed["nested_data"]
+    
+    # Check type preservation
+    assert isinstance(nested["boolean"], bool)
+    assert nested["boolean"] is True
+    
+    assert isinstance(nested["number"], int)
+    assert nested["number"] == 42
+    
+    assert isinstance(nested["array"], list)
+    assert all(isinstance(x, int) for x in nested["array"])
+    assert nested["array"] == [1, 2]
+    
+    assert isinstance(nested["object"]["flag"], bool)
+    assert nested["object"]["flag"] is False
+    
+    assert isinstance(nested["object"]["count"], int)
+    assert nested["object"]["count"] == 100
+
+
+def test_nested_error_handling(basic_step, context_with_namespaces, workspace):
+    """Test error handling in nested template structures."""
+    config = TaskConfig(
+        {
+            "name": "test_errors",
+            "task": "test_task",
+            "inputs": {
+                "nested_errors": {
+                    "level1": {
+                        "valid": "{{ args.name }}",
+                        "invalid": "{{ args.missing }}"
+                    },
+                    "array": [
+                        "{{ env.DEBUG }}",
+                        "{{ env.nonexistent }}",
+                        "{{ steps.unknown.output }}"
+                    ]
+                }
+            }
+        },
+        context_with_namespaces,
+        workspace
+    )
+    
+    with pytest.raises(TemplateError) as exc_info:
+        config.process_inputs()
+    
+    error_msg = str(exc_info.value)
+    # Should identify the undefined variable
+    assert "Undefined variable 'args.missing'" in error_msg
+    # Should show available variables
+    assert "Available variables in 'args' namespace" in error_msg
+    assert "name" in error_msg
+    assert "count" in error_msg
+
+
+def test_numeric_type_conversion(basic_step, context_with_namespaces, workspace):
+    """Test conversion of numeric string templates to proper number types."""
+    config = TaskConfig(
+        {
+            "name": "test_numbers",
+            "task": "test_task",
+            "inputs": {
+                "numbers": {
+                    "integer": "{{ args.int_value }}",
+                    "float": "{{ env.float_value }}",
+                    "zero": "{{ args.zero }}",
+                    "negative": "{{ env.negative }}"
+                }
+            }
+        },
+        {
+            "args": {
+                "int_value": 42,
+                "zero": 0
+            },
+            "env": {
+                "float_value": 3.14,
+                "negative": -1
+            },
+            "steps": {}
+        },
+        workspace
+    )
+    
+    processed = config.process_inputs()
+    numbers = processed["numbers"]
+    
+    # Check numeric type conversion
+    assert isinstance(numbers["integer"], int)
+    assert numbers["integer"] == 42
+    
+    assert isinstance(numbers["float"], float)
+    assert numbers["float"] == 3.14
+    
+    assert isinstance(numbers["zero"], int)
+    assert numbers["zero"] == 0
+    
+    assert isinstance(numbers["negative"], int)
+    assert numbers["negative"] == -1 
