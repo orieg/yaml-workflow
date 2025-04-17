@@ -80,9 +80,116 @@ class TaskConfig:
 
 2. Update task handlers to use standard interface
    - [ ] Python task handler (using TaskConfig)
+     ```python
+     @register_task("python")
+     def python_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Any:
+         """Execute Python code with namespace support."""
+         config = TaskConfig(step, context, workspace)
+         processed = config.process_inputs()
+         
+         # Handle code execution
+         if "code" in processed:
+             return execute_code(processed["code"], config._context)
+         
+         # Handle operations (multiply, divide, etc.)
+         if "operation" in processed:
+             return handle_operation(processed["operation"], processed)
+     ```
+     Steps:
+     1. Update handler to use TaskConfig
+     2. Move template resolution to config.process_inputs()
+     3. Update error handling to use namespace context
+     4. Add tests:
+        - Template resolution in code blocks
+        - Variable access from different namespaces
+        - Error messages with namespace context
+        - Operation handling with processed inputs
+     5. Verify:
+        ```bash
+        python -m pytest tests/test_python_tasks.py -v
+        ```
+
    - [ ] Shell task handler (using TaskConfig)
+     ```python
+     @register_task("shell")
+     def shell_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, Any]:
+         """Execute shell commands with namespace support."""
+         config = TaskConfig(step, context, workspace)
+         processed = config.process_inputs()
+         
+         # Process command with proper escaping
+         command = process_command(processed["command"])
+         
+         # Handle working directory
+         cwd = workspace
+         if "working_dir" in processed:
+             cwd = workspace / processed["working_dir"]
+         
+         return execute_command(command, cwd)
+     ```
+     Steps:
+     1. Update handler to use TaskConfig
+     2. Move command processing to config.process_inputs()
+     3. Update working directory handling
+     4. Add tests:
+        - Command template resolution
+        - Working directory with namespaces
+        - Environment variable handling
+        - Error messages with context
+     5. Verify:
+        ```bash
+        python -m pytest tests/test_shell_tasks.py -v
+        ```
+
    - [ ] File task handler (using TaskConfig)
+     ```python
+     @register_task("write_file")
+     def write_file_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> Dict[str, str]:
+         """Write file with namespace support."""
+         config = TaskConfig(step, context, workspace)
+         processed = config.process_inputs()
+         
+         # Resolve file path
+         target_path = resolve_path(processed["path"], workspace)
+         
+         # Process content with template support
+         content = processed.get("content", "")
+         if isinstance(content, (dict, list)):
+             content = process_structured_content(content, config)
+         
+         return write_file(target_path, content)
+     ```
+     Steps:
+     1. Update handler to use TaskConfig
+     2. Move path resolution to config.process_inputs()
+     3. Update content processing for structured data
+     4. Add tests:
+        - Path template resolution
+        - Content template processing
+        - Structured data handling
+        - Error messages with context
+     5. Verify:
+        ```bash
+        python -m pytest tests/test_file_tasks.py -v
+        ```
+
    - [ ] Test: `python -m pytest tests/test_task_handlers.py`
+
+Implementation Strategy for Each Handler:
+1. Create handler-specific test file if not exists
+2. Add namespace-aware test cases
+3. Update handler implementation
+4. Verify existing functionality
+5. Add namespace-specific error handling
+6. Run full test suite
+
+Success Criteria for Handlers:
+- Uses TaskConfig for all template resolution
+- Preserves existing functionality
+- Provides clear namespace-aware error messages
+- Handles structured data appropriately
+- Maintains backward compatibility
+- Passes all tests with >80% coverage
 
 ✓ Checkpoint: Task interface implementation complete
 ✓ Checkpoint: Task interface tests passing
