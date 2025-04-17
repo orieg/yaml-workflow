@@ -752,13 +752,13 @@ class WorkflowEngine:
     ) -> Optional[Dict[str, Any]]:
         """Handle step execution error according to on_error configuration."""
         name = step.get("name", "unknown")
-        message = str(error)
+        error_message = str(error)
 
         # Get error handling configuration
         on_error = step.get("on_error", {})
         if not on_error:
             # No error handling configured, mark as failed and re-raise
-            self.state.mark_step_failed(name, message)
+            self.state.mark_step_failed(name, error_message)
             return None
 
         # Get error handling action
@@ -766,21 +766,22 @@ class WorkflowEngine:
         next_step = on_error.get("next")
 
         # Handle error message template
-        error_message = on_error.get("message", message)
-        if isinstance(error_message, str):
+        template_message = on_error.get("message", error_message)
+        if isinstance(template_message, str):
             try:
-                template = Template(
-                    error_message,
-                    undefined=StrictUndefined
-                )
-                message = template.render(error=message)
+                # Add error to context temporarily for template rendering
+                self.context["error"] = error_message
+                error_message = self.resolve_template(template_message)
             except Exception as e:
                 self.logger.warning(f"Failed to render error message template: {e}")
+            finally:
+                # Clean up temporary error context
+                self.context.pop("error", None)
 
         if action == "continue":
             # Mark as failed but continue workflow
-            self.state.mark_step_failed(name, message)
-            return {"error": message}
+            self.state.mark_step_failed(name, error_message)
+            return {"error": error_message}
         elif action == "retry":
             # Get retry configuration
             retry_config = step.get("retry", {})
@@ -797,7 +798,7 @@ class WorkflowEngine:
 
             if attempt >= max_attempts:
                 # Max retries exceeded
-                error_message = f"Failed after {attempt} attempts: {message}"
+                error_message = f"Failed after {attempt} attempts: {error_message}"
                 self.state.mark_step_failed(name, error_message)
                 self.state.clear_retry_state(name)
                 return None
@@ -836,7 +837,7 @@ class WorkflowEngine:
                 return self._handle_step_error(step, retry_error)
         elif action == "notify":
             # Mark as failed but try to execute notification task if specified
-            self.state.mark_step_failed(name, message)
+            self.state.mark_step_failed(name, error_message)
             if next_step:
                 try:
                     notify_step = next(
@@ -850,7 +851,7 @@ class WorkflowEngine:
                     # Add error info to context for notification
                     self.context["error"] = {
                         "step": name,
-                        "message": message,
+                        "message": error_message,
                         "error": str(error),
                     }
                     # Execute notification task but still fail the workflow
@@ -862,10 +863,14 @@ class WorkflowEngine:
                         f"Failed to execute notification task: {notify_error}"
                     )
             # Always raise WorkflowError after notification
-            raise WorkflowError(message)
+            raise WorkflowError(error_message)
+        elif action == "fail":
+            # Mark as failed and raise error
+            self.state.mark_step_failed(name, error_message)
+            raise WorkflowError(error_message)
         else:
             self.logger.error(f"Unknown error action: {action}")
-            self.state.mark_step_failed(name, message)
+            self.state.mark_step_failed(name, error_message)
             raise WorkflowError(
-                f"Unknown error action '{action}' for step {name}: {message}"
+                f"Unknown error action '{action}' for step {name}: {error_message}"
             )
