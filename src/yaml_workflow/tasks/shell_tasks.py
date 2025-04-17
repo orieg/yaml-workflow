@@ -9,8 +9,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 from jinja2 import Template, StrictUndefined, UndefinedError
 
-from ..exceptions import TemplateError
-from . import register_task
+from ..exceptions import TemplateError, TaskExecutionError
+from . import register_task, TaskConfig
 
 
 def run_command(
@@ -142,31 +142,91 @@ def process_command(command: str, context: Dict[str, Any]) -> str:
 
 
 @register_task("shell")
-def shell_task(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> str:
+def shell_task(config: TaskConfig) -> Dict[str, Any]:
     """
-    Run a shell command.
+    Run a shell command with namespace support.
 
     Args:
-        step: Step configuration
-        context: Workflow context
-        workspace: Workspace directory
+        config: Task configuration with namespace support
 
     Returns:
-        str: Command output
+        Dict[str, Any]: Command execution results
+
+    Raises:
+        TaskExecutionError: If command execution fails or template resolution fails
     """
-    # Get command from either direct step or processing_task
-    command_template = step.get("command")
-    if not command_template and "processing_task" in step:
-        command_template = step["processing_task"].get("command")
-    if not command_template:
-        raise ValueError("No command provided")
-
-    # Render command with context
-    command = process_command(command_template, context)
-
-    # Run command from workspace directory
-    result = subprocess.run(
-        command, shell=True, cwd=workspace, capture_output=True, text=True, check=True
-    )
-
-    return result.stdout
+    try:
+        # Process inputs with template support
+        try:
+            processed = config.process_inputs()
+        except TemplateError as e:
+            raise TaskExecutionError(
+                f"Template error in shell task: {str(e)}",
+                original_error=e
+            )
+        
+        # Get command (required)
+        if "command" not in processed:
+            raise TaskExecutionError(
+                "No command provided",
+                original_error=ValueError("No command provided")
+            )
+        command = processed["command"]
+        
+        # Handle working directory
+        cwd = config.workspace
+        if "working_dir" in processed:
+            cwd = config.workspace / processed["working_dir"]
+            if not cwd.exists():
+                cwd.mkdir(parents=True)
+        
+        # Handle environment variables
+        env = os.environ.copy()
+        if "env" in processed:
+            env.update(processed["env"])
+        
+        # Get timeout if specified
+        timeout = processed.get("timeout")
+        
+        try:
+            # Execute command
+            result = subprocess.run(
+                command,
+                shell=True,
+                cwd=cwd,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                check=True  # This will raise CalledProcessError on non-zero exit
+            )
+            
+            # Return structured result
+            return {
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "exit_code": result.returncode,
+                "command": command,
+                "working_dir": str(cwd)
+            }
+            
+        except subprocess.CalledProcessError as e:
+            raise TaskExecutionError(
+                f"Command failed with exit code {e.returncode}. "
+                f"stdout: {e.stdout}, stderr: {e.stderr}",
+                original_error=e
+            )
+        except subprocess.TimeoutExpired as e:
+            raise TaskExecutionError(
+                f"Command timed out after {timeout} seconds. "
+                f"stdout: {e.stdout}, stderr: {e.stderr}",
+                original_error=e
+            )
+            
+    except TaskExecutionError:
+        raise
+    except Exception as e:
+        raise TaskExecutionError(
+            f"Shell task failed: {str(e)}",
+            original_error=e
+        )

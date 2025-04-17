@@ -8,22 +8,18 @@ from jinja2 import StrictUndefined, Template, UndefinedError
 
 from ..exceptions import TemplateError
 from ..workspace import resolve_path
-from . import register_task
+from . import register_task, TaskConfig
 
 logger = logging.getLogger(__name__)
 
 
 @register_task("template")
-def render_template(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
-) -> str:
+def render_template(config: TaskConfig) -> str:
     """
     Render a template and save it to a file.
 
     Args:
-        step: Step configuration
-        context: Workflow context
-        workspace: Workspace directory
+        config: Task configuration object
 
     Returns:
         str: Path to the output file
@@ -32,29 +28,31 @@ def render_template(
         TemplateError: If template resolution fails or file cannot be written
     """
     try:
-        # Get template and output path
-        template_str = step.get("template")
+        # Process inputs with template resolution
+        processed = config.process_inputs()
+        
+        template_str = processed.get("template")
         if not template_str:
             raise ValueError("No template provided")
 
-        output_file = step.get("output")
+        output_file = processed.get("output")
         if not output_file:
             raise ValueError("No output file specified")
 
         logger.debug(f"Template string: {template_str}")
-        logger.debug(f"Context for rendering: {context}")
+        logger.debug(f"Context for rendering: {config._context}")
 
         # Render template with strict undefined handling
         template = Template(template_str, undefined=StrictUndefined)
         try:
-            rendered = template.render(**context)
+            rendered = template.render(**config._context)
             logger.debug(f"Rendered template: {rendered}")
         except UndefinedError as e:
             available = {
-                "args": list(context["args"].keys()) if "args" in context else [],
-                "env": list(context["env"].keys()) if "env" in context else [],
-                "steps": list(context["steps"].keys()) if "steps" in context else [],
-                "vars": {k: type(v).__name__ for k, v in context.items() 
+                "args": list(config._context["args"].keys()) if "args" in config._context else [],
+                "env": list(config._context["env"].keys()) if "env" in config._context else [],
+                "steps": list(config._context["steps"].keys()) if "steps" in config._context else [],
+                "vars": {k: type(v).__name__ for k, v in config._context.items() 
                         if k not in ["args", "env", "steps"]}
             }
             raise TemplateError(
@@ -64,7 +62,7 @@ def render_template(
 
         # Save to file
         # For test compatibility, don't use output directory by default
-        output_path = resolve_path(workspace, output_file, use_output_dir=False)
+        output_path = resolve_path(config.workspace, output_file, use_output_dir=False)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(rendered)
 

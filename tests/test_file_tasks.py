@@ -8,7 +8,7 @@ from typing import Any, Dict
 import pytest
 import yaml
 
-from yaml_workflow.tasks import register_task
+from yaml_workflow.tasks import register_task, TaskConfig
 from yaml_workflow.tasks.base import (
     get_task_logger,
     log_task_error,
@@ -42,20 +42,20 @@ def sample_data():
 
 
 @register_task("write_file")
-def write_file(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
-) -> Dict[str, Any]:
+def write_file(config: TaskConfig) -> Dict[str, Any]:
     """Write content to a file."""
-    logger = get_task_logger(workspace, step.get("name", "write_file"))
-    log_task_execution(logger, step, context, workspace)
+    logger = get_task_logger(config.workspace, config.name)
+    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
 
     try:
-        path = workspace / step["params"]["file_path"]
-        content = step["params"]["content"]
-        mode = step.get("mode", "w")
-
+        processed = config.process_inputs()
+        file_path = processed["file_path"]
+        content = processed["content"]
+        
+        path = config.workspace / file_path
         os.makedirs(path.parent, exist_ok=True)
-        with open(path, mode) as f:
+        
+        with open(path, "w") as f:
             f.write(content)
 
         result = {"path": str(path)}
@@ -67,15 +67,16 @@ def write_file(
 
 
 @register_task("read_file")
-def read_file(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
-) -> Dict[str, Any]:
+def read_file(config: TaskConfig) -> Dict[str, Any]:
     """Read content from a file."""
-    logger = get_task_logger(workspace, step.get("name", "read_file"))
-    log_task_execution(logger, step, context, workspace)
+    logger = get_task_logger(config.workspace, config.name)
+    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
 
     try:
-        path = workspace / step["params"]["file_path"]
+        processed = config.process_inputs()
+        file_path = processed["file_path"]
+        
+        path = config.workspace / file_path
         if not path.exists():
             raise FileNotFoundError(f"File not found: {path}")
 
@@ -91,16 +92,18 @@ def read_file(
 
 
 @register_task("copy_file")
-def copy_file(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
-) -> Dict[str, Any]:
+def copy_file(config: TaskConfig) -> Dict[str, Any]:
     """Copy a file from source to destination."""
-    logger = get_task_logger(workspace, step.get("name", "copy_file"))
-    log_task_execution(logger, step, context, workspace)
+    logger = get_task_logger(config.workspace, config.name)
+    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
 
     try:
-        src = workspace / step["source"]
-        dst = workspace / step["destination"]
+        processed = config.process_inputs()
+        source = processed["source"]
+        destination = processed["destination"]
+        
+        src = config.workspace / source
+        dst = config.workspace / destination
 
         if not src.exists():
             raise FileNotFoundError(f"Source file not found: {src}")
@@ -117,16 +120,18 @@ def copy_file(
 
 
 @register_task("move_file")
-def move_file(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
-) -> Dict[str, Any]:
+def move_file(config: TaskConfig) -> Dict[str, Any]:
     """Move a file from source to destination."""
-    logger = get_task_logger(workspace, step.get("name", "move_file"))
-    log_task_execution(logger, step, context, workspace)
+    logger = get_task_logger(config.workspace, config.name)
+    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
 
     try:
-        src = workspace / step["source"]
-        dst = workspace / step["destination"]
+        processed = config.process_inputs()
+        source = processed["source"]
+        destination = processed["destination"]
+        
+        src = config.workspace / source
+        dst = config.workspace / destination
 
         if not src.exists():
             raise FileNotFoundError(f"Source file not found: {src}")
@@ -143,15 +148,16 @@ def move_file(
 
 
 @register_task("delete_file")
-def delete_file(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
-) -> Dict[str, Any]:
+def delete_file(config: TaskConfig) -> Dict[str, Any]:
     """Delete a file."""
-    logger = get_task_logger(workspace, step.get("name", "delete_file"))
-    log_task_execution(logger, step, context, workspace)
+    logger = get_task_logger(config.workspace, config.name)
+    log_task_execution(logger, {"name": config.name, "type": config.type}, config._context, config.workspace)
 
     try:
-        path = workspace / step["path"]
+        processed = config.process_inputs()
+        file_path = processed["file_path"]
+        
+        path = config.workspace / file_path
         if path.exists():
             os.remove(path)
 

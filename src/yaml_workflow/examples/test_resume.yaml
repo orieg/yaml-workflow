@@ -36,29 +36,32 @@ steps:
   # Step 1: Validate required parameter
   - name: check_required_param
     task: shell
-    command: |
-      if [ -z "{{ required_param|default('') }}" ]; then
-        echo "Error: required_param is required" >&2
-        exit 1
-      fi
-      echo "{{ required_param }}" > "output/check_result.txt"
+    inputs:
+      command: |
+        if [ -z "{{ args.required_param|default('') }}" ]; then
+          echo "Error: required_param is required" >&2
+          exit 1
+        fi
+        echo "{{ args.required_param }}" > "output/check_result.txt"
     outputs:
-      check_result: "{{ required_param }}"
+      check_result: "{{ args.required_param }}"
 
   # Step 2: Process the data
   - name: process_data
     task: shell
-    command: |
-      echo "Processing data with {{ required_param }}"
-      echo "{{ required_param }}" > "output/result.txt"
+    inputs:
+      command: |
+        echo "Processing data with {{ args.required_param }}"
+        echo "{{ args.required_param }}" > "output/result.txt"
     outputs:
-      process_result: "{{ required_param }}"
+      process_result: "{{ args.required_param }}"
 
   # Step 3: Final verification
   - name: final_step
     task: shell
-    command: |
-      echo "Final step - reading result"
-      cat "output/result.txt"
+    inputs:
+      command: |
+        echo "Final step - reading result"
+        cat "output/result.txt"
     outputs:
       final_result: "$(cat output/result.txt)" 

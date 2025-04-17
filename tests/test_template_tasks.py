@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from yaml_workflow.tasks.template_tasks import render_template
+from yaml_workflow.tasks import TaskConfig
 
 
 @pytest.fixture
@@ -17,9 +18,17 @@ def template_context():
 
 def test_simple_template_rendering(temp_workspace):
     """Test basic template rendering."""
-    step = {"template": "Hello, {{ name }}!", "output": "greeting.txt"}
+    step = {
+        "name": "test_template",
+        "task": "template",
+        "inputs": {
+            "template": "Hello, {{ name }}!",
+            "output": "greeting.txt"
+        }
+    }
 
-    result = render_template(step, {"name": "Alice"}, temp_workspace)
+    config = TaskConfig(step, {"name": "Alice"}, temp_workspace)
+    result = render_template(config)
 
     output_file = temp_workspace / "greeting.txt"
     assert output_file.exists()
@@ -29,14 +38,19 @@ def test_simple_template_rendering(temp_workspace):
 def test_template_with_loops(temp_workspace, template_context):
     """Test template rendering with loops."""
     step = {
-        "template": """Items:
+        "name": "test_template",
+        "task": "template",
+        "inputs": {
+            "template": """Items:
 {% for item in items %}
 - {{ item }}
 {% endfor %}""",
-        "output": "items.txt",
+            "output": "items.txt"
+        }
     }
 
-    result = render_template(step, template_context, temp_workspace)
+    config = TaskConfig(step, template_context, temp_workspace)
+    result = render_template(config)
 
     output_file = temp_workspace / "items.txt"
     assert output_file.exists()
@@ -49,7 +63,10 @@ def test_template_with_loops(temp_workspace, template_context):
 def test_template_with_conditionals(temp_workspace, template_context):
     """Test template rendering with conditional statements."""
     step = {
-        "template": """
+        "name": "test_template",
+        "task": "template",
+        "inputs": {
+            "template": """
 {% if settings.color == 'blue' %}
 Color is blue
 {% else %}
@@ -60,10 +77,12 @@ Color is not blue
 Size is large
 {% endif %}
 """,
-        "output": "settings.txt",
+            "output": "settings.txt"
+        }
     }
 
-    result = render_template(step, template_context, temp_workspace)
+    config = TaskConfig(step, template_context, temp_workspace)
+    result = render_template(config)
 
     output_file = temp_workspace / "settings.txt"
     assert output_file.exists()
@@ -75,20 +94,25 @@ Size is large
 def test_template_filters(temp_workspace):
     """Test template rendering with filters."""
     step = {
-        "template": """
+        "name": "test_template",
+        "task": "template",
+        "inputs": {
+            "template": """
 {{ name | upper }}
 {{ name | lower }}
 {{ items | join(', ') }}
 {{ number | float | round(2) }}
 """,
-        "output": "filtered.txt",
+            "output": "filtered.txt"
+        }
     }
 
-    result = render_template(
+    config = TaskConfig(
         step,
         {"name": "Alice", "items": ["a", "b", "c"], "number": 3.14159},
-        temp_workspace,
+        temp_workspace
     )
+    result = render_template(config)
 
     output_file = temp_workspace / "filtered.txt"
     assert output_file.exists()
@@ -101,28 +125,38 @@ def test_template_filters(temp_workspace):
 
 def test_template_error_handling(temp_workspace):
     """Test template error handling."""
-    step = {"template": "{{ undefined_variable }}", "output": "error.txt"}
+    step = {
+        "name": "test_template",
+        "task": "template",
+        "inputs": {
+            "template": "{{ undefined_variable }}",
+            "output": "error.txt"
+        }
+    }
 
+    config = TaskConfig(step, {}, temp_workspace)
     with pytest.raises(Exception):
-        render_template(step, {}, temp_workspace)
+        render_template(config)
 
 
 def test_template_whitespace_control(temp_workspace):
     """Test template whitespace control."""
     step = {
-        "template": """
-{%- for item in items %}
-{{ item }}
-{%- endfor %}""",
-        "output": "whitespace.txt",
+        "name": "test_template",
+        "task": "template",
+        "inputs": {
+            "template": "{{ items|join('\n') }}",
+            "output": "whitespace.txt"
+        }
     }
 
-    result = render_template(step, {"items": ["a", "b", "c"]}, temp_workspace)
+    config = TaskConfig(step, {"items": ["a", "b", "c"]}, temp_workspace)
+    result = render_template(config)
 
     output_file = temp_workspace / "whitespace.txt"
     assert output_file.exists()
     content = output_file.read_text()
-    assert content.strip() == "a\nb\nc"
+    assert content == "a\nb\nc"
 
 
 def test_template_from_file(temp_workspace):
@@ -132,11 +166,16 @@ def test_template_from_file(temp_workspace):
     template_file.write_text("Welcome, {{ name }}!\nYour role is: {{ role }}")
 
     step = {
-        "template": template_file.read_text(),  # Read template content directly since render_template doesn't support template_file
-        "output": "welcome.txt",
+        "name": "test_template",
+        "task": "template",
+        "inputs": {
+            "template": template_file.read_text(),  # Read template content directly since render_template doesn't support template_file
+            "output": "welcome.txt"
+        }
     }
 
-    result = render_template(step, {"name": "Bob", "role": "Admin"}, temp_workspace)
+    config = TaskConfig(step, {"name": "Bob", "role": "Admin"}, temp_workspace)
+    result = render_template(config)
 
     output_file = temp_workspace / "welcome.txt"
     assert output_file.exists()

@@ -31,24 +31,26 @@ steps:
   # Step 1: Create greeting
   - name: create_greeting
     task: template
-    template: |
-      Hello, {{ args.name }}!
-      
-      This is run #{{ run_number }} of the {{ workflow_name }} workflow.
-      Created at: {{ timestamp }}
-      Workspace: {{ workspace }}
-    output: greeting.txt
+    inputs:
+      template: |
+        Hello, {{ args.name }}!
+        
+        This is run #{{ run_number }} of the {{ workflow_name }} workflow.
+        Created at: {{ timestamp }}
+        Workspace: {{ workspace }}
+      output: greeting.txt
 
   # Step 2: Display workflow information and greeting
   - name: show_info
     task: shell
-    command: |
-      echo "Workflow run information:"
-      echo "------------------------"
-      echo "Run number: {{ run_number }}"
-      echo "Workflow: {{ workflow_name }}"
-      echo "Created: {{ timestamp }}"
-      echo "Workspace: {{ workspace }}"
-      echo "------------------------"
-      echo "Current directory: $(pwd)"
-      cat greeting.txt 
+    inputs:
+      command: |
+        echo "Workflow run information:"
+        echo "------------------------"
+        echo "Run number: {{ run_number }}"
+        echo "Workflow: {{ workflow_name }}"
+        echo "Created: {{ timestamp }}"
+        echo "Workspace: {{ workspace }}"
+        echo "------------------------"
+        echo "Current directory: $(pwd)"
+        cat greeting.txt 
