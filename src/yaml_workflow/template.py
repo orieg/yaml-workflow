@@ -1,7 +1,7 @@
 """Template engine implementation using Jinja2."""
 
 import re
-from typing import Any, Dict, Iterator, Tuple
+from typing import Any, Dict, Iterator, Tuple, Optional
 
 from jinja2 import Environment, StrictUndefined, Template
 from jinja2.exceptions import TemplateSyntaxError, UndefinedError
@@ -87,13 +87,13 @@ class TemplateEngine:
         return var_name
 
     def process_template(
-        self, template_str: str, variables: Dict[str, Any] = None
+        self, template_str: str, variables: Optional[Dict[str, Any]] = None
     ) -> Any:
         """Process a template string with the given variables.
 
         Args:
             template_str (str): The template string to process.
-            variables (dict, optional): Variables to use in template processing.
+            variables (Optional[Dict[str, Any]], optional): Variables to use in template processing.
                 Defaults to None.
 
         Returns:
@@ -103,6 +103,9 @@ class TemplateEngine:
             TemplateError: If there is an error processing the template.
         """
         try:
+            # Initialize variables to empty dict if None
+            vars_dict: Dict[str, Any] = variables if variables is not None else {}
+
             # If the template is just a variable reference, try to return the raw value
             if template_str.strip().startswith("{{") and template_str.strip().endswith(
                 "}}"
@@ -110,11 +113,11 @@ class TemplateEngine:
                 var_path = template_str.strip()[2:-2].strip()
                 if "." in var_path:
                     parts = var_path.split(".")
-                    current = variables
+                    current: Optional[Dict[str, Any]] = vars_dict
                     for part in parts:
                         if current is None or not isinstance(current, dict):
                             break
-                        current = current.get(part)
+                        current = current.get(part)  # type: ignore
                     if current is not None:
                         return current
 
@@ -122,7 +125,7 @@ class TemplateEngine:
             template = self.env.from_string(template_str)
 
             # Convert variables to AttrDict for proper attribute access
-            context = AttrDict(variables or {})
+            context = AttrDict(vars_dict)
 
             # Process the template with the wrapped variables
             return template.render(**context)
@@ -135,21 +138,25 @@ class TemplateEngine:
             # Handle invalid namespace
             if len(parts) > 0:
                 namespace = parts[0]
-                if namespace not in variables:
+                if namespace not in vars_dict:
                     error_msg = (
                         f"Template error: Invalid namespace '{namespace}'\n"
                         f"Available namespaces:\n"
                     )
-                    for ns in sorted(variables.keys()):
-                        if isinstance(variables[ns], dict):
+                    for ns in sorted(vars_dict.keys()):
+                        if isinstance(vars_dict[ns], dict):
                             error_msg += f"  - {ns}\n"
                     raise TemplateError(error_msg)
 
                 # Handle invalid attribute access
                 if len(parts) > 2:
                     try:
-                        current = variables[namespace]
+                        current = vars_dict[namespace]
+                        if not isinstance(current, dict):
+                            raise TemplateError(f"Template error: Cannot access attributes of non-dictionary value '{namespace}'")
                         for part in parts[1:-1]:
+                            if not isinstance(current, dict):
+                                raise TemplateError(f"Template error: Cannot access attributes of non-dictionary value '{'.'.join(parts[:-1])}'")
                             current = current[part]
                         error_msg = (
                             f"Template error: Invalid attribute '{parts[-1]}' on {type(current).__name__}\n"
@@ -164,16 +171,16 @@ class TemplateEngine:
                     f"Template error: Undefined variable '{var_path}'\n"
                     f"Available variables in '{namespace}' namespace:\n"
                 )
-                if namespace in variables and isinstance(variables[namespace], dict):
-                    for key in sorted(variables[namespace].keys()):
+                if namespace in vars_dict and isinstance(vars_dict[namespace], dict):
+                    for key in sorted(vars_dict[namespace].keys()):
                         error_msg += f"  - {key}\n"
                 raise TemplateError(error_msg)
 
             # Handle root level undefined variable
             error_msg = f"Template error: Undefined variable '{var_path}'\n"
-            if variables:
+            if vars_dict:
                 error_msg += "Available variables:\n"
-                for key in sorted(variables.keys()):
+                for key in sorted(vars_dict.keys()):
                     error_msg += f"  - {key}\n"
             raise TemplateError(error_msg)
 
