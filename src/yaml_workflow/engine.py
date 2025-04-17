@@ -6,14 +6,14 @@ import importlib
 import inspect
 import logging
 import logging.handlers
+import os
 import time
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
-import os
 
 import yaml
-from jinja2 import Template, StrictUndefined
+from jinja2 import StrictUndefined, Template
 
 from .exceptions import (
     FlowError,
@@ -22,14 +22,14 @@ from .exceptions import (
     InvalidFlowDefinitionError,
     StepExecutionError,
     StepNotInFlowError,
-    WorkflowError,
     TemplateError,
+    WorkflowError,
 )
 from .state import WorkflowState
-from .tasks import get_task_handler, TaskConfig
-from .workspace import create_workspace, get_workspace_info
+from .tasks import TaskConfig, get_task_handler
 from .template import TemplateEngine
 from .utils.yaml_utils import get_safe_loader
+from .workspace import create_workspace, get_workspace_info
 
 
 def setup_logging(workspace: Path, name: str) -> logging.Logger:
@@ -129,7 +129,9 @@ class WorkflowEngine:
 
         # Validate required sections
         if not self.workflow.get("steps") and not self.workflow.get("flows"):
-            raise WorkflowError("Invalid workflow file: missing both 'steps' and 'flows' sections")
+            raise WorkflowError(
+                "Invalid workflow file: missing both 'steps' and 'flows' sections"
+            )
 
         # Get workflow name
         self.name = self.workflow.get("name")
@@ -590,10 +592,10 @@ class WorkflowEngine:
     def resolve_value(self, value: Any) -> Any:
         """
         Resolve a single value that might contain templates.
-        
+
         Args:
             value: Value to resolve, can be any type
-            
+
         Returns:
             Resolved value with templates replaced
         """
@@ -620,20 +622,20 @@ class WorkflowEngine:
     def _call_task_handler(self, handler: Any, step: Dict[str, Any]) -> Any:
         """
         Call a task handler with the appropriate signature.
-        
+
         This method checks if the handler accepts TaskConfig and calls it accordingly.
-        
+
         Args:
             handler: The task handler function
             step: The step configuration
-            
+
         Returns:
             Any: The result from the task handler
         """
         # Get handler signature
         sig = inspect.signature(handler)
         params = list(sig.parameters.values())
-        
+
         # Check if handler accepts TaskConfig
         if len(params) == 1 and params[0].annotation == TaskConfig:
             # Create TaskConfig and call handler
@@ -826,14 +828,16 @@ class WorkflowEngine:
                 # Get updated retry state to check attempt count
                 retry_state = self.state.get_retry_state(name)
                 attempt = retry_state if isinstance(retry_state, int) else 1
-                
+
                 if attempt >= max_attempts:
                     # If this was the last retry, mark as failed and clear retry state
-                    error_message = f"Failed after {attempt} attempts: {str(retry_error)}"
+                    error_message = (
+                        f"Failed after {attempt} attempts: {str(retry_error)}"
+                    )
                     self.state.mark_step_failed(name, error_message)
                     self.state.clear_retry_state(name)
                     raise WorkflowError(error_message)
-                
+
                 # Otherwise, handle retry failure recursively
                 return self._handle_step_error(step, retry_error)
         elif action == "notify":

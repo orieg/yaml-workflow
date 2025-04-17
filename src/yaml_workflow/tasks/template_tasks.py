@@ -8,7 +8,7 @@ from jinja2 import StrictUndefined, Template, UndefinedError
 
 from ..exceptions import TemplateError
 from ..workspace import resolve_path
-from . import register_task, TaskConfig
+from . import TaskConfig, register_task
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def render_template(config: TaskConfig) -> str:
     try:
         # Process inputs with template resolution
         processed = config.process_inputs()
-        
+
         template_str = processed.get("template")
         if not template_str:
             raise ValueError("No template provided")
@@ -49,11 +49,26 @@ def render_template(config: TaskConfig) -> str:
             logger.debug(f"Rendered template: {rendered}")
         except UndefinedError as e:
             available = {
-                "args": list(config._context["args"].keys()) if "args" in config._context else [],
-                "env": list(config._context["env"].keys()) if "env" in config._context else [],
-                "steps": list(config._context["steps"].keys()) if "steps" in config._context else [],
-                "vars": {k: type(v).__name__ for k, v in config._context.items() 
-                        if k not in ["args", "env", "steps"]}
+                "args": (
+                    list(config._context["args"].keys())
+                    if "args" in config._context
+                    else []
+                ),
+                "env": (
+                    list(config._context["env"].keys())
+                    if "env" in config._context
+                    else []
+                ),
+                "steps": (
+                    list(config._context["steps"].keys())
+                    if "steps" in config._context
+                    else []
+                ),
+                "vars": {
+                    k: type(v).__name__
+                    for k, v in config._context.items()
+                    if k not in ["args", "env", "steps"]
+                },
             }
             raise TemplateError(
                 f"Failed to resolve variable in template '{template_str}': {str(e)}. "

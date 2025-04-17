@@ -1,8 +1,9 @@
 """Tests for template engine."""
 
 import pytest
-from yaml_workflow.template import TemplateEngine
+
 from yaml_workflow.exceptions import TemplateError
+from yaml_workflow.template import TemplateEngine
 
 
 @pytest.fixture
@@ -15,29 +16,15 @@ def template_engine():
 def variables():
     """Create test variables."""
     return {
-        "args": {
-            "input_file": "input.txt",
-            "output_file": "output.txt"
-        },
-        "env": {
-            "HOME": "/home/user",
-            "PATH": "/usr/bin:/bin"
-        },
-        "steps": {
-            "step1": {
-                "output": "step1 output"
-            }
-        },
-        "batch": {
-            "item": {"id": 1, "name": "test"},
-            "index": 0,
-            "name": "batch_task"
-        },
+        "args": {"input_file": "input.txt", "output_file": "output.txt"},
+        "env": {"HOME": "/home/user", "PATH": "/usr/bin:/bin"},
+        "steps": {"step1": {"output": "step1 output"}},
+        "batch": {"item": {"id": 1, "name": "test"}, "index": 0, "name": "batch_task"},
         "workflow_name": "test_workflow",
         "workspace": "/tmp/workspace",
         "run_number": "1",
         "timestamp": "2024-03-20T12:00:00",
-        "workflow_file": "workflow.yaml"
+        "workflow_file": "workflow.yaml",
     }
 
 
@@ -54,7 +41,7 @@ def test_process_template_undefined_variable(template_engine, variables):
     with pytest.raises(TemplateError) as exc:
         template_engine.process_template(template, variables)
     error_msg = str(exc.value)
-    assert 'Template error: Invalid namespace \'args["missing"]\'' in error_msg
+    assert "Template error: Invalid namespace 'args[\"missing\"]'" in error_msg
     assert "Available namespaces:" in error_msg
     assert "args" in error_msg
     assert "env" in error_msg
@@ -90,7 +77,10 @@ def test_process_template_invalid_attribute(template_engine, variables):
     with pytest.raises(TemplateError) as exc:
         template_engine.process_template(template, variables)
     error_msg = str(exc.value)
-    assert 'Template error: Invalid namespace \'args["input_file"]["invalid"]\'' in error_msg
+    assert (
+        'Template error: Invalid namespace \'args["input_file"]["invalid"]\''
+        in error_msg
+    )
     assert "Available namespaces:" in error_msg
     assert "args" in error_msg
     assert "env" in error_msg
@@ -104,7 +94,7 @@ def test_process_template_invalid_namespace(template_engine, variables):
     with pytest.raises(TemplateError) as exc:
         template_engine.process_template(template, variables)
     error_msg = str(exc.value)
-    assert 'Template error: Invalid namespace \'invalid["variable"]\'' in error_msg
+    assert "Template error: Invalid namespace 'invalid[\"variable\"]'" in error_msg
     assert "Available namespaces:" in error_msg
     assert "args" in error_msg
     assert "env" in error_msg
@@ -128,15 +118,9 @@ def test_process_value_string(template_engine, variables):
 
 def test_process_value_dict(template_engine, variables):
     """Test processing dictionary value."""
-    value = {
-        "file": '{{ args["input_file"] }}',
-        "path": '{{ env["HOME"] }}'
-    }
+    value = {"file": '{{ args["input_file"] }}', "path": '{{ env["HOME"] }}'}
     result = template_engine.process_value(value, variables)
-    assert result == {
-        "file": "input.txt",
-        "path": "/home/user"
-    }
+    assert result == {"file": "input.txt", "path": "/home/user"}
 
 
 def test_process_value_list(template_engine, variables):
@@ -150,4 +134,4 @@ def test_process_value_non_template(template_engine, variables):
     """Test processing non-template value."""
     value = 42
     result = template_engine.process_value(value, variables)
-    assert result == 42 
+    assert result == 42

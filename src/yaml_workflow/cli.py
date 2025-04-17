@@ -105,7 +105,9 @@ def run_workflow(args):
 
                     # Ensure execution_state exists
                     if "execution_state" not in metadata:
-                        raise ValueError("Cannot resume: Invalid metadata format - missing execution_state")
+                        raise ValueError(
+                            "Cannot resume: Invalid metadata format - missing execution_state"
+                        )
 
                     # Ensure retry_state exists
                     if "retry_state" not in metadata["execution_state"]:
@@ -116,7 +118,9 @@ def run_workflow(args):
                         failed_step = metadata["execution_state"].get("failed_step")
                         if failed_step:
                             resume_from = failed_step["step_name"]
-                            print(f"Found failed workflow state, resuming from step: {resume_from}")
+                            print(
+                                f"Found failed workflow state, resuming from step: {resume_from}"
+                            )
                         else:
                             raise ValueError("No failed step found to resume from.")
                     else:
@@ -189,32 +193,34 @@ def run_workflow(args):
                 # Skip empty outputs or None values
                 if output is None or (isinstance(output, str) and not output.strip()):
                     continue
-                
+
                 # Print step name without extra newlines
                 if first_step:
                     print(f"• {step_name}:")
                     first_step = False
                 else:
                     print(f"\n• {step_name}:")
-                
+
                 if isinstance(output, dict):
                     # Clean up string values in the dictionary
                     cleaned_output = {}
                     for k, v in output.items():
                         if isinstance(v, str):
                             # Remove leading/trailing whitespace and normalize line endings
-                            lines = v.strip().split('\n')
+                            lines = v.strip().split("\n")
                             # Remove common indentation from all lines
                             cleaned_lines = []
                             for line in lines:
                                 cleaned_lines.append(line.strip())
-                            cleaned_output[k] = '\n'.join(cleaned_lines)
+                            cleaned_output[k] = "\n".join(cleaned_lines)
                         else:
                             cleaned_output[k] = v
                     output = cleaned_output
-                
+
                 # Use YAML format for structured data
-                formatted_output = yaml.dump(output, default_flow_style=False, sort_keys=False,default_style='|' ).strip()
+                formatted_output = yaml.dump(
+                    output, default_flow_style=False, sort_keys=False, default_style="|"
+                ).strip()
                 sys.stdout.write(formatted_output)
 
         print("\n=== Workspace Info ===")

@@ -1,14 +1,17 @@
 """Template engine implementation using Jinja2."""
-from typing import Any, Dict, Iterator, Tuple
+
 import re
+from typing import Any, Dict, Iterator, Tuple
+
 from jinja2 import Environment, StrictUndefined, Template
-from jinja2.exceptions import UndefinedError, TemplateSyntaxError
+from jinja2.exceptions import TemplateSyntaxError, UndefinedError
 
 from .exceptions import TemplateError
 
 
 class AttrDict(dict):
     """A dictionary that allows attribute access to its keys."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for k, v in list(super().items()):
@@ -51,16 +54,16 @@ class TemplateEngine:
             undefined=StrictUndefined,
             autoescape=False,
             trim_blocks=True,
-            lstrip_blocks=True
+            lstrip_blocks=True,
         )
 
     def _extract_variable_path(self, template_str: str, error_msg: str) -> str:
         """Extract the full variable path from the template string.
-        
+
         Args:
             template_str: The template string being processed
             error_msg: The error message from Jinja2
-            
+
         Returns:
             str: The full variable path
         """
@@ -76,33 +79,37 @@ class TemplateEngine:
                 var_name = "unknown"
 
         # Find the variable in the template string
-        pattern = r'{{\s*([^}]+)\s*}}'
+        pattern = r"{{\s*([^}]+)\s*}}"
         matches = re.findall(pattern, template_str)
         for match in matches:
             if var_name in match:
                 return match.strip()
         return var_name
 
-    def process_template(self, template_str: str, variables: Dict[str, Any] = None) -> Any:
+    def process_template(
+        self, template_str: str, variables: Dict[str, Any] = None
+    ) -> Any:
         """Process a template string with the given variables.
-        
+
         Args:
             template_str (str): The template string to process.
             variables (dict, optional): Variables to use in template processing.
                 Defaults to None.
-        
+
         Returns:
             Any: The processed template value, preserving the original type.
-        
+
         Raises:
             TemplateError: If there is an error processing the template.
         """
         try:
             # If the template is just a variable reference, try to return the raw value
-            if template_str.strip().startswith('{{') and template_str.strip().endswith('}}'):
+            if template_str.strip().startswith("{{") and template_str.strip().endswith(
+                "}}"
+            ):
                 var_path = template_str.strip()[2:-2].strip()
-                if '.' in var_path:
-                    parts = var_path.split('.')
+                if "." in var_path:
+                    parts = var_path.split(".")
                     current = variables
                     for part in parts:
                         if current is None or not isinstance(current, dict):
@@ -113,17 +120,17 @@ class TemplateEngine:
 
             # Create a new template with the configured environment
             template = self.env.from_string(template_str)
-            
+
             # Convert variables to AttrDict for proper attribute access
             context = AttrDict(variables or {})
-            
+
             # Process the template with the wrapped variables
             return template.render(**context)
 
         except UndefinedError as e:
             # Get the full variable path from the template
             var_path = self._extract_variable_path(template_str, str(e))
-            parts = var_path.split('.')
+            parts = var_path.split(".")
 
             # Handle invalid namespace
             if len(parts) > 0:
@@ -191,4 +198,4 @@ class TemplateEngine:
             return {k: self.process_value(v, variables) for k, v in value.items()}
         elif isinstance(value, list):
             return [self.process_value(item, variables) for item in value]
-        return value 
+        return value

@@ -2,30 +2,18 @@ from pathlib import Path
 
 import pytest
 
-from yaml_workflow.tasks.python_tasks import python_task
-from yaml_workflow.tasks import TaskConfig
 from yaml_workflow.exceptions import TemplateError
+from yaml_workflow.tasks import TaskConfig
+from yaml_workflow.tasks.python_tasks import python_task
 
 
 @pytest.fixture
 def context():
     """Create a basic context with namespaces."""
     return {
-        "args": {
-            "x": 10,
-            "y": 5,
-            "numbers": [2, 3, 4],
-            "debug": True
-        },
-        "env": {
-            "multiplier": 2,
-            "factor": 3
-        },
-        "steps": {
-            "previous": {
-                "result": 42
-            }
-        }
+        "args": {"x": 10, "y": 5, "numbers": [2, 3, 4], "debug": True},
+        "env": {"multiplier": 2, "factor": 3},
+        "steps": {"previous": {"result": 42}},
     }
 
 
@@ -38,10 +26,7 @@ def test_multiply_numbers(context, workspace):
     step = {
         "name": "multiply",
         "task": "python",
-        "inputs": {
-            "operation": "multiply",
-            "numbers": [2, 3, 4]
-        }
+        "inputs": {"operation": "multiply", "numbers": [2, 3, 4]},
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -52,10 +37,7 @@ def test_multiply_invalid_input(context, workspace):
     step = {
         "name": "multiply_invalid",
         "task": "python",
-        "inputs": {
-            "operation": "multiply",
-            "numbers": ["a", "b"]
-        }
+        "inputs": {"operation": "multiply", "numbers": ["a", "b"]},
     }
     config = TaskConfig(step, context, workspace)
     with pytest.raises(TemplateError, match="could not convert string to float"):
@@ -66,11 +48,7 @@ def test_divide_numbers(context, workspace):
     step = {
         "name": "divide",
         "task": "python",
-        "inputs": {
-            "operation": "divide",
-            "dividend": 10,
-            "divisor": 2
-        }
+        "inputs": {"operation": "divide", "dividend": 10, "divisor": 2},
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -81,11 +59,7 @@ def test_divide_by_zero(context, workspace):
     step = {
         "name": "divide_zero",
         "task": "python",
-        "inputs": {
-            "operation": "divide",
-            "dividend": 10,
-            "divisor": 0
-        }
+        "inputs": {"operation": "divide", "dividend": 10, "divisor": 0},
     }
     config = TaskConfig(step, context, workspace)
     with pytest.raises(TemplateError, match="Division by zero"):
@@ -99,11 +73,7 @@ def test_custom_handler(context, workspace):
     step = {
         "name": "custom",
         "task": "python",
-        "inputs": {
-            "operation": "custom",
-            "handler": custom_func,
-            "args": [5]
-        }
+        "inputs": {"operation": "custom", "handler": custom_func, "args": [5]},
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -114,10 +84,7 @@ def test_custom_handler_invalid(context, workspace):
     step = {
         "name": "custom_invalid",
         "task": "python",
-        "inputs": {
-            "operation": "custom",
-            "handler": None
-        }
+        "inputs": {"operation": "custom", "handler": None},
     }
     config = TaskConfig(step, context, workspace)
     with pytest.raises(TemplateError, match="Custom handler must be a callable"):
@@ -125,26 +92,19 @@ def test_custom_handler_invalid(context, workspace):
 
 
 def test_unknown_operation(context, workspace):
-    step = {
-        "name": "unknown",
-        "task": "python",
-        "inputs": {
-            "operation": "unknown"
-        }
-    }
+    step = {"name": "unknown", "task": "python", "inputs": {"operation": "unknown"}}
     config = TaskConfig(step, context, workspace)
     with pytest.raises(TemplateError, match="Unknown operation: unknown"):
         python_task(config)
 
 
 def test_missing_operation(context, workspace):
-    step = {
-        "name": "missing_op",
-        "task": "python",
-        "inputs": {}
-    }
+    step = {"name": "missing_op", "task": "python", "inputs": {}}
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError, match="Either code or operation must be specified for Python task"):
+    with pytest.raises(
+        TemplateError,
+        match="Either code or operation must be specified for Python task",
+    ):
         python_task(config)
 
 
@@ -158,7 +118,7 @@ def test_python_code_execution(context, workspace):
 numbers = [1, 2, 3, 4, 5]
 result = sum(x * x for x in numbers)
 """
-        }
+        },
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -177,8 +137,8 @@ y = input_y
 result = x + y
 """,
             "input_x": 10,
-            "input_y": 20
-        }
+            "input_y": 20,
+        },
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -194,7 +154,7 @@ def test_python_code_with_context(context, workspace):
 # Use context variables
 result = context["args"]["x"] * context["env"]["multiplier"]
 """
-        }
+        },
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -210,10 +170,13 @@ def test_python_code_execution_error(context, workspace):
 # This will raise a NameError
 result = undefined_variable
 """
-        }
+        },
     }
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError, match="Failed to execute Python code: name 'undefined_variable' is not defined"):
+    with pytest.raises(
+        TemplateError,
+        match="Failed to execute Python code: name 'undefined_variable' is not defined",
+    ):
         python_task(config)
 
 
@@ -227,10 +190,12 @@ def test_python_code_syntax_error(context, workspace):
 if True
     result = 42
 """
-        }
+        },
     }
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError, match="Failed to execute Python code: expected ':'"):
+    with pytest.raises(
+        TemplateError, match="Failed to execute Python code: expected ':'"
+    ):
         python_task(config)
 
 
@@ -241,8 +206,8 @@ def test_python_multiply_with_params(context, workspace):
         "inputs": {
             "operation": "multiply",
             "numbers": "{{ args.numbers }}",
-            "factor": "{{ env.factor }}"
-        }
+            "factor": "{{ env.factor }}",
+        },
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -254,9 +219,7 @@ def test_python_task_result_in_next_task(context, workspace):
     step1 = {
         "name": "task1",
         "task": "python",
-        "inputs": {
-            "code": "result = context['steps']['previous']['result']"
-        }
+        "inputs": {"code": "result = context['steps']['previous']['result']"},
     }
     config1 = TaskConfig(step1, context, workspace)
     result1 = python_task(config1)
@@ -269,9 +232,7 @@ def test_python_task_result_in_next_task(context, workspace):
     step2 = {
         "name": "task2",
         "task": "python",
-        "inputs": {
-            "code": "result = context['steps']['task1']['result'] * 2"
-        }
+        "inputs": {"code": "result = context['steps']['task1']['result'] * 2"},
     }
     config2 = TaskConfig(step2, context, workspace)
     result2 = python_task(config2)
@@ -282,9 +243,7 @@ def test_python_task_no_result_variable(context, workspace):
     step = {
         "name": "no_result",
         "task": "python",
-        "inputs": {
-            "code": "x = 42  # No result variable set"
-        }
+        "inputs": {"code": "x = 42  # No result variable set"},
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -301,7 +260,7 @@ x = 1
 y = 2
 result = [x, y]
 """
-        }
+        },
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -312,9 +271,7 @@ def test_python_task_no_result_no_expression(context, workspace):
     step = {
         "name": "no_result_no_expr",
         "task": "python",
-        "inputs": {
-            "code": "# Just a comment"
-        }
+        "inputs": {"code": "# Just a comment"},
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -333,7 +290,7 @@ if x > 5:
 else:
     result = 'small'
 """
-        }
+        },
     }
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
@@ -351,10 +308,10 @@ def test_python_task_function_mode(context, workspace):
 def process(x, y, multiplier):
     return (x + y) * multiplier
 """,
-            "args": ["{{ args.x }}", "{{ args.y }}", "{{ env.multiplier }}"]
-        }
+            "args": ["{{ args.x }}", "{{ args.y }}", "{{ env.multiplier }}"],
+        },
     }
-    
+
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
     assert result["result"] == 30  # (10 + 5) * 2
@@ -371,10 +328,10 @@ def test_python_task_function_mode_with_defaults(context, workspace):
 def process(x, y=5, multiplier=2):
     return (x + y) * multiplier
 """,
-            "args": [10]  # Only provide first argument
-        }
+            "args": [10],  # Only provide first argument
+        },
     }
-    
+
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
     assert result["result"] == 30  # (10 + 5) * 2
@@ -391,12 +348,14 @@ def test_python_task_function_mode_invalid_signature(context, workspace):
 def wrong_name(x, y):  # Function must be named 'process'
     return x + y
 """,
-            "args": [1, 2]
-        }
+            "args": [1, 2],
+        },
     }
-    
+
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError, match="Function mode requires a 'process' function"):
+    with pytest.raises(
+        TemplateError, match="Function mode requires a 'process' function"
+    ):
         python_task(config)
 
 
@@ -412,10 +371,10 @@ def process(x, y, *, multiplier=1):
     return (x + y) * multiplier
 """,
             "args": [2, 3],
-            "kwargs": {"multiplier": 4}
-        }
+            "kwargs": {"multiplier": 4},
+        },
     }
-    
+
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
     assert result["result"] == 20  # (2 + 3) * 4
@@ -432,10 +391,10 @@ def test_python_task_function_mode_template_error(context, workspace):
 def process(x):
     return x * 2
 """,
-            "args": ["{{ args.missing }}"]
-        }
+            "args": ["{{ args.missing }}"],
+        },
     }
-    
+
     config = TaskConfig(step, context, workspace)
     with pytest.raises(TemplateError):
         python_task(config)
@@ -443,11 +402,8 @@ def process(x):
 
 def test_python_task_function_mode_complex_types(context, workspace):
     """Test function mode with complex argument types."""
-    context["args"]["data"] = {
-        "numbers": [1, 2, 3],
-        "factor": 2
-    }
-    
+    context["args"]["data"] = {"numbers": [1, 2, 3], "factor": 2}
+
     step = {
         "name": "function_complex",
         "task": "python",
@@ -457,10 +413,10 @@ def test_python_task_function_mode_complex_types(context, workspace):
 def process(data):
     return sum(x * data['factor'] for x in data['numbers'])
 """,
-            "args": ["{{ args.data }}"]
-        }
+            "args": ["{{ args.data }}"],
+        },
     }
-    
+
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
     assert result["result"] == 12  # (1 + 2 + 3) * 2
@@ -474,10 +430,10 @@ def test_python_task_template_resolution(context, workspace):
         "inputs": {
             "operation": "multiply",
             "numbers": "{{ args.numbers }}",
-            "factor": "{{ env.multiplier }}"
-        }
+            "factor": "{{ env.multiplier }}",
+        },
     }
-    
+
     config = TaskConfig(step, context, workspace)
     result = python_task(config)
     assert result["result"] == 48.0  # (2 * 3 * 4) * 2
@@ -491,10 +447,10 @@ def test_python_task_namespace_error_handling(context, workspace):
         "inputs": {
             "operation": "multiply",
             "numbers": "{{ invalid.numbers }}",
-            "factor": 2
-        }
+            "factor": 2,
+        },
     }
-    
+
     config = TaskConfig(step, context, workspace)
     with pytest.raises(TemplateError) as exc_info:
         python_task(config)

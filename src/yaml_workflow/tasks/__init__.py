@@ -5,12 +5,12 @@ This package contains various task modules that can be used in workflows.
 Each module provides specific functionality that can be referenced in workflow YAML files.
 """
 
+import re
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, ParamSpec, TypeVar, cast
-import re
 
-from jinja2 import UndefinedError, StrictUndefined
+from jinja2 import StrictUndefined, UndefinedError
 
 from ..exceptions import TemplateError
 from ..template import TemplateEngine
@@ -28,6 +28,7 @@ _task_handlers: Dict[str, TaskHandler] = {}
 
 class TaskConfig:
     """Configuration class for task handlers with namespace support."""
+
     def __init__(self, step: Dict[str, Any], context: Dict[str, Any], workspace: Path):
         """
         Initialize task configuration.
@@ -71,7 +72,9 @@ class TaskConfig:
             "args": list(self._context.get("args", {}).keys()),
             "env": list(self._context.get("env", {}).keys()),
             "steps": list(self._context.get("steps", {}).keys()),
-            "root": [k for k in self._context.keys() if k not in ["args", "env", "steps"]]
+            "root": [
+                k for k in self._context.keys() if k not in ["args", "env", "steps"]
+            ],
         }
 
     def process_inputs(self) -> Dict[str, Any]:
@@ -90,9 +93,13 @@ class TaskConfig:
                 "args": self._context.get("args", {}),
                 "env": self._context.get("env", {}),
                 "steps": self._context.get("steps", {}),
-                **{k: v for k, v in self._context.items() if k not in ["args", "env", "steps"]}
+                **{
+                    k: v
+                    for k, v in self._context.items()
+                    if k not in ["args", "env", "steps"]
+                },
             }
-            
+
             self._processed_inputs = self._process_value(self.inputs, template_context)
         return self._processed_inputs
 
@@ -111,18 +118,19 @@ class TaskConfig:
             try:
                 result = self._template_engine.process_template(value, template_context)
                 # Try to convert string results back to their original type
-                if result == 'True':
+                if result == "True":
                     return True
-                elif result == 'False':
+                elif result == "False":
                     return False
                 try:
                     # First try to evaluate as a Python literal (for lists, dicts, etc.)
                     import ast
+
                     try:
                         return ast.literal_eval(result)
                     except (ValueError, SyntaxError):
                         # If not a valid Python literal, try numeric conversion
-                        if '.' in result:
+                        if "." in result:
                             return float(result)
                         return int(result)
                 except (ValueError, TypeError, SyntaxError):
@@ -136,7 +144,9 @@ class TaskConfig:
                     f"Error: {error_msg}. Available variables in '{namespace}' namespace: {available[namespace]}"
                 )
         elif isinstance(value, dict):
-            return {k: self._process_value(v, template_context) for k, v in value.items()}
+            return {
+                k: self._process_value(v, template_context) for k, v in value.items()
+            }
         elif isinstance(value, list):
             return [self._process_value(item, template_context) for item in value]
         return value
@@ -155,7 +165,7 @@ class TaskConfig:
         for namespace in ["args", "env", "steps"]:
             if f"{namespace}." in error_msg:
                 return namespace
-            
+
         # Check for dictionary access pattern (e.g., 'dict object' has no attribute 'undefined')
         # Extract the undefined attribute name from the error message
         match = re.search(r"no attribute '(\w+)'", error_msg)
@@ -165,13 +175,17 @@ class TaskConfig:
             for namespace in ["args", "env", "steps"]:
                 if namespace in self._context:
                     template_str = next(
-                        (v for v in self.inputs.values() 
-                         if isinstance(v, str) and f"{namespace}.{undefined_attr}" in v),
-                        ""
+                        (
+                            v
+                            for v in self.inputs.values()
+                            if isinstance(v, str)
+                            and f"{namespace}.{undefined_attr}" in v
+                        ),
+                        "",
                     )
                     if template_str:
                         return namespace
-        
+
         return "root"
 
 
@@ -185,9 +199,11 @@ def register_task(name: str) -> Callable[[TaskHandler], TaskHandler]:
     Returns:
         Callable: Decorator function
     """
+
     def decorator(func: TaskHandler) -> TaskHandler:
         _task_handlers[name] = func
         return func
+
     return decorator
 
 
@@ -219,23 +235,18 @@ def create_task_handler(func: Callable[..., R]) -> TaskHandler:
     Returns:
         TaskHandler: Wrapped task handler
     """
+
     @wraps(func)
     def wrapper(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> R:
         config = TaskConfig(step, context, workspace)
         processed_inputs = config.process_inputs()
         return func(**processed_inputs)
+
     return cast(TaskHandler, wrapper)
 
 
 # Import task modules
-from . import (
-    basic_tasks,
-    batch,
-    file_tasks,
-    python_tasks,
-    shell_tasks,
-    template_tasks,
-)
+from . import basic_tasks, batch, file_tasks, python_tasks, shell_tasks, template_tasks
 
 # Register basic tasks
 register_task("echo")(create_task_handler(basic_tasks.echo))
