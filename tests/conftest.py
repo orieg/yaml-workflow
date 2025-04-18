@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from yaml_workflow.tasks import create_task_handler, register_task
+from yaml_workflow.tasks import TaskConfig, register_task
 
 # Add the src directory to Python path
 src_dir = Path(__file__).parent.parent / "src"
@@ -128,17 +128,15 @@ def custom_task_module(temp_workspace):
     task_file = module_dir / "my_task.py"
     task_file.write_text(
         """
-from yaml_workflow.tasks import register_task, create_task_handler
-
-def my_custom_task(message='Hello'):
-    return {'result': f"{message} from custom task!"}
+from yaml_workflow.tasks import TaskConfig, register_task
 
 @register_task('my_custom_task')
-def my_custom_task_handler(step, context, workspace):
-    inputs = step.get('inputs', {})
-    if 'message' not in inputs:
+def my_custom_task_handler(config: TaskConfig) -> dict:
+    processed = config.process_inputs()
+    message = processed.get('message', 'Hello')
+    if not message:
         raise ValueError("'message' is required in inputs")
-    return my_custom_task(**inputs)
+    return {'result': f"{message} from custom task!"}
 """
     )
 

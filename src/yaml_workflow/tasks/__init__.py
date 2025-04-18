@@ -5,273 +5,153 @@ This package contains various task modules that can be used in workflows.
 Each module provides specific functionality that can be referenced in workflow YAML files.
 """
 
-import re
+import inspect
 from functools import wraps
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, ParamSpec, TypeVar, cast
+from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
-from jinja2 import StrictUndefined, UndefinedError
-
-from ..exceptions import TemplateError
-from ..template import TemplateEngine
+from ..types import TaskHandler
+from .config import TaskConfig
 
 # Type variables for task function signatures
-P = ParamSpec("P")
 R = TypeVar("R")
 
-# Type for task handlers
-TaskHandler = Callable[[Dict[str, Any], Dict[str, Any], Path], Any]
-
 # Registry of task handlers
-_task_handlers: Dict[str, TaskHandler] = {}
-
-
-class TaskConfig:
-    """Configuration class for task handlers with namespace support."""
-
-    def __init__(self, step: Dict[str, Any], context: Dict[str, Any], workspace: Path):
-        """
-        Initialize task configuration.
-
-        Args:
-            step: Step configuration from workflow
-            context: Execution context with namespaces
-            workspace: Workspace path
-        """
-        self.name = step.get("name")
-        self.type = step.get("task")
-        self.inputs = step.get("inputs", {})
-        self._context = context
-        self.workspace = workspace
-        self._processed_inputs: Dict[str, Any] = {}
-        self._template_engine = TemplateEngine()
-
-    def get_variable(self, name: str, namespace: Optional[str] = None) -> Any:
-        """
-        Get a variable with namespace support.
-
-        Args:
-            name: Variable name
-            namespace: Optional namespace (args, env, steps)
-
-        Returns:
-            Any: Variable value if found
-        """
-        if namespace:
-            return self._context.get(namespace, {}).get(name)
-        return self._context.get(name)
-
-    def get_available_variables(self) -> Dict[str, List[str]]:
-        """
-        Get available variables by namespace.
-
-        Returns:
-            Dict[str, List[str]]: Available variables in each namespace
-        """
-        return {
-            "args": list(self._context.get("args", {}).keys()),
-            "env": list(self._context.get("env", {}).keys()),
-            "steps": list(self._context.get("steps", {}).keys()),
-            "root": [
-                k for k in self._context.keys() if k not in ["args", "env", "steps"]
-            ],
-        }
-
-    def process_inputs(self) -> Dict[str, Any]:
-        """
-        Process task inputs with template resolution.
-
-        Recursively processes all string values in the inputs dictionary,
-        including nested dictionaries and lists.
-
-        Returns:
-            Dict[str, Any]: Processed inputs with resolved templates
-        """
-        if not self._processed_inputs:
-            # Create a flattened context for template processing
-            template_context = {
-                "args": self._context.get("args", {}),
-                "env": self._context.get("env", {}),
-                "steps": self._context.get("steps", {}),
-                **{
-                    k: v
-                    for k, v in self._context.items()
-                    if k not in ["args", "env", "steps"]
-                },
-            }
-
-            self._processed_inputs = self._process_value(self.inputs, template_context)
-        return self._processed_inputs
-
-    def _process_value(self, value: Any, template_context: Dict[str, Any]) -> Any:
-        """
-        Recursively process a value with template resolution.
-
-        Args:
-            value: Value to process
-            template_context: Template context for variable resolution
-
-        Returns:
-            Any: Processed value with resolved templates
-        """
-        if isinstance(value, str):
-            try:
-                result = self._template_engine.process_template(value, template_context)
-                # Try to convert string results back to their original type
-                if result == "True":
-                    return True
-                elif result == "False":
-                    return False
-                try:
-                    # First try to evaluate as a Python literal (for lists, dicts, etc.)
-                    import ast
-
-                    try:
-                        return ast.literal_eval(result)
-                    except (ValueError, SyntaxError):
-                        # If not a valid Python literal, try numeric conversion
-                        if "." in result:
-                            return float(result)
-                        return int(result)
-                except (ValueError, TypeError, SyntaxError):
-                    return result
-            except UndefinedError as e:
-                error_msg = str(e)
-                namespace = self._get_undefined_namespace(error_msg)
-                available = self.get_available_variables()
-                raise TemplateError(
-                    f"Template error: Undefined variable in namespace '{namespace}'. "
-                    f"Error: {error_msg}. Available variables in '{namespace}' namespace: {available[namespace]}"
-                )
-        elif isinstance(value, dict):
-            return {
-                k: self._process_value(v, template_context) for k, v in value.items()
-            }
-        elif isinstance(value, list):
-            return [self._process_value(item, template_context) for item in value]
-        return value
-
-    def _get_undefined_namespace(self, error_msg: str) -> str:
-        """
-        Extract namespace from undefined variable error.
-
-        Args:
-            error_msg: Error message from UndefinedError
-
-        Returns:
-            str: Namespace name or 'root' if not found
-        """
-        # Check for direct variable access pattern (e.g., args.undefined)
-        for namespace in ["args", "env", "steps"]:
-            if f"{namespace}." in error_msg:
-                return namespace
-
-        # Check for dictionary access pattern (e.g., 'dict object' has no attribute 'undefined')
-        # Extract the undefined attribute name from the error message
-        match = re.search(r"no attribute '(\w+)'", error_msg)
-        if match:
-            undefined_attr = match.group(1)
-            # Find which namespace was trying to access this attribute
-            for namespace in ["args", "env", "steps"]:
-                if namespace in self._context:
-                    template_str = next(
-                        (
-                            v
-                            for v in self.inputs.values()
-                            if isinstance(v, str)
-                            and f"{namespace}.{undefined_attr}" in v
-                        ),
-                        "",
-                    )
-                    if template_str:
-                        return namespace
-
-        return "root"
+_task_registry: Dict[str, TaskHandler] = {}
 
 
 def register_task(name: str) -> Callable[[TaskHandler], TaskHandler]:
-    """
-    Decorator to register a task handler.
+    """Register a task handler.
 
     Args:
-        name: Name of the task type
+        name: Task name
 
     Returns:
-        Callable: Decorator function that can handle traditional task handlers
+        Decorator function
     """
 
-    def decorator(func: TaskHandler) -> TaskHandler:
-        _task_handlers[name] = func
-        return func
+    def decorator(handler: TaskHandler) -> TaskHandler:
+        _task_registry[name] = handler
+        return handler
 
     return decorator
 
 
-def get_task_handler(task_type: str) -> Optional[TaskHandler]:
-    """
-    Get a task handler by type.
+def get_task_handler(name: str) -> Optional[TaskHandler]:
+    """Get a task handler by name.
 
     Args:
-        task_type: Type of task
+        name: Task name
 
     Returns:
-        Optional[TaskHandler]: Task handler function if found, None otherwise
+        Optional[TaskHandler]: Task handler if found
     """
-    return _task_handlers.get(task_type)
+    return _task_registry.get(name)
 
 
 def create_task_handler(func: Callable[..., R]) -> TaskHandler:
     """
-    Create a task handler that wraps a basic function.
+    Create a task handler from a function.
 
-    This wrapper:
-    1. Creates a TaskConfig instance for namespace support
-    2. Processes inputs with template resolution
-    3. Handles workspace paths if needed
+    This function wraps a regular function to make it compatible with the task system.
+    The wrapped function will receive its arguments from the task inputs.
 
     Args:
-        func: The function to wrap as a task handler
+        func: Function to wrap
 
     Returns:
-        TaskHandler: Wrapped task handler
+        TaskHandler: Task handler function
     """
 
     @wraps(func)
-    def wrapper(step: Dict[str, Any], context: Dict[str, Any], workspace: Path) -> R:
-        config = TaskConfig(step, context, workspace)
-        processed_inputs = config.process_inputs()
-        return func(**processed_inputs)
+    def wrapper(config: TaskConfig) -> R:
+        # Get function parameters
+        sig = inspect.signature(func)
+        params = sig.parameters
 
-    return cast(TaskHandler, wrapper)
+        # Process inputs with template support
+        processed = config.process_inputs()
+
+        # Extract arguments for the function
+        kwargs = {}
+        for name, param in params.items():
+            if name in processed:
+                kwargs[name] = processed[name]
+            elif param.default is not inspect.Parameter.empty:
+                kwargs[name] = param.default
+            else:
+                raise ValueError(f"Missing required parameter: {name}")
+
+        # Call the function with extracted arguments
+        return func(**kwargs)
+
+    return wrapper
 
 
-# Import task modules
-from . import basic_tasks, batch, file_tasks, python_tasks, shell_tasks, template_tasks
+from .basic_tasks import (
+    add_numbers,
+    create_greeting,
+    echo,
+    fail,
+    hello_world,
+    join_strings,
+)
+from .batch import batch_task
+from .file_tasks import (
+    append_file_task,
+    read_file_task,
+    read_json_task,
+    read_yaml_task,
+    write_file_task,
+    write_json_task,
+    write_yaml_task,
+)
+from .python_tasks import print_vars_task
 
-# Register basic tasks
-register_task("echo")(create_task_handler(basic_tasks.echo))
-register_task("fail")(create_task_handler(basic_tasks.fail))
-register_task("hello_world")(create_task_handler(basic_tasks.hello_world))
-register_task("add_numbers")(create_task_handler(basic_tasks.add_numbers))
-register_task("join_strings")(create_task_handler(basic_tasks.join_strings))
-register_task("create_greeting")(create_task_handler(basic_tasks.create_greeting))
+# Import task handlers to ensure they are registered
+from .shell_tasks import shell_task
+from .template_tasks import render_template
 
-# Register file tasks
-register_task("write_file")(file_tasks.write_file_task)
-register_task("read_file")(file_tasks.read_file_task)
-register_task("append_file")(file_tasks.append_file_task)
-register_task("copy_file")(file_tasks.copy_file_task)
-register_task("move_file")(file_tasks.move_file_task)
-register_task("delete_file")(file_tasks.delete_file_task)
+# Register built-in tasks
+register_task("shell")(shell_task)
+register_task("write_file")(write_file_task)
+register_task("read_file")(read_file_task)
+register_task("append_file")(append_file_task)
+register_task("write_json")(write_json_task)
+register_task("read_json")(read_json_task)
+register_task("write_yaml")(write_yaml_task)
+register_task("read_yaml")(read_yaml_task)
+register_task("print_vars")(print_vars_task)
+register_task("template")(render_template)
+register_task("batch")(batch_task)
+register_task("echo")(create_task_handler(echo))
+register_task("fail")(create_task_handler(fail))
+register_task("hello_world")(create_task_handler(hello_world))
+register_task("add_numbers")(create_task_handler(add_numbers))
+register_task("join_strings")(create_task_handler(join_strings))
+register_task("create_greeting")(create_task_handler(create_greeting))
 
-# Register shell tasks
-register_task("shell")(shell_tasks.shell_task)
-
-# Register template tasks
-register_task("template")(template_tasks.render_template)
-
-# Register Python tasks
-register_task("python")(python_tasks.python_task)
-
-# Register batch task (using new implementation)
-register_task("batch")(batch.batch_task)
+__all__ = [
+    "TaskConfig",
+    "TaskHandler",
+    "register_task",
+    "get_task_handler",
+    "create_task_handler",
+    "shell_task",
+    "write_file_task",
+    "read_file_task",
+    "append_file_task",
+    "write_json_task",
+    "read_json_task",
+    "write_yaml_task",
+    "read_yaml_task",
+    "print_vars_task",
+    "render_template",
+    "batch_task",
+    "echo",
+    "fail",
+    "hello_world",
+    "add_numbers",
+    "join_strings",
+    "create_greeting",
+]

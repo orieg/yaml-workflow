@@ -48,31 +48,11 @@ def render_template(config: TaskConfig) -> str:
             rendered = template.render(**config._context)
             logger.debug(f"Rendered template: {rendered}")
         except UndefinedError as e:
-            available = {
-                "args": (
-                    list(config._context["args"].keys())
-                    if "args" in config._context
-                    else []
-                ),
-                "env": (
-                    list(config._context["env"].keys())
-                    if "env" in config._context
-                    else []
-                ),
-                "steps": (
-                    list(config._context["steps"].keys())
-                    if "steps" in config._context
-                    else []
-                ),
-                "vars": {
-                    k: type(v).__name__
-                    for k, v in config._context.items()
-                    if k not in ["args", "env", "steps"]
-                },
-            }
+            available = config.get_available_variables()
+            namespace = config._get_undefined_namespace(str(e))
             raise TemplateError(
                 f"Failed to resolve variable in template '{template_str}': {str(e)}. "
-                f"Available variables: {available}"
+                f"Available variables in '{namespace}' namespace: {available[namespace]}"
             )
 
         # Save to file

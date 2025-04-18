@@ -1,7 +1,7 @@
 """Template engine implementation using Jinja2."""
 
 import re
-from typing import Any, Dict, Iterator, Tuple, Optional
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 from jinja2 import Environment, StrictUndefined, Template
 from jinja2.exceptions import TemplateSyntaxError, UndefinedError
@@ -153,10 +153,14 @@ class TemplateEngine:
                     try:
                         current = vars_dict[namespace]
                         if not isinstance(current, dict):
-                            raise TemplateError(f"Template error: Cannot access attributes of non-dictionary value '{namespace}'")
+                            raise TemplateError(
+                                f"Template error: Cannot access attributes of non-dictionary value '{namespace}'"
+                            )
                         for part in parts[1:-1]:
                             if not isinstance(current, dict):
-                                raise TemplateError(f"Template error: Cannot access attributes of non-dictionary value '{'.'.join(parts[:-1])}'")
+                                raise TemplateError(
+                                    f"Template error: Cannot access attributes of non-dictionary value '{'.'.join(parts[:-1])}'"
+                                )
                             current = current[part]
                         error_msg = (
                             f"Template error: Invalid attribute '{parts[-1]}' on {type(current).__name__}\n"

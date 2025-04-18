@@ -280,16 +280,11 @@ def handle_custom_operation(config: TaskConfig) -> Dict[str, Any]:
         raise TemplateError(f"Custom handler failed: {str(e)}")
 
 
-@register_task("print_vars")
-def print_vars_task(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: Union[str, Path]
-) -> Dict[str, Any]:
+def print_vars_task(config: TaskConfig) -> Dict[str, Any]:
     """Print all available variables in the context.
 
     Args:
-        step: The step configuration
-        context: The execution context
-        workspace: The workspace path
+        config: Task configuration object
 
     Returns:
         Dict containing success status
@@ -298,23 +293,32 @@ def print_vars_task(
         TemplateError: If task execution fails
     """
     try:
-        logger = get_task_logger(workspace, step.get("name", "print_vars"))
-        workspace_path = Path(workspace) if isinstance(workspace, str) else workspace
-        log_task_execution(logger, step, context, workspace_path)
+        logger = get_task_logger(config.workspace, config.name or "print_vars")
+        log_task_execution(
+            logger,
+            {"name": config.name, "type": config.type},
+            config._context,
+            config.workspace,
+        )
 
-        print("\n=== Available Variables ===")
-        print("\nContext:")
-        for key, value in context.items():
-            print(f"{key}: {type(value)} = {value}")
+        # Get message from inputs if provided
+        processed = config.process_inputs()
+        message = processed.get("message")
+        if message:
+            print(f"\n{message}")
 
-        print("\nStep:")
-        for key, value in step.items():
-            print(f"{key}: {type(value)} = {value}")
+        print("\nWorkflow Variables:")
+        print("==================")
 
-        print("\nWorkspace:", workspace)
-        print("=== End Variables ===\n")
+        # Sort variables by name for consistent output
+        for key in sorted(config._context.keys()):
+            value = config._context[key]
+            print(f"{key}: {value}")
+        print("==================\n")
 
-        return {"success": True}
+        result = {"success": True}
+        log_task_result(logger, result)
+        return result
 
     except Exception as e:
         log_task_error(logger, e)
