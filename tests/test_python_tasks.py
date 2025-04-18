@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from yaml_workflow.exceptions import TemplateError
+from yaml_workflow.exceptions import TaskExecutionError, TemplateError
 from yaml_workflow.tasks import TaskConfig
 from yaml_workflow.tasks.python_tasks import python_task
 
@@ -40,7 +40,9 @@ def test_multiply_invalid_input(context, workspace):
         "inputs": {"operation": "multiply", "numbers": ["a", "b"]},
     }
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError, match="could not convert string to float"):
+    with pytest.raises(
+        TaskExecutionError, match="could not convert string to float: 'a'"
+    ):
         python_task(config)
 
 
@@ -62,39 +64,25 @@ def test_divide_by_zero(context, workspace):
         "inputs": {"operation": "divide", "dividend": 10, "divisor": 0},
     }
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError, match="Division by zero"):
+    with pytest.raises(TaskExecutionError, match="Division by zero"):
         python_task(config)
 
 
-def test_custom_handler(context, workspace):
-    def custom_func(x):
-        return x * 2
-
+def test_custom_handler_not_implemented(context, workspace):
     step = {
         "name": "custom",
         "task": "python",
-        "inputs": {"operation": "custom", "handler": custom_func, "args": [5]},
+        "inputs": {"operation": "custom"},
     }
     config = TaskConfig(step, context, workspace)
-    result = python_task(config)
-    assert result["result"] == 10
-
-
-def test_custom_handler_invalid(context, workspace):
-    step = {
-        "name": "custom_invalid",
-        "task": "python",
-        "inputs": {"operation": "custom", "handler": None},
-    }
-    config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError, match="Custom handler must be a callable"):
+    with pytest.raises(TaskExecutionError, match="not implemented"):
         python_task(config)
 
 
 def test_unknown_operation(context, workspace):
     step = {"name": "unknown", "task": "python", "inputs": {"operation": "unknown"}}
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError, match="Unknown operation: unknown"):
+    with pytest.raises(TaskExecutionError, match="Unknown operation: unknown"):
         python_task(config)
 
 
@@ -102,8 +90,8 @@ def test_missing_operation(context, workspace):
     step = {"name": "missing_op", "task": "python", "inputs": {}}
     config = TaskConfig(step, context, workspace)
     with pytest.raises(
-        TemplateError,
-        match="Either code or operation must be specified for Python task",
+        TaskExecutionError,
+        match="Either 'code' or 'operation' must be specified for Python task",
     ):
         python_task(config)
 
@@ -174,8 +162,8 @@ result = undefined_variable
     }
     config = TaskConfig(step, context, workspace)
     with pytest.raises(
-        TemplateError,
-        match="Failed to execute Python code: name 'undefined_variable' is not defined",
+        TaskExecutionError,
+        match="name 'undefined_variable' is not defined",
     ):
         python_task(config)
 
@@ -193,9 +181,7 @@ if True
         },
     }
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(
-        TemplateError, match="Failed to execute Python code: expected ':'"
-    ):
+    with pytest.raises(TaskExecutionError, match="expected ':'"):
         python_task(config)
 
 
@@ -354,7 +340,7 @@ def wrong_name(x, y):  # Function must be named 'process'
 
     config = TaskConfig(step, context, workspace)
     with pytest.raises(
-        TemplateError, match="Function mode requires a 'process' function"
+        TaskExecutionError, match="Function mode requires a 'process' function"
     ):
         python_task(config)
 
@@ -396,7 +382,7 @@ def process(x):
     }
 
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError):
+    with pytest.raises(TaskExecutionError, match="Undefined variable"):
         python_task(config)
 
 
@@ -452,6 +438,5 @@ def test_python_task_namespace_error_handling(context, workspace):
     }
 
     config = TaskConfig(step, context, workspace)
-    with pytest.raises(TemplateError) as exc_info:
+    with pytest.raises(TaskExecutionError, match="Invalid namespace 'invalid'"):
         python_task(config)
-    assert "invalid" in str(exc_info.value)

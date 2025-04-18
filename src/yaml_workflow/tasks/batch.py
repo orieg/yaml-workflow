@@ -84,9 +84,9 @@ def process_item(
 
         config = TaskConfig(step, item_context, workspace)
         result = handler(config)
-        # If result is a dict with a single 'result' key, unwrap it
-        if isinstance(result, dict) and len(result) == 1 and "result" in result:
-            return result["result"]
+        # Remove unwrapping logic - return the full result dict from the handler
+        # if isinstance(result, dict) and len(result) == 1 and "result" in result:
+        #     return result["result"]
         return result
     except Exception as e:
         # Centralized error handling for exceptions during item processing
@@ -228,15 +228,15 @@ def batch_task(config: TaskConfig) -> Dict[str, Any]:
                     sub_task_config_for_item = task_config
                     future = executor.submit(
                         process_item,
-                        item,
-                        sub_task_config_for_item,
-                        config._context,  # Pass original context
-                        config.workspace,
-                        arg_name,
-                        chunk_index,
-                        chunk_start + item_index,
-                        len(items),  # total
-                        chunk_size,  # chunk_size
+                        item,  # item: Any
+                        sub_task_config_for_item,  # task_config: Dict[str, Any]
+                        config._context,  # context: Dict[str, Any]
+                        config.workspace,  # workspace: Path
+                        arg_name,  # arg_name: str
+                        chunk_index,  # chunk_index: int
+                        chunk_start + item_index,  # item_index: int
+                        len(items),  # total: int
+                        chunk_size,  # chunk_size: int
                     )
                     futures[future] = (item, chunk_start + item_index)
 
