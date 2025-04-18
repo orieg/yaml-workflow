@@ -187,29 +187,31 @@ def test_batch_validation(workspace, basic_context):
     """Test batch task validation."""
     # Test missing items
     step = {
-        "name": "test_batch_validation",
+        "name": "test_batch_validation_items",
         "task": "batch",
         "inputs": {"task": {"task": "python", "inputs": {"code": "result = 'test'"}}},
     }
 
     config = TaskConfig(step, basic_context, workspace)
-    with pytest.raises(ValueError, match="items parameter is required"):
+    # Expect TaskExecutionError because config errors are now wrapped
+    with pytest.raises(TaskExecutionError, match="'items' parameter is required"):
         batch_task(config)
 
     # Test missing task config
     step = {
-        "name": "test_batch_validation",
+        "name": "test_batch_validation_task",
         "task": "batch",
         "inputs": {"items": ["item1", "item2"]},
     }
 
     config = TaskConfig(step, basic_context, workspace)
-    with pytest.raises(ValueError, match="task configuration is required"):
+    # Expect TaskExecutionError because config errors are now wrapped
+    with pytest.raises(TaskExecutionError, match="'task' configuration is required"):
         batch_task(config)
 
     # Test invalid chunk size
     step = {
-        "name": "test_batch_validation",
+        "name": "test_batch_validation_chunk",
         "task": "batch",
         "inputs": {
             "items": ["item1", "item2"],
@@ -219,12 +221,13 @@ def test_batch_validation(workspace, basic_context):
     }
 
     config = TaskConfig(step, basic_context, workspace)
-    with pytest.raises(ValueError, match="chunk_size must be greater than 0"):
+    # Expect TaskExecutionError because config errors are now wrapped
+    with pytest.raises(TaskExecutionError, match="'chunk_size' must be greater than 0"):
         batch_task(config)
 
     # Test invalid max_workers
     step = {
-        "name": "test_batch_validation",
+        "name": "test_batch_validation_workers",
         "task": "batch",
         "inputs": {
             "items": ["item1", "item2"],
@@ -234,7 +237,10 @@ def test_batch_validation(workspace, basic_context):
     }
 
     config = TaskConfig(step, basic_context, workspace)
-    with pytest.raises(ValueError, match="max_workers must be greater than 0"):
+    # Expect TaskExecutionError because config errors are now wrapped
+    with pytest.raises(
+        TaskExecutionError, match="'max_workers' must be greater than 0"
+    ):
         batch_task(config)
 
 
