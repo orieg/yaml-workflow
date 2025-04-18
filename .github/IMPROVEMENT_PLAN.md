@@ -396,7 +396,7 @@ git push    # Push to remote
    - [x] 3. `batch.py`, `batch_context.py` - Batch processing
    - [x] 4. File operations: `file_tasks.py`, `file_utils.py`
    - [x] 5. Execution tasks: `python_tasks.py`
-   - [ ] 5. Execution tasks: `shell_tasks.py`
+   - [x] 5. Execution tasks: `shell_tasks.py`
    - [ ] 6. Template handling: `template_tasks.py`
    - [ ] 7. Simple tasks: `basic_tasks.py`, `noop.py`
 
