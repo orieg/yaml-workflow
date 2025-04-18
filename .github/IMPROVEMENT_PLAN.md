@@ -393,7 +393,7 @@ git push    # Push to remote
    Order of updates:
    1. `base.py` - Core error utilities (Skipped/Defered - Handled within handle_task_error)
    - [x] 2. `config.py` - Error template handling
-   3. `batch.py`, `batch_context.py` - Batch processing
+   - [x] 3. `batch.py`, `batch_context.py` - Batch processing
    4. File operations: `file_tasks.py`, `file_utils.py`
    5. Execution tasks: `python_tasks.py`, `shell_tasks.py`
    6. Template handling: `template_tasks.py`
