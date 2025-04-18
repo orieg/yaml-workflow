@@ -50,6 +50,50 @@
    - Task type combinations
    - Performance testing
 
+## Project Setup
+
+1. **Virtual Environment**
+   ```bash
+   # Create and activate virtual environment
+   python -m venv .venv
+   source .venv/bin/activate  # On Unix/macOS
+   # or
+   .venv\Scripts\activate     # On Windows
+   ```
+
+2. **Development Installation**
+   ```bash
+   # Install package in editable mode with all development dependencies
+   pip install -e ".[dev,test,doc]"
+   ```
+
+3. **Dependencies Groups**
+   ```toml
+   # pyproject.toml
+   [project.optional-dependencies]
+   dev = [
+       "black",
+       "isort",
+       "mypy",
+   ]
+   test = [
+       "pytest>=7.0",
+       "pytest-cov",
+   ]
+   doc = [
+       "sphinx",
+       "sphinx-rtd-theme",
+   ]
+   ```
+
+4. **Verify Setup**
+   ```bash
+   # Verify installation and dependencies
+   python -c "import yaml_workflow; print(yaml_workflow.__version__)"
+   pytest --version
+   black --version
+   ```
+
 ## Improvement Plan
 
 ### Phase 1: Error Handling Consolidation
@@ -169,6 +213,132 @@ pytest
 - Documentation updated
 ```
 
+### Version Control Process
+
+1. **Branch Strategy**
+   ```bash
+   # Create feature branch
+   git checkout -b feature/error-handling-utils
+
+   # Regular commits during development
+   # Prepare message in a temp file according to the format below
+   # Example: cat > /tmp/commit_msg.txt << 'EOF' ... EOF
+   git add .
+   git commit -F /tmp/commit_msg.txt # Use -F for multi-line messages from file
+
+   # After passing quality gates
+   git push origin feature/error-handling-utils
+   ```
+
+2. **Commit Message Format**
+   ```
+   [type] Short summary (50 chars)
+   <blank line>
+   Detailed explanation of the change, wrapped at 72 characters.
+   Explain what and why vs. how.
+   <blank line>
+   - Bullet points for specific changes
+   - Start with verbs in imperative mood
+   ```
+
+   Types: [feat], [fix], [docs], [test], [refactor], [chore]
+
+   *Note: To ensure proper formatting for multi-line commit messages like the one described above, it's recommended to use `git commit -F <file>` (as shown in the Branch Strategy example) or pipe the message via `git commit -F -`.*
+
+### Implementation Order
+
+1. **Setup Phase**
+   ```bash
+   # Directory Structure
+   mkdir -p src/yaml_workflow/{utils,tasks,tests}
+   mkdir -p docs/guide
+
+   # Virtual Environment
+   python -m venv .venv
+   source .venv/bin/activate
+
+   # Dependencies
+   pip install -e ".[dev,test,doc]"
+
+   # Verify
+   python -c "import yaml_workflow; print(yaml_workflow.__version__)"
+   ```
+   Success Criteria:
+   - All directories created
+   - Virtual environment active
+   - All dependencies installed
+   - Package importable
+
+2. **Error Handling Phase**
+   ```bash
+   # Create files
+   touch src/yaml_workflow/utils/error_handling.py
+   touch src/yaml_workflow/utils/__init__.py
+   touch tests/test_error_handling.py
+   ```
+   Implementation Order:
+   1. Create ErrorContext class
+   2. Implement handle_task_error
+   3. Update base task class
+   4. Add error handling tests
+   Success Criteria:
+   - All error handling tests pass
+   - No duplicate error code
+   - Coverage > 90%
+
+3. **Documentation Phase**
+   ```bash
+   # Create doc files
+   touch docs/guide/task-development.md
+   touch docs/guide/flows.md
+   touch docs/guide/error-handling.md
+   ```
+   Implementation Order:
+   1. Write task development guide
+   2. Document error handling patterns
+   3. Create flow configuration guide
+   4. Add runnable examples
+   Success Criteria:
+   - All guides complete
+   - Examples tested and working
+   - No broken links
+   - Documentation builds
+
+4. **Testing Phase**
+   ```bash
+   # Create test files
+   touch tests/test_error_scenarios.py
+   touch tests/test_flow_transitions.py
+   ```
+   Implementation Order:
+   1. Implement error scenario tests
+   2. Add flow transition tests
+   3. Add performance tests
+   4. Verify coverage
+   Success Criteria:
+   - All tests pass
+   - Coverage meets targets
+   - Performance tests pass
+   - Edge cases covered
+
+### Quality Verification
+
+Each phase must pass these checks:
+```bash
+# 1. Code Quality
+black . && isort . && mypy .
+
+# 2. Tests
+pytest --cov=yaml_workflow tests/
+
+# 3. Documentation Build (using MkDocs)
+mkdocs build --clean --strict
+
+# 4. Git Status
+git status  # Ensure all changes committed
+git push    # Push to remote
+```
+
 ## Core Changes
 
 1. **Error Handling Core** (`tasks/error_handling.py`)
@@ -188,7 +358,7 @@ pytest
    
    def handle_task_error(context: ErrorContext) -> None:
        """Centralized error handling for tasks."""
-       logger = get_task_logger(context.task_config.workspace, context.step_name)
+       logger = get_task_logger(context.task_config.get('workspace', '.'), context.step_name)
        log_task_error(logger, context.error)
        if not isinstance(context.error, TaskExecutionError):
            raise TaskExecutionError(
@@ -245,7 +415,7 @@ pytest
        """Test error context creation and validation."""
        
    def test_error_handling():
-       """Test centralized error handling."""
+       """Test centralized error handling logic."""
        
    def test_error_logging():
        """Test error logging functionality."""
@@ -254,169 +424,42 @@ pytest
 2. **Integration Tests** (`test_error_integration.py`)
    ```python
    def test_error_flow():
-       """Test error handling across tasks."""
+       """Test error handling across multiple tasks and flows."""
        
    def test_retry_mechanism():
-       """Test retry functionality."""
+       """Test retry functionality integrated with engine."""
        
    def test_state_persistence():
-       """Test error state handling."""
+       """Test error state persistence and recovery."""
    ```
 
 3. **Task-Specific Tests**
    Add error handling tests to each task's test file:
    ```python
-   def test_task_error_handling():
-       """Test task-specific error scenarios."""
+   def test_file_task_error_handling():
+       """Test task-specific error scenarios (e.g., file not found)."""
        
-   def test_task_retry():
-       """Test task retry behavior."""
+   def test_file_task_retry():
+       """Test task retry behavior for file operations."""
    ```
 
-## Implementation Steps
+## Example Updates
 
-1. Create `error_handling.py` with core functionality
-2. Update `base.py` with enhanced error logging
-3. Update each task file in specified order
-4. Update engine and state handling
-5. Add all test cases
-6. Update documentation
+Update examples to demonstrate new error handling features:
+```yaml
+# example_workflow.yaml
+steps:
+  read_file:
+    type: file
+    inputs:
+      file_path: non_existent_data.txt
+    on_error:
+      next: error_handler
+      retry: 3
 
-Each commit should:
-- Focus on one logical change
-- Include tests
-- Pass all quality gates
-- Update relevant documentation
-
-## Implementation Order
-
-Each task below MUST pass all quality gates before proceeding:
-
-1. **Error Handling Core**
-   - Create `tasks/error_handling.py`:
-     ```python
-     # Key functions to implement:
-     def handle_task_error(context: ErrorContext) -> None:
-         """Centralized error handling for tasks."""
-         logger = get_task_logger(context.task_config.workspace, context.step_name)
-         log_task_error(logger, context.error)
-         if not isinstance(context.error, TaskExecutionError):
-             raise TaskExecutionError(
-                 step_name=context.step_name,
-                 original_error=context.error,
-                 task_config=context.task_config
-             )
-         raise
-     ```
-   - Add tests in `tests/tasks/test_error_handling.py`
-   - Success criteria:
-     - All error handling functions typed and documented
-     - Test coverage > 90% for new code
-     - No mypy errors
-   - ✓ Run quality gates
-   - Commit changes
-
-2. **Task Implementation Updates**
-   - Update tasks in this order:
-     1. `base.py` (core error handling)
-     2. `config.py` (error configuration)
-     3. `batch.py` and `batch_context.py`
-     4. `file_tasks.py` and `file_utils.py`
-     5. `python_tasks.py`
-     6. `shell_tasks.py`
-     7. `template_tasks.py`
-     8. `basic_tasks.py`
-     9. `noop.py`
-   - For each task file:
-     ```python
-     # Update imports
-     from ..utils.error_handling import handle_task_error, ErrorContext
-     
-     # Replace try/except blocks with:
-     try:
-         # task logic
-     except Exception as e:
-         context = ErrorContext(
-             step_name=task_name,
-             task_type=self.task_type,
-             error=e,
-             task_config=self.config.dict()
-         )
-         handle_task_error(context)
-     ```
-   - Success criteria:
-     - Consistent error handling across all tasks
-     - No duplicate error handling code
-     - All tests pass
-     - Type safety in all task files
-   - ✓ Run quality gates
-   - Commit changes
-
-3. **Documentation Enhancement**
-   - Create new files:
-     - `docs/guide/task-development.md`
-     - `docs/guide/flows.md`
-     - `docs/guide/error-handling.md`
-   - Update existing docs:
-     - `docs/workflow-structure.md`
-     - `docs/tasks.md`
-   - Success criteria:
-     - All new features documented
-     - Examples for each error scenario
-     - Updated workflow examples
-   - ✓ Run quality gates
-   - Commit changes
-
-4. **Test Suite Enhancement**
-   - Add new test files:
-     - `tests/test_error_scenarios.py`
-     - `tests/test_flow_transitions.py`
-   - Success criteria:
-     - Coverage > 90% for error handling
-     - All edge cases tested
-     - Performance tests added
-   - ✓ Run quality gates
-   - Commit changes
-
-5. **Example Updates**
-   - Update examples:
-     ```yaml
-     # example_workflow.yaml
-     steps:
-       read_file:
-         type: file
-         inputs:
-           file_path: data.txt
-         on_error:
-           next: error_handler
-     ```
-   - Success criteria:
-     - All examples runnable
-     - Error handling demonstrated
-     - Documentation matches examples
-   - ✓ Run quality gates
-   - Commit changes
-
-### Version Control Guidelines
-
-1. **Commit Messages**
-   ```
-   Format:
-   [component] Brief description
-   
-   - Detailed change 1
-   - Detailed change 2
-   
-   Quality gates:
-   - ✓ black
-   - ✓ isort
-   - ✓ mypy
-   - ✓ pytest
-   ```
-
-2. **Branch Strategy**
-   - Create feature branch for each task
-   - Name format: `feature/error-handling-utils`
-   - Merge only after all quality gates pass
+  error_handler:
+    type: noop # Or a specific error reporting task
+    # ... configuration for error handling step ...
+```
 
 Each step should be implemented incrementally with thorough testing to ensure stability. NO changes should be committed until all quality gates pass. Each commit should be atomic and focused on a single logical change. 
