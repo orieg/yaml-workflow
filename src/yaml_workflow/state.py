@@ -50,17 +50,20 @@ class WorkflowState:
 
         # Initialize with empty state
         self.metadata: Dict[str, Any] = {
-            "execution_state": cast(ExecutionState, {
-                "current_step": 0,
-                "completed_steps": [],
-                "failed_step": None,
-                "step_outputs": {},
-                "last_updated": datetime.now().isoformat(),
-                "status": "not_started",
-                "flow": None,
-                "retry_state": {},
-                "completed_at": None,
-            }),
+            "execution_state": cast(
+                ExecutionState,
+                {
+                    "current_step": 0,
+                    "completed_steps": [],
+                    "failed_step": None,
+                    "step_outputs": {},
+                    "last_updated": datetime.now().isoformat(),
+                    "status": "not_started",
+                    "flow": None,
+                    "retry_state": {},
+                    "completed_at": None,
+                },
+            ),
             "namespaces": DEFAULT_NAMESPACES.copy(),
         }
 
@@ -69,7 +72,9 @@ class WorkflowState:
             self.metadata.update(metadata)
             # Ensure required structures exist
             if "execution_state" not in self.metadata:
-                self.metadata["execution_state"] = cast(ExecutionState, self.metadata["execution_state"])
+                self.metadata["execution_state"] = cast(
+                    ExecutionState, self.metadata["execution_state"]
+                )
             if "retry_state" not in self.metadata["execution_state"]:
                 self.metadata["execution_state"]["retry_state"] = {}
             if "namespaces" not in self.metadata:
@@ -87,17 +92,20 @@ class WorkflowState:
 
         # Ensure all required structures exist
         if "execution_state" not in self.metadata:
-            self.metadata["execution_state"] = cast(ExecutionState, {
-                "current_step": 0,
-                "completed_steps": [],
-                "failed_step": None,
-                "step_outputs": {},
-                "last_updated": datetime.now().isoformat(),
-                "status": "not_started",
-                "flow": None,
-                "retry_state": {},
-                "completed_at": None,
-            })
+            self.metadata["execution_state"] = cast(
+                ExecutionState,
+                {
+                    "current_step": 0,
+                    "completed_steps": [],
+                    "failed_step": None,
+                    "step_outputs": {},
+                    "last_updated": datetime.now().isoformat(),
+                    "status": "not_started",
+                    "flow": None,
+                    "retry_state": {},
+                    "completed_at": None,
+                },
+            )
         if "namespaces" not in self.metadata:
             self.metadata["namespaces"] = DEFAULT_NAMESPACES.copy()
         self.save()
@@ -255,17 +263,20 @@ class WorkflowState:
 
     def reset_state(self) -> None:
         """Reset workflow execution state and namespaces."""
-        self.metadata["execution_state"] = cast(ExecutionState, {
-            "current_step": 0,
-            "completed_steps": [],
-            "failed_step": None,
-            "step_outputs": {},
-            "last_updated": datetime.now().isoformat(),
-            "status": "not_started",
-            "flow": None,
-            "retry_state": {},
-            "completed_at": None,
-        })
+        self.metadata["execution_state"] = cast(
+            ExecutionState,
+            {
+                "current_step": 0,
+                "completed_steps": [],
+                "failed_step": None,
+                "step_outputs": {},
+                "last_updated": datetime.now().isoformat(),
+                "status": "not_started",
+                "flow": None,
+                "retry_state": {},
+                "completed_at": None,
+            },
+        )
         # Create a fresh copy of empty namespaces
         self.metadata["namespaces"] = {
             "args": {},
