@@ -7,14 +7,15 @@ from typing import Any, Dict
 from jinja2 import StrictUndefined, Template, UndefinedError
 
 from ..exceptions import TemplateError
-from ..workspace import resolve_path
 from . import TaskConfig, register_task
+from .base import get_task_logger, log_task_execution, log_task_result
+from .error_handling import ErrorContext, handle_task_error
 
 logger = logging.getLogger(__name__)
 
 
 @register_task("template")
-def render_template(config: TaskConfig) -> str:
+def render_template(config: TaskConfig) -> Dict[str, Any]:
     """
     Render a template and save it to a file.
 
@@ -22,12 +23,18 @@ def render_template(config: TaskConfig) -> str:
         config: Task configuration object
 
     Returns:
-        str: Path to the output file
+        Dict[str, Any]: Dictionary containing the path to the output file
 
     Raises:
-        TemplateError: If template resolution fails or file cannot be written
+        TaskExecutionError: If template resolution fails or file cannot be written (via handle_task_error)
     """
+    task_name = str(config.name or "template_task")
+    task_type = str(config.type or "template")
+    logger = get_task_logger(config.workspace, task_name)
+
     try:
+        log_task_execution(logger, config.step, config._context, config.workspace)
+
         # Process inputs with template resolution
         processed = config.process_inputs()
 
@@ -39,35 +46,28 @@ def render_template(config: TaskConfig) -> str:
         if not output_file:
             raise ValueError("No output file specified")
 
-        logger.debug(f"Template string: {template_str}")
-        logger.debug(f"Context for rendering: {config._context}")
-
         # Render template with strict undefined handling
         template = Template(template_str, undefined=StrictUndefined)
-        try:
-            rendered = template.render(**config._context)
-            logger.debug(f"Rendered template: {rendered}")
-        except UndefinedError as e:
-            available = config.get_available_variables()
-            namespace = config._get_undefined_namespace(str(e))
-            raise TemplateError(
-                f"Failed to resolve variable in template '{template_str}': {str(e)}. "
-                f"Available variables in '{namespace}' namespace: {available[namespace]}"
-            )
+        rendered = template.render(**config._context)
 
         # Save to file
-        # For test compatibility, don't use output directory by default
-        output_path = resolve_path(config.workspace, output_file, use_output_dir=False)
+        # Assuming output_file is relative to workspace
+        output_path = config.workspace / output_file
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(rendered)
 
-        return str(output_path)
+        result = {"output_path": str(output_path)}
+        log_task_result(logger, result)
+        return result
 
-    except ValueError as e:
-        raise TemplateError(str(e))
-    except IOError as e:
-        raise TemplateError(f"Failed to write output file '{output_file}': {str(e)}")
     except Exception as e:
-        if not isinstance(e, TemplateError):
-            raise TemplateError(f"Failed to process template: {str(e)}")
-        raise
+        # Centralized error handling
+        context = ErrorContext(
+            step_name=task_name,
+            task_type=task_type,
+            error=e,
+            task_config=config.step,
+            template_context=config._context,
+        )
+        handle_task_error(context)
+        return {}  # Unreachable
