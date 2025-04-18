@@ -106,9 +106,15 @@ class ModuleImportError(WorkflowRuntimeError):
 class TaskExecutionError(WorkflowRuntimeError):
     """Raised when a task fails during execution."""
 
-    def __init__(self, step_name: str, original_error: Exception):
+    def __init__(
+        self,
+        step_name: str,
+        original_error: Exception,
+        task_config: Optional[dict] = None,
+    ):
         self.step_name = step_name
         self.original_error = original_error
+        self.task_config = task_config
         super().__init__(f"Task '{step_name}' failed: {str(original_error)}")
 
 

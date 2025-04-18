@@ -44,10 +44,11 @@ def sample_data():
 @register_task("write_file")
 def write_file(config: TaskConfig) -> Dict[str, Any]:
     """Write content to a file."""
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = config.name or "write_file_task"
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
@@ -74,10 +75,11 @@ def write_file(config: TaskConfig) -> Dict[str, Any]:
 @register_task("read_file")
 def read_file(config: TaskConfig) -> Dict[str, Any]:
     """Read content from a file."""
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = config.name or "read_file_task"
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
@@ -104,10 +106,11 @@ def read_file(config: TaskConfig) -> Dict[str, Any]:
 @register_task("copy_file")
 def copy_file(config: TaskConfig) -> Dict[str, Any]:
     """Copy a file from source to destination."""
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = config.name or "copy_file_task"
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
@@ -137,10 +140,11 @@ def copy_file(config: TaskConfig) -> Dict[str, Any]:
 @register_task("move_file")
 def move_file(config: TaskConfig) -> Dict[str, Any]:
     """Move a file from source to destination."""
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = config.name or "move_file_task"
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
@@ -170,10 +174,11 @@ def move_file(config: TaskConfig) -> Dict[str, Any]:
 @register_task("delete_file")
 def delete_file(config: TaskConfig) -> Dict[str, Any]:
     """Delete a file."""
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = config.name or "delete_file_task"
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
