@@ -327,6 +327,39 @@ class WorkflowEngine:
             for name, value in params.items():
                 self.logger.info(f"  {name}: {value}")
 
+        # Handle resume from parameter validation failure
+        if (
+            resume_from
+            and self.state.metadata["execution_state"]["failed_step"]
+            and self.state.metadata["execution_state"]["failed_step"]["step_name"]
+            == "parameter_validation"
+        ):
+            # Reset state but keep the failed status
+            self.state.reset_state()
+            self.state.metadata["execution_state"]["status"] = "failed"
+            resume_from = None
+
+        # Validate required parameters
+        workflow_params = self.workflow.get("params", {})
+        for param_name, param_config in workflow_params.items():
+            if isinstance(param_config, dict):
+                if param_config.get("required", False):
+                    if (
+                        param_name not in self.context["args"]
+                        or self.context["args"][param_name] is None
+                    ):
+                        error_msg = f"Required parameter '{param_name}' is undefined"
+                        self.state.mark_step_failed("parameter_validation", error_msg)
+                        raise WorkflowError(error_msg)
+                    if "minLength" in param_config:
+                        value = str(self.context["args"][param_name])
+                        if len(value) < param_config["minLength"]:
+                            error_msg = f"Parameter '{param_name}' must be at least {param_config['minLength']} characters long"
+                            self.state.mark_step_failed(
+                                "parameter_validation", error_msg
+                            )
+                            raise WorkflowError(error_msg)
+
         # Get flow configuration
         flows = self.workflow.get("flows", {})
 
@@ -621,9 +654,7 @@ class WorkflowEngine:
 
     def _call_task_handler(self, handler: Any, step: Dict[str, Any]) -> Any:
         """
-        Call a task handler with the appropriate signature.
-
-        This method checks if the handler accepts TaskConfig and calls it accordingly.
+        Call a task handler with TaskConfig.
 
         Args:
             handler: The task handler function
@@ -632,18 +663,9 @@ class WorkflowEngine:
         Returns:
             Any: The result from the task handler
         """
-        # Get handler signature
-        sig = inspect.signature(handler)
-        params = list(sig.parameters.values())
-
-        # Check if handler accepts TaskConfig
-        if len(params) == 1 and params[0].annotation == TaskConfig:
-            # Create TaskConfig and call handler
-            config = TaskConfig(step, self.context, self.workspace)
-            return handler(config)
-        else:
-            # Call with original signature
-            return handler(step, self.context, self.workspace)
+        # Create TaskConfig and call handler
+        config = TaskConfig(step, self.context, self.workspace)
+        return handler(config)
 
     def execute_step(self, step: Dict[str, Any]) -> None:
         """Execute a single workflow step."""
@@ -752,52 +774,38 @@ class WorkflowEngine:
 
     def _handle_step_error(
         self, step: Dict[str, Any], error: Exception
-    ) -> Optional[Dict[str, Any]]:
-        """Handle step execution error according to on_error configuration."""
-        name = step.get("name", "unknown")
+    ) -> Optional[Any]:
+        """Handle step execution error based on error handling configuration."""
+        name = step.get("name", "unnamed_step")
         error_message = str(error)
 
         # Get error handling configuration
-        on_error = step.get("on_error", {})
-        if not on_error:
-            # No error handling configured, mark as failed and re-raise
-            self.state.mark_step_failed(name, error_message)
-            return None
+        error_config = step.get("on_error", {})
+        action = error_config.get("action", "fail")
+        next_step = error_config.get("next")
 
-        # Get error handling action
-        action = on_error.get("action", "fail")
-        next_step = on_error.get("next")
+        # Add error info to context for template resolution
+        self.context["error"] = error_message
 
-        # Handle error message template
-        template_message = on_error.get("message", error_message)
-        if isinstance(template_message, str):
+        # Process custom error message if provided
+        if "message" in error_config:
             try:
-                # Add error to context temporarily for template rendering
-                self.context["error"] = error_message
-                error_message = self.resolve_template(template_message)
+                error_message = self.resolve_template(error_config["message"])
             except Exception as e:
-                self.logger.warning(f"Failed to render error message template: {e}")
-            finally:
-                # Clean up temporary error context
-                self.context.pop("error", None)
+                self.logger.warning(f"Failed to resolve error message template: {e}")
 
-        if action == "continue":
-            # Mark as failed but continue workflow
-            self.state.mark_step_failed(name, error_message)
-            return {"error": error_message}
-        elif action == "retry":
+        if action == "retry":
             # Get retry configuration
-            retry_config = step.get("retry", {})
-            max_attempts = retry_config.get("max_attempts", 3)
-            delay = retry_config.get("delay", 0)
-            backoff = retry_config.get("backoff", 1)
+            max_attempts = int(error_config.get("max_attempts", 3))
+            delay = float(error_config.get("delay", 1.0))
+            backoff = float(error_config.get("backoff", 2.0))
 
             # Get current retry state
             retry_state = self.state.get_retry_state(name)
-            attempt = retry_state + 1 if isinstance(retry_state, int) else 1
+            attempt = retry_state.get("attempt", 0) + 1
 
             # Update retry state
-            self.state.update_retry_state(name, attempt)
+            self.state.update_retry_state(name, {"attempt": attempt})
 
             if attempt >= max_attempts:
                 # Max retries exceeded
@@ -827,7 +835,7 @@ class WorkflowEngine:
             except Exception as retry_error:
                 # Get updated retry state to check attempt count
                 retry_state = self.state.get_retry_state(name)
-                attempt = retry_state if isinstance(retry_state, int) else 1
+                attempt = retry_state.get("attempt", 0)
 
                 if attempt >= max_attempts:
                     # If this was the last retry, mark as failed and clear retry state
@@ -840,6 +848,10 @@ class WorkflowEngine:
 
                 # Otherwise, handle retry failure recursively
                 return self._handle_step_error(step, retry_error)
+        elif action == "continue":
+            # Mark as failed but continue workflow
+            self.state.mark_step_failed(name, error_message)
+            return {"error": error_message}
         elif action == "notify":
             # Mark as failed but try to execute notification task if specified
             self.state.mark_step_failed(name, error_message)

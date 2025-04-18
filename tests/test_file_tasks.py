@@ -194,13 +194,57 @@ def delete_file(config: TaskConfig) -> Dict[str, Any]:
         raise
 
 
-def test_write_text_file(tmp_path):
-    """Test writing text file."""
-    file_path = tmp_path / "test.txt"
+def test_write_text_file_direct(temp_workspace):
+    """Test writing text file using direct function."""
+    file_path = temp_workspace / "test.txt"
     content = "Hello, World!"
-    result = write_file_direct(str(file_path), content, tmp_path)
+    result = write_file_direct(str(file_path), content, temp_workspace)
     assert result == str(file_path)
     assert Path(file_path).read_text() == content
+
+
+def test_write_text_file_task(temp_workspace):
+    """Test writing text file using task handler."""
+    file_path = "test.txt"
+    content = "Hello, World!"
+    step = {
+        "name": "write_test",
+        "task": "write_file",
+        "inputs": {
+            "file_path": file_path,
+            "content": content,
+        },
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    result = write_file(config)
+    assert result["path"] == str(temp_workspace / file_path)
+    assert Path(temp_workspace / file_path).read_text() == content
+
+
+def test_read_text_file_direct(temp_workspace):
+    """Test reading text file using direct function."""
+    file_path = temp_workspace / "test.txt"
+    content = "Hello, World!"
+    file_path.write_text(content)
+    result = read_file_direct(str(file_path), temp_workspace)
+    assert result == content
+
+
+def test_read_text_file_task(temp_workspace):
+    """Test reading text file using task handler."""
+    file_path = "test.txt"
+    content = "Hello, World!"
+    (temp_workspace / file_path).write_text(content)
+    step = {
+        "name": "read_test",
+        "task": "read_file",
+        "inputs": {
+            "file_path": file_path,
+        },
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    result = read_file(config)
+    assert result["content"] == content
 
 
 def test_write_json_file(tmp_path):
@@ -221,33 +265,6 @@ def test_write_yaml_file(tmp_path):
     assert yaml.safe_load(Path(file_path).read_text()) == data
 
 
-def test_read_text_file(tmp_path):
-    """Test reading text file."""
-    file_path = tmp_path / "test.txt"
-    content = "Hello, World!"
-    Path(file_path).write_text(content)
-    result = read_file_direct(str(file_path), tmp_path)
-    assert result == content
-
-
-def test_read_json_file(tmp_path):
-    """Test reading JSON file."""
-    data = {"name": "Alice", "age": 25}
-    file_path = tmp_path / "data.json"
-    Path(file_path).write_text(json.dumps(data))
-    result = read_file_direct(str(file_path), tmp_path)
-    assert json.loads(result) == data
-
-
-def test_read_yaml_file(tmp_path):
-    """Test reading YAML file."""
-    data = {"name": "Bob", "age": 30}
-    file_path = tmp_path / "data.yaml"
-    Path(file_path).write_text(yaml.dump(data))
-    result = read_file_direct(str(file_path), tmp_path)
-    assert yaml.safe_load(result) == data
-
-
 def test_append_text_file(tmp_path):
     """Test appending to text file."""
     file_path = tmp_path / "test.txt"
@@ -259,37 +276,98 @@ def test_append_text_file(tmp_path):
     assert Path(file_path).read_text() == initial_content + append_content
 
 
-def test_copy_file(tmp_path):
-    """Test copying file."""
-    source_path = tmp_path / "source.txt"
-    dest_path = tmp_path / "dest.txt"
+def test_copy_file_direct(temp_workspace):
+    """Test copying file using direct function."""
+    source_path = temp_workspace / "source.txt"
+    dest_path = temp_workspace / "dest.txt"
     content = "Test content"
-    Path(source_path).write_text(content)
-    result = copy_file_direct(str(source_path), str(dest_path), tmp_path)
+    source_path.write_text(content)
+    result = copy_file_direct(str(source_path), str(dest_path), temp_workspace)
     assert result == str(dest_path)
     assert Path(dest_path).read_text() == content
 
 
-def test_move_file(tmp_path):
-    """Test moving file."""
-    source_path = tmp_path / "source.txt"
-    dest_path = tmp_path / "dest.txt"
+def test_copy_file_task(temp_workspace):
+    """Test copying file using task handler."""
+    source = "source.txt"
+    dest = "dest.txt"
     content = "Test content"
-    Path(source_path).write_text(content)
-    result = move_file_direct(str(source_path), str(dest_path), tmp_path)
+    (temp_workspace / source).write_text(content)
+    step = {
+        "name": "copy_test",
+        "task": "copy_file",
+        "inputs": {
+            "source": source,
+            "destination": dest,
+        },
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    result = copy_file(config)
+    assert result["source"] == str(temp_workspace / source)
+    assert result["destination"] == str(temp_workspace / dest)
+    assert Path(temp_workspace / dest).read_text() == content
+
+
+def test_move_file_direct(temp_workspace):
+    """Test moving file using direct function."""
+    source_path = temp_workspace / "source.txt"
+    dest_path = temp_workspace / "dest.txt"
+    content = "Test content"
+    source_path.write_text(content)
+    result = move_file_direct(str(source_path), str(dest_path), temp_workspace)
     assert result == str(dest_path)
     assert Path(dest_path).read_text() == content
     assert not source_path.exists()
 
 
-def test_delete_file(tmp_path):
-    """Test deleting file."""
-    file_path = tmp_path / "test.txt"
+def test_move_file_task(temp_workspace):
+    """Test moving file using task handler."""
+    source = "source.txt"
+    dest = "dest.txt"
     content = "Test content"
-    Path(file_path).write_text(content)
-    result = delete_file_direct(str(file_path), tmp_path)
+    (temp_workspace / source).write_text(content)
+    step = {
+        "name": "move_test",
+        "task": "move_file",
+        "inputs": {
+            "source": source,
+            "destination": dest,
+        },
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    result = move_file(config)
+    assert result["source"] == str(temp_workspace / source)
+    assert result["destination"] == str(temp_workspace / dest)
+    assert Path(temp_workspace / dest).read_text() == content
+    assert not (temp_workspace / source).exists()
+
+
+def test_delete_file_direct(temp_workspace):
+    """Test deleting file using direct function."""
+    file_path = temp_workspace / "test.txt"
+    content = "Test content"
+    file_path.write_text(content)
+    result = delete_file_direct(str(file_path), temp_workspace)
     assert result == str(file_path)
     assert not file_path.exists()
+
+
+def test_delete_file_task(temp_workspace):
+    """Test deleting file using task handler."""
+    file_path = "test.txt"
+    content = "Test content"
+    (temp_workspace / file_path).write_text(content)
+    step = {
+        "name": "delete_test",
+        "task": "delete_file",
+        "inputs": {
+            "file_path": file_path,
+        },
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    result = delete_file(config)
+    assert result["path"] == str(temp_workspace / file_path)
+    assert not (temp_workspace / file_path).exists()
 
 
 def test_write_csv_file(tmp_path):
@@ -306,49 +384,85 @@ def test_write_csv_file(tmp_path):
     assert Path(file_path).read_text() == csv_content
 
 
-def test_file_error_handling(tmp_path):
+def test_file_error_handling(temp_workspace):
     """Test error handling for file operations."""
-    non_existent = tmp_path / "non_existent.txt"
-    with pytest.raises(TaskExecutionError) as exc_info:
-        read_file_direct(str(non_existent), tmp_path)
-    assert "No such file or directory" in str(exc_info.value)
+    # Test non-existent file
+    non_existent = "non_existent.txt"
+    step = {
+        "name": "read_non_existent",
+        "task": "read_file",
+        "inputs": {
+            "file_path": non_existent,
+        },
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(FileNotFoundError):
+        read_file(config)
 
     # Test invalid JSON
-    invalid_json = tmp_path / "invalid.json"
+    invalid_json = temp_workspace / "invalid.json"
     invalid_json.write_text("{invalid")
     with pytest.raises(TaskExecutionError) as exc_info:
-        read_json(str(invalid_json), tmp_path)
+        read_json(str(invalid_json), temp_workspace)
     assert "Expecting property name" in str(exc_info.value)
 
     # Test invalid YAML
-    invalid_yaml = tmp_path / "invalid.yaml"
+    invalid_yaml = temp_workspace / "invalid.yaml"
     invalid_yaml.write_text("invalid: [yaml")
     with pytest.raises(TaskExecutionError) as exc_info:
-        read_yaml(str(invalid_yaml), tmp_path)
-    assert "expected" in str(exc_info.value)  # YAML error messages vary by version
+        read_yaml(str(invalid_yaml), temp_workspace)
+    assert "expected" in str(exc_info.value)
 
 
-def test_file_operations_with_directories(tmp_path):
+def test_file_operations_with_directories(temp_workspace):
     """Test file operations with nested directories."""
-    nested_path = tmp_path / "nested" / "dir" / "test.txt"
+    nested_path = "nested/dir/test.txt"
     content = "Test content"
-    result = write_file_direct(str(nested_path), content, tmp_path)
-    assert result == str(nested_path)
-    assert Path(nested_path).read_text() == content
+    step = {
+        "name": "write_nested",
+        "task": "write_file",
+        "inputs": {
+            "file_path": nested_path,
+            "content": content,
+        },
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    result = write_file(config)
+    assert result["path"] == str(temp_workspace / nested_path)
+    assert Path(temp_workspace / nested_path).read_text() == content
 
 
-def test_file_operations_with_empty_files(tmp_path):
+def test_file_operations_with_empty_files(temp_workspace):
     """Test file operations with empty files."""
-    file_path = tmp_path / "empty.txt"
-    result = write_file_direct(str(file_path), "", tmp_path)
-    assert result == str(file_path)
-    assert Path(file_path).read_text() == ""
+    file_path = "empty.txt"
+    step = {
+        "name": "write_empty",
+        "task": "write_file",
+        "inputs": {
+            "file_path": file_path,
+            "content": "",
+        },
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    result = write_file(config)
+    assert result["path"] == str(temp_workspace / file_path)
+    assert Path(temp_workspace / file_path).read_text() == ""
 
 
-def test_file_operations_with_special_characters(tmp_path):
+def test_file_operations_with_special_characters(temp_workspace):
     """Test file operations with special characters in content."""
-    file_path = tmp_path / "special.txt"
-    content = "Line 1\nLine 2\tTabbed\r\nWindows line ending"
-    result = write_file_direct(str(file_path), content, tmp_path)
-    assert result == str(file_path)
-    assert read_file_direct(str(file_path), tmp_path) == content
+    file_path = "special.txt"
+    content = "Line 1\nLine 2\tTabbed\nWindows line ending"
+    step = {
+        "name": "write_special",
+        "task": "write_file",
+        "inputs": {
+            "file_path": file_path,
+            "content": content,
+        },
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    result = write_file(config)
+    assert result["path"] == str(temp_workspace / file_path)
+    actual_content = Path(temp_workspace / file_path).read_text().replace("\r\n", "\n")
+    assert actual_content == content

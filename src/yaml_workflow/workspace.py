@@ -7,7 +7,7 @@ import os
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from yaml_workflow.exceptions import WorkflowError
 
@@ -206,31 +206,32 @@ def get_workspace_info(workspace: Path) -> Dict[str, Any]:
 
 
 class BatchState:
-    """State manager for batch processing with namespace support."""
+    """Manages batch processing state."""
 
     def __init__(self, workspace: Path, name: str):
         """Initialize batch state.
 
         Args:
-            workspace: Path to workspace directory
-            name: Name of the batch process
+            workspace: Workspace directory
+            name: Name of the batch
         """
         self.workspace = workspace
         self.name = name
-        self.state_dir = workspace / ".batch_state"
-        self.state_file = self.state_dir / f"{name}_state.json"
+        self.state_dir = workspace / "temp" / "batch_state"
+        self.state_file = self.state_dir / f"{name}.json"
 
-        self.state = {
-            "processed": [],  # Keep order for resume
-            "failed": {},  # item -> error info
-            "template_errors": {},  # Track template resolution failures
-            "namespaces": {  # Track namespace states
+        # Initialize with empty state
+        self.state: Dict[str, Any] = {
+            "processed": [],  # List[str]
+            "failed": {},  # Dict[str, Dict[str, str]]
+            "template_errors": {},  # Dict[str, Dict[str, str]]
+            "namespaces": {  # Dict[str, Dict[str, Any]]
                 "args": {},
                 "env": {},
                 "steps": {},
                 "batch": {},
             },
-            "stats": {
+            "stats": {  # Dict[str, int]
                 "total": 0,
                 "processed": 0,
                 "failed": 0,
@@ -239,19 +240,21 @@ class BatchState:
             },
         }
 
-        self._load_state()
+        # Load existing state if available
+        if self.state_file.exists():
+            self._load_state()
 
     def _load_state(self) -> None:
-        """Load state from file if it exists."""
-        if self.state_file.exists():
-            try:
-                self.state = json.loads(self.state_file.read_text())
-            except json.JSONDecodeError as e:
-                raise WorkflowError(f"Failed to load batch state: {e}")
+        """Load state from file."""
+        try:
+            state_data = json.loads(self.state_file.read_text())
+            self.state.update(state_data)
+        except Exception as e:
+            raise WorkflowError(f"Failed to load batch state: {e}")
 
     def save(self) -> None:
         """Save current state to file."""
-        self.state_dir.mkdir(exist_ok=True)
+        self.state_dir.mkdir(parents=True, exist_ok=True)
         self.state_file.write_text(json.dumps(self.state, indent=2))
 
     def mark_processed(self, item: Any, result: Dict[str, Any]) -> None:
@@ -261,8 +264,9 @@ class BatchState:
             item: The processed item
             result: Processing result
         """
-        if item not in self.state["processed"]:
-            self.state["processed"].append(item)
+        processed_items = cast(List[str], self.state["processed"])
+        if str(item) not in processed_items:
+            processed_items.append(str(item))
             self.state["stats"]["processed"] += 1
 
     def mark_failed(self, item: Any, error: str) -> None:
@@ -272,7 +276,8 @@ class BatchState:
             item: The failed item
             error: Error message
         """
-        self.state["failed"][str(item)] = {
+        failed_items = cast(Dict[str, Dict[str, str]], self.state["failed"])
+        failed_items[str(item)] = {
             "error": error,
             "timestamp": str(datetime.now()),
         }
@@ -285,7 +290,8 @@ class BatchState:
             item: The item with template error
             error: Template error message
         """
-        self.state["template_errors"][str(item)] = {
+        template_errors = cast(Dict[str, Dict[str, str]], self.state["template_errors"])
+        template_errors[str(item)] = {
             "error": error,
             "timestamp": str(datetime.now()),
         }
@@ -298,8 +304,9 @@ class BatchState:
             namespace: Name of the namespace
             data: Namespace data to update
         """
-        if namespace in self.state["namespaces"]:
-            self.state["namespaces"][namespace].update(data)
+        namespaces = cast(Dict[str, Dict[str, Any]], self.state["namespaces"])
+        if namespace in namespaces:
+            namespaces[namespace].update(data)
 
     def get_stats(self) -> Dict[str, int]:
         """Get processing statistics.
@@ -307,16 +314,21 @@ class BatchState:
         Returns:
             Dict containing processing statistics
         """
-        return self.state["stats"]
+        return cast(Dict[str, int], self.state["stats"])
 
     def reset(self) -> None:
         """Reset batch state."""
         self.state = {
-            "processed": [],
-            "failed": {},
-            "template_errors": {},
-            "namespaces": {"args": {}, "env": {}, "steps": {}, "batch": {}},
-            "stats": {
+            "processed": [],  # List[str]
+            "failed": {},  # Dict[str, Dict[str, str]]
+            "template_errors": {},  # Dict[str, Dict[str, str]]
+            "namespaces": {  # Dict[str, Dict[str, Any]]
+                "args": {},
+                "env": {},
+                "steps": {},
+                "batch": {},
+            },
+            "stats": {  # Dict[str, int]
                 "total": 0,
                 "processed": 0,
                 "failed": 0,

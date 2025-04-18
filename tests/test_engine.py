@@ -10,7 +10,7 @@ from yaml_workflow.exceptions import (
     StepNotInFlowError,
     WorkflowError,
 )
-from yaml_workflow.tasks import register_task
+from yaml_workflow.tasks import TaskConfig, register_task
 
 
 @pytest.fixture
@@ -223,7 +223,7 @@ def test_on_error_retry(tmp_path):
     attempts = []
 
     @register_task("flaky")
-    def flaky_task(step, context, workspace):
+    def flaky_task(config: TaskConfig):
         attempts.append(len(attempts) + 1)
         if len(attempts) < 3:
             raise ValueError("Temporary failure")
@@ -253,8 +253,8 @@ def test_on_error_notify(tmp_path):
     notifications = []
 
     @register_task("notify")
-    def notify_task(step, context, workspace):
-        notifications.append(context["error"])
+    def notify_task(config: TaskConfig):
+        notifications.append(config._context["error"])
         return {"notified": True}
 
     workflow = {
