@@ -7,31 +7,30 @@ from glob import glob
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from . import register_task
+from . import TaskConfig, register_task
 from .base import get_task_logger
 
 
 @register_task("file_utils")
-def list_files(
-    step: Dict[str, Any], context: Dict[str, Any], workspace: Path
-) -> Dict[str, Any]:
+def list_files(config: TaskConfig) -> Dict[str, Any]:
     """
     List files in a directory matching a pattern.
 
     Args:
-        step: Step configuration
-        context: Workflow context
-        workspace: Workspace directory
+        config: Task configuration containing:
+            - step: Step configuration
+            - context: Workflow context
+            - workspace: Workspace directory
 
     Returns:
         Dict[str, Any]: Dictionary containing:
             - file_list: List of matching file paths
             - total_files: Total number of files found
     """
-    logger = get_task_logger(workspace, step.get("name", "list_files"))
+    logger = get_task_logger(config.workspace, config.step.get("name", "list_files"))
 
     # Get input parameters
-    inputs = step.get("inputs", {})
+    inputs = config.step.get("inputs", {})
     directory = inputs.get("directory")
     pattern = inputs.get("pattern", "*")
     recursive = inputs.get("recursive", False)
@@ -41,7 +40,7 @@ def list_files(
 
     # Resolve directory path
     if not os.path.isabs(directory):
-        directory = os.path.join(str(workspace), directory)
+        directory = os.path.join(str(config.workspace), directory)
 
     # Build glob pattern
     if recursive:

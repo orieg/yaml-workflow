@@ -170,10 +170,11 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
     Raises:
         TaskExecutionError: If command execution fails or template resolution fails
     """
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = str(config.name) if config.name is not None else "unnamed_task"
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
@@ -190,95 +191,100 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
 
         # Get command (required)
         if "command" not in processed:
+            missing_cmd_error = ValueError("command parameter is required")
             raise TaskExecutionError(
                 "No command provided for shell task",
-                original_error=ValueError("command parameter is required"),
+                original_error=missing_cmd_error,
             )
         command = processed["command"]
 
         # Handle working directory
         cwd = config.workspace
         if "working_dir" in processed:
-            try:
-                cwd = config.workspace / processed["working_dir"]
-                if not cwd.exists():
-                    cwd.mkdir(parents=True)
-            except Exception as e:
-                raise TaskExecutionError(
-                    f"Failed to create working directory '{processed['working_dir']}': {str(e)}",
-                    original_error=e,
-                )
+            working_dir = processed["working_dir"]
+            if not os.path.isabs(working_dir):
+                cwd = config.workspace / working_dir
+            else:
+                cwd = Path(working_dir)
 
-        # Handle environment variables
-        env = os.environ.copy()
+        # Get environment variables
+        env = get_environment()
         if "env" in processed:
-            try:
-                env.update(processed["env"])
-            except Exception as e:
-                raise TaskExecutionError(
-                    f"Failed to set environment variables: {str(e)}", original_error=e
-                )
+            env.update(processed["env"])
 
-        # Get timeout if specified
-        timeout = processed.get("timeout")
+        # Get shell mode - default to True for better script compatibility
+        shell = processed.get("shell", True)
 
+        # Get timeout
+        timeout = processed.get("timeout", None)
+
+        # Process command template
         try:
-            # Execute command
-            result = subprocess.run(
-                command,
-                shell=True,
-                cwd=cwd,
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
+            command = process_command(command, config._context)
+        except TemplateError as e:
+            raise TaskExecutionError(
+                f"Failed to process shell command template: {str(e)}",
+                original_error=e,
             )
 
-            # Prepare result dictionary
-            task_result = {
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "exit_code": result.returncode,
-                "command": command,
-                "working_dir": str(cwd),
-            }
-
-            # Check for command failure
-            if result.returncode != 0:
-                error_msg = (
-                    f"Command failed with exit code {result.returncode}: {command}\n"
-                )
-                if result.stdout:
-                    error_msg += f"stdout:\n{result.stdout}\n"
-                if result.stderr:
-                    error_msg += f"stderr:\n{result.stderr}"
-
-                log_task_error(logger, error_msg)
-                raise TaskExecutionError(
-                    error_msg,
-                    original_error=subprocess.CalledProcessError(
-                        result.returncode,
-                        command,
-                        output=result.stdout,
-                        stderr=result.stderr,
-                    ),
-                )
-
-            log_task_result(logger, task_result)
-            return task_result
-
+        # Run command
+        try:
+            returncode, stdout, stderr = run_command(
+                command, cwd=str(cwd), env=env, shell=shell, timeout=timeout
+            )
         except subprocess.TimeoutExpired as e:
-            error_msg = f"Command timed out after {timeout} seconds: {command}"
-            log_task_error(logger, error_msg)
-            raise TaskExecutionError(error_msg, original_error=e)
+            raise TaskExecutionError(
+                f"Command timed out after {timeout} seconds",
+                original_error=e,
+            )
+        except subprocess.CalledProcessError as e:
+            raise TaskExecutionError(
+                f"Command failed with exit code {e.returncode}",
+                original_error=e,
+            )
         except Exception as e:
-            error_msg = f"Failed to execute shell command: {str(e)}"
-            log_task_error(logger, error_msg)
-            raise TaskExecutionError(error_msg, original_error=e)
+            raise TaskExecutionError(
+                f"Failed to execute command: {str(e)}",
+                original_error=e,
+            )
+
+        # Check return code
+        if returncode != 0:
+            cmd_error = subprocess.CalledProcessError(
+                returncode, command, stdout, stderr
+            )
+            raise TaskExecutionError(
+                f"Command failed with exit code {returncode}",
+                original_error=cmd_error,
+            )
+
+        # Log task completion
+        log_task_result(
+            logger,
+            {
+                "returncode": returncode,
+                "stdout": stdout,
+                "stderr": stderr,
+                "command": command,
+            },
+        )
+
+        # Return results with both returncode and exit_code for backward compatibility
+        return {
+            "returncode": returncode,
+            "exit_code": returncode,  # Alias for backward compatibility
+            "stdout": stdout,
+            "stderr": stderr,
+            "command": command,
+        }
+
+    except TaskExecutionError as e:
+        log_task_error(logger, e)
+        raise
 
     except Exception as e:
-        if not isinstance(e, TaskExecutionError):
-            error_msg = f"Shell task failed: {str(e)}"
-            log_task_error(logger, error_msg)
-            raise TaskExecutionError(error_msg, original_error=e)
-        raise
+        log_task_error(logger, e)
+        raise TaskExecutionError(
+            f"Unexpected error in shell task: {str(e)}",
+            original_error=e,
+        )

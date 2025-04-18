@@ -12,7 +12,7 @@ from click.testing import CliRunner
 from jinja2 import Template
 
 from yaml_workflow.cli import main
-from yaml_workflow.tasks import create_task_handler, register_task
+from yaml_workflow.tasks import TaskConfig, register_task
 
 
 @pytest.fixture(autouse=True)
@@ -20,13 +20,11 @@ def setup_tasks():
     """Register test task handlers."""
 
     @register_task("echo")
-    def echo_task(step, context, workspace):
+    def echo_task(config: TaskConfig) -> str:
         """Echo task that supports template rendering."""
-        message = step.get("inputs", {}).get("message", "")
-        # Render template with context
-        template = Template(message)
-        rendered_message = template.render(**context)
-        return rendered_message
+        processed = config.process_inputs()
+        message = processed.get("message", "")
+        return message  # Template rendering is handled by process_inputs
 
 
 @contextmanager

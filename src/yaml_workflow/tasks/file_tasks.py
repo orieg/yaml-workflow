@@ -17,12 +17,13 @@ from . import TaskConfig, register_task
 from .base import get_task_logger, log_task_error, log_task_execution, log_task_result
 
 
-def ensure_directory(file_path: Path) -> None:
+def ensure_directory(file_path: Path, step_name: str) -> None:
     """
     Ensure the directory exists for the given file path.
 
     Args:
         file_path: Path to the file
+        step_name: Name of the step for error reporting
 
     Raises:
         TaskExecutionError: If directory cannot be created
@@ -30,16 +31,18 @@ def ensure_directory(file_path: Path) -> None:
     try:
         file_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError as e:
-        raise TaskExecutionError(
-            f"Failed to create directory '{file_path.parent}': {str(e)}"
-        )
+        raise TaskExecutionError(step_name=step_name, original_error=e)
 
 
 # Direct file operations
 
 
 def write_file_direct(
-    file_path: str, content: str, workspace: Path, encoding: str = "utf-8"
+    file_path: str,
+    content: str,
+    workspace: Path,
+    encoding: str = "utf-8",
+    step_name: str = "write_file",
 ) -> str:
     """Write content to a file.
 
@@ -48,6 +51,7 @@ def write_file_direct(
         content: Content to write
         workspace: Workspace directory
         encoding: File encoding (default: utf-8)
+        step_name: Name of the step for error reporting
 
     Returns:
         str: Path to written file
@@ -57,21 +61,27 @@ def write_file_direct(
     """
     try:
         resolved_path = resolve_path(workspace, file_path)
-        ensure_directory(resolved_path)
+        ensure_directory(resolved_path, step_name)
         with open(resolved_path, "wb") as f:
             f.write(content.encode(encoding))
         return str(resolved_path)
     except (IOError, UnicodeEncodeError) as e:
-        raise TaskExecutionError(f"Failed to write file '{file_path}': {str(e)}")
+        raise TaskExecutionError(step_name=step_name, original_error=e)
 
 
-def read_file_direct(file_path: str, workspace: Path, encoding: str = "utf-8") -> str:
+def read_file_direct(
+    file_path: str,
+    workspace: Path,
+    encoding: str = "utf-8",
+    step_name: str = "read_file",
+) -> str:
     """Read content from a file.
 
     Args:
         file_path: Path to the file
         workspace: Workspace directory
         encoding: File encoding (default: utf-8)
+        step_name: Name of the step for error reporting
 
     Returns:
         str: File content
@@ -84,13 +94,15 @@ def read_file_direct(file_path: str, workspace: Path, encoding: str = "utf-8") -
         with open(resolved_path, "rb") as f:
             return f.read().decode(encoding)
     except (IOError, UnicodeDecodeError) as e:
-        if isinstance(e, FileNotFoundError):
-            raise TaskExecutionError(step_name="read_file", original_error=e)
-        raise TaskExecutionError(step_name="read_file", original_error=e)
+        raise TaskExecutionError(step_name=step_name, original_error=e)
 
 
 def append_file_direct(
-    file_path: str, content: str, workspace: Path, encoding: str = "utf-8"
+    file_path: str,
+    content: str,
+    workspace: Path,
+    encoding: str = "utf-8",
+    step_name: str = "append_file",
 ) -> str:
     """Append content to a file.
 
@@ -99,6 +111,7 @@ def append_file_direct(
         content: Content to append
         workspace: Workspace directory
         encoding: File encoding (default: utf-8)
+        step_name: Name of the step for error reporting
 
     Returns:
         str: Path to the file
@@ -108,21 +121,24 @@ def append_file_direct(
     """
     try:
         resolved_path = resolve_path(workspace, file_path)
-        ensure_directory(resolved_path)
+        ensure_directory(resolved_path, step_name)
         with open(resolved_path, "a", encoding=encoding) as f:
             f.write(content)
         return str(resolved_path)
     except (IOError, UnicodeEncodeError) as e:
-        raise TaskExecutionError(f"Failed to append to file '{file_path}': {str(e)}")
+        raise TaskExecutionError(step_name=step_name, original_error=e)
 
 
-def copy_file_direct(source: str, destination: str, workspace: Path) -> str:
+def copy_file_direct(
+    source: str, destination: str, workspace: Path, step_name: str = "copy_file"
+) -> str:
     """Copy a file from source to destination.
 
     Args:
         source: Source file path
         destination: Destination file path
         workspace: Workspace directory
+        step_name: Name of the step for error reporting
 
     Returns:
         str: Path to destination file
@@ -133,24 +149,23 @@ def copy_file_direct(source: str, destination: str, workspace: Path) -> str:
     try:
         source_path = resolve_path(workspace, source)
         dest_path = resolve_path(workspace, destination)
-        ensure_directory(dest_path)
+        ensure_directory(dest_path, step_name)
         shutil.copy2(source_path, dest_path)
         return str(dest_path)
     except (IOError, shutil.Error) as e:
-        if isinstance(e, FileNotFoundError):
-            raise TaskExecutionError(f"Source file not found: '{source}'")
-        raise TaskExecutionError(
-            f"Failed to copy file from '{source}' to '{destination}': {str(e)}"
-        )
+        raise TaskExecutionError(step_name=step_name, original_error=e)
 
 
-def move_file_direct(source: str, destination: str, workspace: Path) -> str:
+def move_file_direct(
+    source: str, destination: str, workspace: Path, step_name: str = "move_file"
+) -> str:
     """Move a file from source to destination.
 
     Args:
         source: Source file path
         destination: Destination file path
         workspace: Workspace directory
+        step_name: Name of the step for error reporting
 
     Returns:
         str: Path to destination file
@@ -161,23 +176,22 @@ def move_file_direct(source: str, destination: str, workspace: Path) -> str:
     try:
         source_path = resolve_path(workspace, source)
         dest_path = resolve_path(workspace, destination)
-        ensure_directory(dest_path)
+        ensure_directory(dest_path, step_name)
         shutil.move(str(source_path), str(dest_path))
         return str(dest_path)
     except (IOError, shutil.Error) as e:
-        if isinstance(e, FileNotFoundError):
-            raise TaskExecutionError(f"Source file not found: '{source}'")
-        raise TaskExecutionError(
-            f"Failed to move file from '{source}' to '{destination}': {str(e)}"
-        )
+        raise TaskExecutionError(step_name=step_name, original_error=e)
 
 
-def delete_file_direct(file_path: str, workspace: Path) -> str:
+def delete_file_direct(
+    file_path: str, workspace: Path, step_name: str = "delete_file"
+) -> str:
     """Delete a file.
 
     Args:
         file_path: Path to the file
         workspace: Workspace directory
+        step_name: Name of the step for error reporting
 
     Returns:
         str: Path to deleted file
@@ -191,310 +205,189 @@ def delete_file_direct(file_path: str, workspace: Path) -> str:
             resolved_path.unlink()
         return str(resolved_path)
     except IOError as e:
-        raise TaskExecutionError(f"Failed to delete file '{file_path}': {str(e)}")
+        raise TaskExecutionError(step_name=step_name, original_error=e)
 
 
 # Task handlers
 
 
 @register_task("write_file")
-def write_file_task(config: TaskConfig) -> Dict[str, Any]:
-    """Task handler for writing files."""
-    logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(
-        logger,
-        {"name": config.name, "type": config.type},
-        config._context,
-        config.workspace,
-    )
-
+def write_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
+    """Write content to a file."""
+    task_name = str(config.name or "write_file")
+    logger = get_task_logger(config.workspace, task_name)
     try:
-        # Process inputs with template resolution
-        try:
-            processed = config.process_inputs()
-        except TemplateError as e:
-            raise TaskExecutionError(
-                f"Failed to resolve template in write_file task: {str(e)}",
-                original_error=e,
-            )
-
-        file_path = processed.get("file_path")
+        processed = config.process_inputs()
+        file_path = processed.get("file")
         content = processed.get("content")
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise TaskExecutionError("file_path parameter is required")
+            raise ValueError("No file path provided")
         if content is None:
-            raise TaskExecutionError("content parameter is required")
+            raise ValueError("No content provided")
 
-        try:
-            result = write_file_direct(file_path, content, config.workspace, encoding)
-            task_result = {"path": result, "encoding": encoding, "size": len(content)}
-            log_task_result(logger, task_result)
-            return task_result
-        except TaskExecutionError as e:
-            log_task_error(logger, str(e))
-            raise
-
+        result = write_file_direct(
+            file_path, str(content), config.workspace, encoding, task_name
+        )
+        return {"path": result, "content": content}
     except Exception as e:
-        if not isinstance(e, TaskExecutionError):
-            error_msg = f"Write file task failed: {str(e)}"
-            log_task_error(logger, error_msg)
-            raise TaskExecutionError(error_msg, original_error=e)
-        raise
+        error = (
+            e
+            if isinstance(e, TaskExecutionError)
+            else TaskExecutionError(step_name=task_name, original_error=e)
+        )
+        log_task_error(logger, error)
+        return None
 
 
 @register_task("read_file")
-def read_file_task(config: TaskConfig) -> Dict[str, Any]:
-    """Task handler for reading files."""
-    logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(
-        logger,
-        {"name": config.name, "type": config.type},
-        config._context,
-        config.workspace,
-    )
-
+def read_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
+    """Read content from a file."""
+    task_name = str(config.name or "read_file")
+    logger = get_task_logger(config.workspace, task_name)
     try:
-        # Process inputs with template resolution
-        try:
-            processed = config.process_inputs()
-        except TemplateError as e:
-            raise TaskExecutionError(
-                f"Failed to resolve template in read_file task: {str(e)}",
-                original_error=e,
-            )
-
-        file_path = processed.get("file_path")
+        processed = config.process_inputs()
+        file_path = processed.get("file")
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise TaskExecutionError("file_path parameter is required")
+            raise ValueError("No file path provided")
 
-        try:
-            content = read_file_direct(file_path, config.workspace, encoding)
-            task_result = {
-                "path": str(resolve_path(config.workspace, file_path)),
-                "content": content,
-                "encoding": encoding,
-                "size": len(content),
-            }
-            log_task_result(logger, task_result)
-            return task_result
-        except TaskExecutionError as e:
-            log_task_error(logger, str(e))
-            raise
-
+        content = read_file_direct(file_path, config.workspace, encoding, task_name)
+        return {"path": file_path, "content": content}
     except Exception as e:
-        if not isinstance(e, TaskExecutionError):
-            error_msg = f"Read file task failed: {str(e)}"
-            log_task_error(logger, error_msg)
-            raise TaskExecutionError(error_msg, original_error=e)
-        raise
+        error = (
+            e
+            if isinstance(e, TaskExecutionError)
+            else TaskExecutionError(step_name=task_name, original_error=e)
+        )
+        log_task_error(logger, error)
+        return None
 
 
 @register_task("append_file")
-def append_file_task(config: TaskConfig) -> Dict[str, Any]:
-    """Task handler for appending to files."""
-    logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(
-        logger,
-        {"name": config.name, "type": config.type},
-        config._context,
-        config.workspace,
-    )
-
+def append_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
+    """Append content to a file."""
+    task_name = str(config.name or "append_file")
+    logger = get_task_logger(config.workspace, task_name)
     try:
-        # Process inputs with template resolution
-        try:
-            processed = config.process_inputs()
-        except TemplateError as e:
-            raise TaskExecutionError(
-                f"Failed to resolve template in append_file task: {str(e)}",
-                original_error=e,
-            )
-
-        file_path = processed.get("file_path")
+        processed = config.process_inputs()
+        file_path = processed.get("file")
         content = processed.get("content")
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise TaskExecutionError("file_path parameter is required")
+            raise ValueError("No file path provided")
         if content is None:
-            raise TaskExecutionError("content parameter is required")
+            raise ValueError("No content provided")
 
-        try:
-            result = append_file_direct(file_path, content, config.workspace, encoding)
-            task_result = {"path": result, "encoding": encoding, "size": len(content)}
-            log_task_result(logger, task_result)
-            return task_result
-        except TaskExecutionError as e:
-            log_task_error(logger, str(e))
-            raise
-
+        result = append_file_direct(
+            file_path, str(content), config.workspace, encoding, task_name
+        )
+        return {"path": result, "content": content}
     except Exception as e:
-        if not isinstance(e, TaskExecutionError):
-            error_msg = f"Append file task failed: {str(e)}"
-            log_task_error(logger, error_msg)
-            raise TaskExecutionError(error_msg, original_error=e)
-        raise
+        error = (
+            e
+            if isinstance(e, TaskExecutionError)
+            else TaskExecutionError(step_name=task_name, original_error=e)
+        )
+        log_task_error(logger, error)
+        return None
 
 
 @register_task("copy_file")
-def copy_file_task(config: TaskConfig) -> Dict[str, Any]:
-    """Task handler for copying files."""
-    logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(
-        logger,
-        {"name": config.name, "type": config.type},
-        config._context,
-        config.workspace,
-    )
-
+def copy_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
+    """Copy a file from source to destination."""
+    task_name = str(config.name or "copy_file")
+    logger = get_task_logger(config.workspace, task_name)
     try:
-        # Process inputs with template resolution
-        try:
-            processed = config.process_inputs()
-        except TemplateError as e:
-            raise TaskExecutionError(
-                f"Failed to resolve template in copy_file task: {str(e)}",
-                original_error=e,
-            )
-
+        processed = config.process_inputs()
         source = processed.get("source")
         destination = processed.get("destination")
 
         if not source:
-            raise TaskExecutionError("source parameter is required")
+            raise ValueError("No source file provided")
         if not destination:
-            raise TaskExecutionError("destination parameter is required")
+            raise ValueError("No destination file provided")
 
-        try:
-            result = copy_file_direct(source, destination, config.workspace)
-            task_result = {
-                "source": str(resolve_path(config.workspace, source)),
-                "destination": result,
-            }
-            log_task_result(logger, task_result)
-            return task_result
-        except TaskExecutionError as e:
-            log_task_error(logger, str(e))
-            raise
-
+        result = copy_file_direct(source, destination, config.workspace, task_name)
+        return {"source": source, "destination": result}
     except Exception as e:
-        if not isinstance(e, TaskExecutionError):
-            error_msg = f"Copy file task failed: {str(e)}"
-            log_task_error(logger, error_msg)
-            raise TaskExecutionError(error_msg, original_error=e)
-        raise
+        error = (
+            e
+            if isinstance(e, TaskExecutionError)
+            else TaskExecutionError(step_name=task_name, original_error=e)
+        )
+        log_task_error(logger, error)
+        return None
 
 
 @register_task("move_file")
-def move_file_task(config: TaskConfig) -> Dict[str, Any]:
-    """Task handler for moving files."""
-    logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(
-        logger,
-        {"name": config.name, "type": config.type},
-        config._context,
-        config.workspace,
-    )
-
+def move_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
+    """Move a file from source to destination."""
+    task_name = str(config.name or "move_file")
+    logger = get_task_logger(config.workspace, task_name)
     try:
-        # Process inputs with template resolution
-        try:
-            processed = config.process_inputs()
-        except TemplateError as e:
-            raise TaskExecutionError(
-                f"Failed to resolve template in move_file task: {str(e)}",
-                original_error=e,
-            )
-
+        processed = config.process_inputs()
         source = processed.get("source")
         destination = processed.get("destination")
 
         if not source:
-            raise TaskExecutionError("source parameter is required")
+            raise ValueError("No source file provided")
         if not destination:
-            raise TaskExecutionError("destination parameter is required")
+            raise ValueError("No destination file provided")
 
-        try:
-            result = move_file_direct(source, destination, config.workspace)
-            task_result = {
-                "source": str(resolve_path(config.workspace, source)),
-                "destination": result,
-            }
-            log_task_result(logger, task_result)
-            return task_result
-        except TaskExecutionError as e:
-            log_task_error(logger, str(e))
-            raise
-
+        result = move_file_direct(source, destination, config.workspace, task_name)
+        return {"source": source, "destination": result}
     except Exception as e:
-        if not isinstance(e, TaskExecutionError):
-            error_msg = f"Move file task failed: {str(e)}"
-            log_task_error(logger, error_msg)
-            raise TaskExecutionError(error_msg, original_error=e)
-        raise
+        error = (
+            e
+            if isinstance(e, TaskExecutionError)
+            else TaskExecutionError(step_name=task_name, original_error=e)
+        )
+        log_task_error(logger, error)
+        return None
 
 
 @register_task("delete_file")
-def delete_file_task(config: TaskConfig) -> Dict[str, Any]:
-    """Task handler for deleting files."""
-    logger = get_task_logger(config.workspace, config.name)
-    log_task_execution(
-        logger,
-        {"name": config.name, "type": config.type},
-        config._context,
-        config.workspace,
-    )
-
+def delete_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
+    """Delete a file."""
+    task_name = str(config.name or "delete_file")
+    logger = get_task_logger(config.workspace, task_name)
     try:
-        # Process inputs with template resolution
-        try:
-            processed = config.process_inputs()
-        except TemplateError as e:
-            raise TaskExecutionError(
-                f"Failed to resolve template in delete_file task: {str(e)}",
-                original_error=e,
-            )
-
-        file_path = processed.get("file_path")
+        processed = config.process_inputs()
+        file_path = processed.get("file")
 
         if not file_path:
-            raise TaskExecutionError("file_path parameter is required")
+            raise ValueError("No file path provided")
 
-        try:
-            result = delete_file_direct(file_path, config.workspace)
-            task_result = {"path": result}
-            log_task_result(logger, task_result)
-            return task_result
-        except TaskExecutionError as e:
-            log_task_error(logger, str(e))
-            raise
-
+        result = delete_file_direct(file_path, config.workspace, task_name)
+        return {"path": result}
     except Exception as e:
-        if not isinstance(e, TaskExecutionError):
-            error_msg = f"Delete file task failed: {str(e)}"
-            log_task_error(logger, error_msg)
-            raise TaskExecutionError(error_msg, original_error=e)
-        raise
+        error = (
+            e
+            if isinstance(e, TaskExecutionError)
+            else TaskExecutionError(step_name=task_name, original_error=e)
+        )
+        log_task_error(logger, error)
+        return None
 
 
 @register_task("read_json")
 def read_json_task(config: TaskConfig) -> Union[Dict[str, Any], List[Any]]:
     """Task handler for reading JSON files."""
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = str(config.name or "read_json")
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
 
     try:
         processed = config.process_inputs()
-
         file_path = processed.get("file_path")
 
         if not file_path:
@@ -503,26 +396,27 @@ def read_json_task(config: TaskConfig) -> Union[Dict[str, Any], List[Any]]:
         result = read_json(file_path, config.workspace)
         log_task_result(logger, result)
         return result
-
     except Exception as e:
         log_task_error(logger, e)
+        if not isinstance(e, TaskExecutionError):
+            raise TaskExecutionError(step_name=task_name, original_error=e)
         raise
 
 
 @register_task("write_json")
 def write_json_task(config: TaskConfig) -> str:
     """Task handler for writing JSON files."""
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = str(config.name or "write_json")
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
 
     try:
         processed = config.process_inputs()
-
         file_path = processed.get("file_path")
         data = processed.get("data")
         indent = processed.get("indent", 2)
@@ -535,26 +429,27 @@ def write_json_task(config: TaskConfig) -> str:
         result = write_json(file_path, data, indent, config.workspace)
         log_task_result(logger, result)
         return result
-
     except Exception as e:
         log_task_error(logger, e)
+        if not isinstance(e, TaskExecutionError):
+            raise TaskExecutionError(step_name=task_name, original_error=e)
         raise
 
 
 @register_task("read_yaml")
 def read_yaml_task(config: TaskConfig) -> Dict[str, Any]:
     """Task handler for reading YAML files."""
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = str(config.name or "read_yaml")
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
 
     try:
         processed = config.process_inputs()
-
         file_path = processed.get("file_path")
 
         if not file_path:
@@ -563,26 +458,27 @@ def read_yaml_task(config: TaskConfig) -> Dict[str, Any]:
         result = read_yaml(file_path, config.workspace)
         log_task_result(logger, result)
         return result
-
     except Exception as e:
         log_task_error(logger, e)
+        if not isinstance(e, TaskExecutionError):
+            raise TaskExecutionError(step_name=task_name, original_error=e)
         raise
 
 
 @register_task("write_yaml")
 def write_yaml_task(config: TaskConfig) -> str:
     """Task handler for writing YAML files."""
-    logger = get_task_logger(config.workspace, config.name)
+    task_name = str(config.name or "write_yaml")
+    logger = get_task_logger(config.workspace, task_name)
     log_task_execution(
         logger,
-        {"name": config.name, "type": config.type},
+        {"name": task_name, "type": config.type},
         config._context,
         config.workspace,
     )
 
     try:
         processed = config.process_inputs()
-
         file_path = processed.get("file_path")
         data = processed.get("data")
 
@@ -594,9 +490,10 @@ def write_yaml_task(config: TaskConfig) -> str:
         result = write_yaml(file_path, data, config.workspace)
         log_task_result(logger, result)
         return result
-
     except Exception as e:
         log_task_error(logger, e)
+        if not isinstance(e, TaskExecutionError):
+            raise TaskExecutionError(step_name=task_name, original_error=e)
         raise
 
 
@@ -680,7 +577,7 @@ def write_json(
     try:
         if workspace:
             file_path = str(resolve_path(workspace, file_path))
-            ensure_directory(Path(file_path))
+            ensure_directory(Path(file_path), "write_json")
 
         with open(file_path, "w") as f:
             json.dump(data, f, indent=indent)
@@ -731,7 +628,7 @@ def write_yaml(
     try:
         if workspace:
             file_path = str(resolve_path(workspace, file_path))
-            ensure_directory(Path(file_path))
+            ensure_directory(Path(file_path), "write_yaml")
 
         with open(file_path, "w") as f:
             yaml.dump(data, f, default_flow_style=False)

@@ -8,7 +8,7 @@ including step completion, outputs, and retry mechanisms.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, TypedDict
+from typing import Any, Dict, List, Literal, Optional, TypedDict, cast
 
 
 # Type definitions
@@ -21,10 +21,18 @@ class ExecutionState(TypedDict):
     status: Literal["not_started", "in_progress", "completed", "failed"]
     flow: Optional[str]
     retry_state: Dict[str, Dict[str, Any]]
+    completed_at: Optional[str]
+
+
+class NamespaceDict(TypedDict):
+    args: Dict[str, Any]
+    env: Dict[str, Any]
+    steps: Dict[str, Any]
+    batch: Dict[str, Any]
 
 
 METADATA_FILE = ".workflow_metadata.json"
-DEFAULT_NAMESPACES = {"args": {}, "env": {}, "steps": {}, "batch": {}}
+DEFAULT_NAMESPACES: NamespaceDict = {"args": {}, "env": {}, "steps": {}, "batch": {}}
 
 
 class WorkflowState:
@@ -41,17 +49,21 @@ class WorkflowState:
         self.metadata_path = workspace / METADATA_FILE
 
         # Initialize with empty state
-        self.metadata = {
-            "execution_state": {
-                "current_step": 0,
-                "completed_steps": [],
-                "failed_step": None,
-                "step_outputs": {},
-                "last_updated": datetime.now().isoformat(),
-                "status": "not_started",
-                "flow": None,
-                "retry_state": {},
-            },
+        self.metadata: Dict[str, Any] = {
+            "execution_state": cast(
+                ExecutionState,
+                {
+                    "current_step": 0,
+                    "completed_steps": [],
+                    "failed_step": None,
+                    "step_outputs": {},
+                    "last_updated": datetime.now().isoformat(),
+                    "status": "not_started",
+                    "flow": None,
+                    "retry_state": {},
+                    "completed_at": None,
+                },
+            ),
             "namespaces": DEFAULT_NAMESPACES.copy(),
         }
 
@@ -60,7 +72,9 @@ class WorkflowState:
             self.metadata.update(metadata)
             # Ensure required structures exist
             if "execution_state" not in self.metadata:
-                self.metadata["execution_state"] = self.metadata["execution_state"]
+                self.metadata["execution_state"] = cast(
+                    ExecutionState, self.metadata["execution_state"]
+                )
             if "retry_state" not in self.metadata["execution_state"]:
                 self.metadata["execution_state"]["retry_state"] = {}
             if "namespaces" not in self.metadata:
@@ -78,16 +92,20 @@ class WorkflowState:
 
         # Ensure all required structures exist
         if "execution_state" not in self.metadata:
-            self.metadata["execution_state"] = {
-                "current_step": 0,
-                "completed_steps": [],
-                "failed_step": None,
-                "step_outputs": {},
-                "last_updated": datetime.now().isoformat(),
-                "status": "not_started",
-                "flow": None,
-                "retry_state": {},
-            }
+            self.metadata["execution_state"] = cast(
+                ExecutionState,
+                {
+                    "current_step": 0,
+                    "completed_steps": [],
+                    "failed_step": None,
+                    "step_outputs": {},
+                    "last_updated": datetime.now().isoformat(),
+                    "status": "not_started",
+                    "flow": None,
+                    "retry_state": {},
+                    "completed_at": None,
+                },
+            )
         if "namespaces" not in self.metadata:
             self.metadata["namespaces"] = DEFAULT_NAMESPACES.copy()
         self.save()
@@ -104,33 +122,29 @@ class WorkflowState:
         Returns:
             Dict[str, Any]: Current workflow state including execution state, step outputs, and namespaces
         """
+        exec_state = cast(ExecutionState, self.metadata["execution_state"])
         return {
-            "execution_state": self.metadata["execution_state"],
+            "execution_state": exec_state,
             "namespaces": self.metadata["namespaces"],
             "steps": {
                 step: {
                     "status": (
                         "completed"
-                        if step in self.metadata["execution_state"]["completed_steps"]
+                        if step in exec_state["completed_steps"]
                         else (
                             "failed"
-                            if self.metadata["execution_state"]["failed_step"]
-                            and self.metadata["execution_state"]["failed_step"][
-                                "step_name"
-                            ]
-                            == step
+                            if exec_state["failed_step"]
+                            and exec_state["failed_step"]["step_name"] == step
                             else "not_started"
                         )
                     ),
-                    "outputs": self.metadata["execution_state"]["step_outputs"].get(
-                        step, {}
-                    ),
+                    "outputs": exec_state["step_outputs"].get(step, {}),
                 }
                 for step in set(
-                    self.metadata["execution_state"]["completed_steps"]
+                    exec_state["completed_steps"]
                     + (
-                        [self.metadata["execution_state"]["failed_step"]["step_name"]]
-                        if self.metadata["execution_state"]["failed_step"]
+                        [exec_state["failed_step"]["step_name"]]
+                        if exec_state["failed_step"]
                         else []
                     )
                 )
@@ -144,9 +158,10 @@ class WorkflowState:
             namespace: Name of the namespace to update
             data: Data to update the namespace with
         """
-        if namespace not in self.metadata["namespaces"]:
-            self.metadata["namespaces"][namespace] = {}
-        self.metadata["namespaces"][namespace].update(data)
+        namespaces = cast(Dict[str, Dict[str, Any]], self.metadata["namespaces"])
+        if namespace not in namespaces:
+            namespaces[namespace] = {}
+        namespaces[namespace].update(data)
         self.save()
 
     def get_namespace(self, namespace: str) -> Dict[str, Any]:
@@ -158,7 +173,8 @@ class WorkflowState:
         Returns:
             Dict[str, Any]: Namespace data
         """
-        return self.metadata["namespaces"].get(namespace, {})
+        namespaces = cast(Dict[str, Dict[str, Any]], self.metadata["namespaces"])
+        return namespaces.get(namespace, {})
 
     def get_variable(self, variable: str, namespace: str) -> Any:
         """Get a variable from a specific namespace.
@@ -170,7 +186,8 @@ class WorkflowState:
         Returns:
             Any: Variable value
         """
-        return self.metadata["namespaces"].get(namespace, {}).get(variable)
+        namespaces = cast(Dict[str, Dict[str, Any]], self.metadata["namespaces"])
+        return namespaces.get(namespace, {}).get(variable)
 
     def clear_namespace(self, namespace: str) -> None:
         """Clear all data from a namespace.
@@ -178,13 +195,14 @@ class WorkflowState:
         Args:
             namespace: Name of the namespace to clear
         """
-        if namespace in self.metadata["namespaces"]:
-            self.metadata["namespaces"][namespace] = {}
+        namespaces = cast(Dict[str, Dict[str, Any]], self.metadata["namespaces"])
+        if namespace in namespaces:
+            namespaces[namespace] = {}
             self.save()
 
     def mark_step_complete(self, step_name: str, outputs: Dict[str, Any]) -> None:
         """Mark a step as completed and store its outputs."""
-        state = self.metadata["execution_state"]
+        state = cast(ExecutionState, self.metadata["execution_state"])
         state["current_step"] += 1
         state["completed_steps"].append(step_name)
         state["step_outputs"][step_name] = outputs
@@ -193,7 +211,7 @@ class WorkflowState:
 
     def mark_step_failed(self, step_name: str, error: str) -> None:
         """Mark a step as failed with error information."""
-        state = self.metadata["execution_state"]
+        state = cast(ExecutionState, self.metadata["execution_state"])
         # Clear any existing retry state for this step
         if "retry_state" in state:
             state["retry_state"].pop(step_name, None)
@@ -208,24 +226,25 @@ class WorkflowState:
 
     def mark_workflow_completed(self) -> None:
         """Mark the workflow as completed."""
-        state = self.metadata["execution_state"]
+        state = cast(ExecutionState, self.metadata["execution_state"])
         state["status"] = "completed"
         state["completed_at"] = datetime.now().isoformat()
         self.save()
 
     def set_flow(self, flow_name: Optional[str]) -> None:
         """Set the flow being executed."""
-        state = self.metadata["execution_state"]
+        state = cast(ExecutionState, self.metadata["execution_state"])
         state["flow"] = flow_name
         self.save()
 
     def get_flow(self) -> Optional[str]:
         """Get the name of the flow being executed."""
-        return self.metadata["execution_state"].get("flow")
+        state = cast(ExecutionState, self.metadata["execution_state"])
+        return state.get("flow")
 
     def can_resume_from_step(self, step_name: str) -> bool:
         """Check if workflow can be resumed from a specific step."""
-        state = self.metadata["execution_state"]
+        state = cast(ExecutionState, self.metadata["execution_state"])
         # Check if workflow is in failed state and has a failed step
         if state["status"] != "failed" or not state["failed_step"]:
             return False
@@ -239,38 +258,48 @@ class WorkflowState:
 
     def get_completed_outputs(self) -> Dict[str, Any]:
         """Get outputs from all completed steps."""
-        return self.metadata["execution_state"]["step_outputs"]
+        state = cast(ExecutionState, self.metadata["execution_state"])
+        return state["step_outputs"]
 
     def reset_state(self) -> None:
         """Reset workflow execution state and namespaces."""
-        self.metadata["execution_state"] = {
-            "current_step": 0,
-            "completed_steps": [],
-            "failed_step": None,
-            "step_outputs": {},
-            "retry_state": {},
-            "last_updated": datetime.now().isoformat(),
-            "status": "not_started",
-            "flow": None,
+        self.metadata["execution_state"] = cast(
+            ExecutionState,
+            {
+                "current_step": 0,
+                "completed_steps": [],
+                "failed_step": None,
+                "step_outputs": {},
+                "last_updated": datetime.now().isoformat(),
+                "status": "not_started",
+                "flow": None,
+                "retry_state": {},
+                "completed_at": None,
+            },
+        )
+        # Create a fresh copy of empty namespaces
+        self.metadata["namespaces"] = {
+            "args": {},
+            "env": {},
+            "steps": {},
+            "batch": {},
         }
-        self.metadata["namespaces"] = {"args": {}, "env": {}, "steps": {}, "batch": {}}
         self.save()
 
     def get_retry_state(self, step_name: str) -> Dict[str, Any]:
-        """Get retry state for a step."""
-        return (
-            self.metadata["execution_state"].get("retry_state", {}).get(step_name, {})
-        )
+        """Get retry state for a specific step."""
+        state = cast(ExecutionState, self.metadata["execution_state"])
+        return state["retry_state"].get(step_name, {})
 
     def update_retry_state(self, step_name: str, retry_state: Dict[str, Any]) -> None:
-        """Update retry state for a step."""
-        if "retry_state" not in self.metadata["execution_state"]:
-            self.metadata["execution_state"]["retry_state"] = {}
-        self.metadata["execution_state"]["retry_state"][step_name] = retry_state
+        """Update retry state for a specific step."""
+        state = cast(ExecutionState, self.metadata["execution_state"])
+        state["retry_state"][step_name] = retry_state
         self.save()
 
     def clear_retry_state(self, step_name: str) -> None:
-        """Clear retry state for a step."""
-        if "retry_state" in self.metadata["execution_state"]:
-            self.metadata["execution_state"]["retry_state"].pop(step_name, None)
+        """Clear retry state for a specific step."""
+        state = cast(ExecutionState, self.metadata["execution_state"])
+        if step_name in state["retry_state"]:
+            del state["retry_state"][step_name]
             self.save()

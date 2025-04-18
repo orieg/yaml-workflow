@@ -5,7 +5,8 @@ Batch processing task for handling multiple items in parallel.
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Tuple, cast
 
 from ..exceptions import TaskExecutionError
 from . import TaskConfig, get_task_handler, register_task
@@ -15,7 +16,7 @@ def process_item(
     item: Any,
     task_config: Dict[str, Any],
     context: Dict[str, Any],
-    workspace: str,
+    workspace: Path,
     arg_name: str,
     chunk_index: int = 0,
     item_index: int = 0,
@@ -169,7 +170,7 @@ def batch_task(config: TaskConfig) -> Dict[str, Any]:
     arg_name = processed.get("arg_name", "item")
 
     # Initialize state
-    state = {
+    state: Dict[str, Any] = {
         "processed": [],
         "failed": [],
         "results": [],
@@ -182,13 +183,13 @@ def batch_task(config: TaskConfig) -> Dict[str, Any]:
     }
 
     # Store results with their indices for ordering
-    ordered_results = []
-    ordered_processed = []
-    ordered_failed = []
+    ordered_results: List[Tuple[int, Any]] = []
+    ordered_processed: List[Tuple[int, Any]] = []
+    ordered_failed: List[Tuple[int, Dict[str, Any]]] = []
 
     # Process items in chunks
     for chunk_index, chunk_start in enumerate(range(0, len(items), chunk_size)):
-        chunk = items[chunk_start : chunk_start + chunk_size]
+        chunk = cast(List[Any], items[chunk_start : chunk_start + chunk_size])
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {}

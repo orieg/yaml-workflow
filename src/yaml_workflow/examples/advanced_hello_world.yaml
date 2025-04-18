@@ -42,6 +42,9 @@ steps:
         else
           echo "Valid: {{ args.name }}" > "output/validation_result.txt"
         fi
+    on_error:
+      action: fail
+      message: "Failed to validate input: {{ error }}"
 
   # Step 2: Read the validation result file
   # This step uses the file_tasks module to read the validation result
@@ -51,7 +54,10 @@ steps:
     inputs:
       file_path: "output/validation_result.txt"
       encoding: "utf-8"
-    outputs: validation_content
+    outputs: validation_message
+    on_error:
+      action: fail
+      message: "Failed to read validation result: {{ error }}"
 
   # Step 3: Process the validation result
   # Creates a boolean flag file (validation_passed.txt) that will control conditional execution
@@ -67,13 +73,20 @@ steps:
           echo "Validation passed"
           printf "true" > "output/validation_passed.txt"
         fi
+    on_error:
+      action: fail
+      message: "Failed to process validation result: {{ error }}"
 
   # Step 3b: Read validation result
   - name: read_validation
     task: read_file
     inputs:
       file_path: "output/validation_passed.txt"
+      encoding: "utf-8"
     outputs: validation_content
+    on_error:
+      action: fail
+      message: "Failed to read validation status: {{ error }}"
 
   # Debug step to print all variables
   - name: debug_vars
@@ -164,15 +177,28 @@ steps:
       file_path: "output/error_report.txt"
       content: |
         Workflow encountered an error:
-        Input validation failed{% if args.name %} for name: {{ args.name }}{% else %}: name parameter not provided{% endif %}
+        ====================
         
-        Please check the requirements and try again.
+        Status: Failed
+        Reason: Input validation failed
+        {% if args.name %}Input Value: {{ args.name }}{% else %}Input Value: [not provided]{% endif %}
+        
+        Validation Details:
+        {{ validation_message }}
         
         Requirements:
         - Name must be provided
         - Name must be between 2 and 50 characters
         - Name must not contain special characters
+        
+        To resolve this error:
+        1. Check the validation message above
+        2. Ensure your input meets all requirements
+        3. Run the workflow again with valid input
     condition: "'{{ validation_content }}' == 'false'"
+    on_error:
+      action: fail
+      message: "Failed to create error report: {{ error }}"
 
   # Step 9: Final status notification
   # Always runs (no condition)
@@ -195,4 +221,7 @@ steps:
           else
             cat "output/validation_result.txt"
           fi
-        fi 
+        fi
+    on_error:
+      action: fail
+      message: "Failed to display workflow status: {{ error }}" 
