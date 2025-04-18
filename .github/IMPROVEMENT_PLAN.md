@@ -221,8 +221,8 @@ pytest
    git checkout -b feature/error-handling-utils
 
    # Regular commits during development
-   # Prepare message in a temp file according to the format below
-   # Example: cat > /tmp/commit_msg.txt << 'EOF' ... EOF
+   # Prepare the multi-line commit message in /tmp/commit_msg.txt according to the format below.
+   # (Ensure the file is created correctly before committing, see note below)
    git add .
    git commit -F /tmp/commit_msg.txt # Use -F for multi-line messages from file
 
@@ -243,38 +243,40 @@ pytest
 
    Types: [feat], [fix], [docs], [test], [refactor], [chore]
 
-   *Note: To ensure proper formatting for multi-line commit messages like the one described above, it's recommended to use `git commit -F <file>` (as shown in the Branch Strategy example) or pipe the message via `git commit -F -`.*
+   *Note: To ensure proper formatting for multi-line commit messages like the one described above, it's recommended to use `git commit -F <file>` or pipe the message via `git commit -F -`. If using automation, verify that the temporary file `/tmp/commit_msg.txt` is created with the exact required multi-line content before running the commit command. Manual file creation might be necessary if the automation tool struggles with reliable multi-line file generation.*
 
 ### Implementation Order
 
-1. **Setup Phase**
+- [ ] 1. **Setup Phase**
    ```bash
-   # Directory Structure
-   mkdir -p src/yaml_workflow/{utils,tasks,tests}
-   mkdir -p docs/guide
+   # Verify directories (already exist)
+   # src/yaml_workflow/utils/
+   # src/yaml_workflow/tasks/
+   # src/yaml_workflow/tests/
+   # docs/guide/
 
-   # Virtual Environment
-   python -m venv .venv
-   source .venv/bin/activate
+   # Virtual Environment (assuming already active or managed externally)
+   # python -m venv .venv
+   # source .venv/bin/activate
 
-   # Dependencies
-   pip install -e ".[dev,test,doc]"
+   # Dependencies (assuming already installed or managed externally)
+   # pip install -e ".[dev,test,doc]"
 
-   # Verify
+   # Verify Installation
    python -c "import yaml_workflow; print(yaml_workflow.__version__)"
    ```
    Success Criteria:
-   - All directories created
-   - Virtual environment active
-   - All dependencies installed
-   - Package importable
+   - Required directories exist
+   - Virtual environment is active (if used)
+   - Development dependencies are installed
+   - Package is importable and basic checks pass
 
-2. **Error Handling Phase**
+- [ ] 2. **Error Handling Phase**
    ```bash
-   # Create files
-   touch src/yaml_workflow/utils/error_handling.py
-   touch src/yaml_workflow/utils/__init__.py
-   touch tests/test_error_handling.py
+   # Create/Verify files
+   # touch src/yaml_workflow/utils/error_handling.py
+   # touch src/yaml_workflow/utils/__init__.py  # Ensure it exists
+   # touch tests/test_error_handling.py
    ```
    Implementation Order:
    1. Create ErrorContext class
@@ -286,12 +288,12 @@ pytest
    - No duplicate error code
    - Coverage > 90%
 
-3. **Documentation Phase**
+- [ ] 3. **Documentation Phase**
    ```bash
-   # Create doc files
-   touch docs/guide/task-development.md
-   touch docs/guide/flows.md
-   touch docs/guide/error-handling.md
+   # Create/Verify doc files
+   # touch docs/guide/task-development.md
+   # touch docs/guide/flows.md
+   # touch docs/guide/error-handling.md
    ```
    Implementation Order:
    1. Write task development guide
@@ -304,11 +306,11 @@ pytest
    - No broken links
    - Documentation builds
 
-4. **Testing Phase**
+- [ ] 4. **Testing Phase**
    ```bash
-   # Create test files
-   touch tests/test_error_scenarios.py
-   touch tests/test_flow_transitions.py
+   # Create/Verify test files
+   # touch tests/test_error_scenarios.py
+   # touch tests/test_flow_transitions.py
    ```
    Implementation Order:
    1. Implement error scenario tests
