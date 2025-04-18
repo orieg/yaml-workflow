@@ -98,7 +98,7 @@
 
 ### Phase 1: Error Handling Consolidation
 
-1. **Create Error Handling Utilities** (`src/yaml_workflow/utils/error_handling.py`)
+1. **Create Error Handling Utilities** (`src/yaml_workflow/tasks/error_handling.py`)
    ```python
    def handle_task_error(task_name: str, error: Exception, config: TaskConfig) -> None:
        """Centralized error handling for tasks."""
@@ -274,8 +274,8 @@ pytest
 - [ ] 2. **Error Handling Phase**
    ```bash
    # Create/Verify files
-   # touch src/yaml_workflow/utils/error_handling.py
-   # touch src/yaml_workflow/utils/__init__.py  # Ensure it exists
+   # touch src/yaml_workflow/tasks/error_handling.py
+   # touch src/yaml_workflow/tasks/__init__.py  # Ensure it exists
    # touch tests/test_error_handling.py
    ```
    Implementation Order:
