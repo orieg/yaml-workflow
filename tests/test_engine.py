@@ -339,7 +339,7 @@ def test_on_error_notify(tmp_path):
         notifications[0]["step"] == "failing_step"
     ), "Error context should record the failing step"
     assert (
-        "Deliberate failure" in notifications[0]["error"]
+        "Deliberate failure" in notifications[0]["message"]
     ), "Error context should contain original error message"
     # Check that the final step also ran
     assert (
@@ -386,8 +386,9 @@ def test_on_error_template_message(tmp_path):
     assert state["execution_state"]["failed_step"]["error"].startswith(
         "Task failed with context: {'step': 'step1'"
     )
+    # Check for the renamed key
     assert (
-        "'error': 'Error XYZ occurred'"
+        "'message': 'Error XYZ occurred'"
         in state["execution_state"]["failed_step"]["error"]
     )
 

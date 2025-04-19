@@ -265,9 +265,9 @@ class WorkflowEngine:
         if not all_steps:
             raise WorkflowError("No steps defined in workflow")
 
-        # If no flows defined or flow is "all", return all steps
+        # If no flows defined or flow is None or flow is "all", return all steps
         flows = self.workflow.get("flows", {})
-        if not flows or flow_name == "all":
+        if not flows or flow_name is None or flow_name == "all":
             return all_steps
 
         # Get flow definition
@@ -439,33 +439,36 @@ class WorkflowEngine:
             ].copy()
 
         # Determine the sequence of steps to execute
-        all_steps = self._get_flow_steps(flow)
+        all_steps = self._get_flow_steps() # Get *all* defined steps for jump targets
         step_dict = {step["name"]: step for step in all_steps}
 
-        # Determine starting point
+        # Determine starting point based on the *flow-specific* steps list
+        flow_steps = self._get_flow_steps(flow) # Get steps for the current flow
+        flow_step_dict = {step["name"]: step for step in flow_steps}
+
         start_index = 0
         if resume_from:
-            if resume_from not in step_dict:
+            if resume_from not in flow_step_dict:
                 raise StepNotInFlowError(
                     resume_from,
                     flow or "default",
                 )
             start_index = next(
-                (i for i, step in enumerate(all_steps) if step["name"] == resume_from),
+                (i for i, step in enumerate(flow_steps) if step["name"] == resume_from),
                 0,
             )
             self.logger.info(f"Resuming workflow from step: {resume_from}")
         elif start_from:
-            if start_from not in step_dict:
+            if start_from not in flow_step_dict:
                 raise StepNotInFlowError(start_from, flow or "default")
             start_index = next(
-                (i for i, step in enumerate(all_steps) if step["name"] == start_from),
+                (i for i, step in enumerate(flow_steps) if step["name"] == start_from),
                 0,
             )
             self.logger.info(f"Starting workflow from step: {start_from}")
 
         # Apply initial skips only - runtime skips are handled in execute_step
-        steps_to_execute_initially = all_steps[start_index:]
+        steps_to_execute_initially = flow_steps[start_index:]
         initial_skip_set = set(skip_steps or [])
         steps_to_execute = [
             step
@@ -510,36 +513,43 @@ class WorkflowEngine:
                     self.logger.info(
                         f"Jumping to error handling step: {error_flow_target}"
                     )
-                    if error_flow_target not in step_dict:
-                        raise StepNotInFlowError(
-                            error_flow_target,
-                            flow or "default",
-                        )
-                    # Find the index of the target step in the original list
+                    # Find the index of the target step in the original *full* list of steps
                     try:
                         target_index_in_all = next(
                             i
                             for i, s in enumerate(all_steps)
                             if s["name"] == error_flow_target
                         )
-                        # Find the corresponding index in the potentially filtered steps_to_execute
-                        # This is complex if skips happened. Easier to rebuild the list from target.
-                        # Rebuild steps_to_execute from the target onwards
+                        # Reset the execution queue to start from the target step,
+                        # using the main list of all steps and respecting skips.
                         steps_to_execute = [
                             s
                             for s in all_steps[target_index_in_all:]
                             if s["name"] not in initial_skip_set
                         ]
-                        current_index = 0
+                        current_index = 0 # Start from the beginning of the new list
                         self.state.clear_error_flow_target()
+                        # Add the target step to executed_step_names *before* continuing
+                        # to prevent immediate re-execution if it was skipped initially.
+                        # However, let execute_step handle adding it after successful run.
+                        # We might need to clear executed_step_names specific to the failed branch?
+                        # For now, just continue loop.
                         continue
                     except StopIteration:
-                        # Should not happen if step_dict check passed, but belt-and-suspenders
+                        # This means the target step from on_error.next doesn't exist in the workflow steps
                         self.logger.error(
-                            f"Internal error: Could not find index for error target '{error_flow_target}'"
+                            f"Configuration error: on_error.next target '{error_flow_target}' not found in workflow steps."
                         )
-                        raise
+                        # Mark the *original* step as failed, as the jump target is invalid
+                        self.state.mark_step_failed(
+                            step_name, f"Invalid on_error.next target: {error_flow_target}"
+                        )
+                        self.state.save()
+                        raise WorkflowError(
+                            f"Invalid on_error.next target '{error_flow_target}' for step '{step_name}'"
+                        ) from e
                 else:
+                    # --- Handle Terminal Failure (No Jump Target) ---
                     # The error was already marked as terminally failed in execute_step
                     # which also sets the workflow state to failed.
                     # Re-raise a WorkflowError to signal the end of execution
@@ -547,7 +557,6 @@ class WorkflowEngine:
                     final_error_message = f"Workflow halted at step '{step_name}' due to unhandled error: {root_cause}"  # Use root cause in message
                     self.logger.error(final_error_message)
                     # No need to call mark_workflow_failed here; mark_step_failed in execute_step handles it.
-                    # *** Simplification: Pass the *actual* root cause as original_error ***
                     raise WorkflowError(
                         final_error_message, original_error=root_cause
                     ) from root_cause
@@ -830,9 +839,11 @@ class WorkflowEngine:
         else:
             # --- Handle Final Failure (No More Retries) ---
             self.logger.error(f"Step '{step_name}' failed after {retry_count} retries.")
-            error_info = {"step": step_name, "error": error_str_for_message}
+            # Populate the 'error' context variable for templates
+            error_info = {"step": step_name, "message": error_str_for_message}
             self.context["error"] = error_info
-            self.context["error"]["raw_error"] = error_to_propagate
+            # Store the raw exception object separately if needed (e.g., for programmatic access)
+            # self.context["error"]["raw_error"] = error_to_propagate # Keeping this commented for now
 
             error_message_template = on_error_config.get("message")
             final_error_message_for_state = str(

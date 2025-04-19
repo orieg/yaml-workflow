@@ -419,6 +419,54 @@ def test_complex_flow_error_handling(run_cli, example_workflows_dir, workspace_d
     assert "Cleanup finished." in out, "Cleanup finish message missing from stdout"
 
 
+def test_complex_flow_error_handling_fail_path(run_cli, example_workflows_dir, workspace_dir):
+    """Test the complex flow and error handling example workflow (failure path)."""
+    workflow_file = example_workflows_dir / "complex_flow_error_handling.yaml"
+
+    # Run workflow with flaky_mode=fail to trigger the error handling path
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(workflow_file),
+            "--workspace",
+            str(workspace_dir),
+            "--base-dir",
+            str(workspace_dir.parent),
+            "flaky_mode=fail",  # Correct parameter format
+        ]
+    )
+
+    # Print logs for debugging if failed
+    if exit_code != 0:
+        print("=== STDOUT ===")
+        print(out)
+        print("=== STDERR ===")
+        print(err)
+        log_files = list(workspace_dir.rglob("*.log"))
+        if log_files:
+            print(f"=== LOG FILE ({log_files[0].name}) ===")
+            print(log_files[0].read_text())
+
+    assert exit_code == 0, f"Workflow should succeed via error handling: {err}"
+
+    # Check for initial setup file (should still exist)
+    input_data_file = workspace_dir / "output" / "input_data.txt"
+    assert input_data_file.exists(), "output/input_data.txt was not created"
+
+    # Check that the main processing log was NOT created, as process_core_2 should be skipped
+    processing_log_file = workspace_dir / "output" / "processing_log.txt"
+    assert not processing_log_file.exists(), "output/processing_log.txt SHOULD NOT be created in failure path"
+
+    # Ensure the error handler step WAS executed (check stdout)
+    assert (
+        "ERROR HANDLED: Flaky step failed permanently." in out
+    ), "Error handler message missing from stdout"
+
+    # Ensure cleanup step ran (should run after error handler)
+    assert "Performing cleanup..." in out, "Cleanup start message missing from stdout"
+    assert "Cleanup finished." in out, "Cleanup finish message missing from stdout"
+
+
 # Get the root directory of the project based on the location of this file
 EXAMPLES_DIR = Path(__file__).parent.parent / "src" / "yaml_workflow" / "examples"
 ADVANCED_HELLO_WORLD_YAML = EXAMPLES_DIR / "advanced_hello_world.yaml"

@@ -47,12 +47,11 @@ steps:
     outputs: flaky_result # Map stdout to this variable on success
     on_error:
       action: retry # Explicitly state retry action
-      retry:
-        max_attempts: 3
-        delay: 1 # Wait 1 second between retries
+      retry: 3 # Max attempts as integer
+      delay: 1 # Wait 1 second between retries
       # If all retries fail, jump to the error_handler step
       next: handle_flaky_error
-      message: "Flaky step failed after {{ retry_count }} retries: {{ error.error }}"
+      message: "Flaky step failed: {{ error.message }}"
 
   # 4. Optional Step - Demonstrates Continue on Error
   - name: optional_step
@@ -84,7 +83,7 @@ steps:
         --------------------------------------------------
         ERROR HANDLED: Flaky step failed permanently.
         Step: {{ error.step }}
-        Error: {{ error.error }}
+        Error: {{ error.message }}
         Run Number: {{ run_number }}
         User: {{ args.user_name }}
         See logs in workspace: {{ workspace }}
