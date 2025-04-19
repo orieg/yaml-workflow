@@ -63,7 +63,7 @@ steps:
           raise ValueError("invalid operation")
           
         # Return validated input
-        result = {
+        return {
           "numbers": numbers,
           "operation": operation
         }
@@ -87,7 +87,7 @@ steps:
             }
         
         # Get validated input
-        data = steps.validate_input.output
+        data = steps.validate_input
         numbers = data["numbers"]
         operation = data["operation"]
         

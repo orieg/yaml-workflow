@@ -261,7 +261,7 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
             raise cmd_error
 
         # Log successful execution
-        result = {"returncode": returncode, "stdout": stdout, "stderr": stderr}
+        result = {"return_code": returncode, "stdout": stdout, "stderr": stderr}
         log_task_result(logger, result)
         return result
 
