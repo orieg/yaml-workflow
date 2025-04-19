@@ -165,6 +165,14 @@ class WorkflowEngine:
             "args": {},
             "env": dict(os.environ),
             "steps": {},
+            # Add workflow namespace
+            "workflow": {
+                "name": self.name,
+                "file": str(self.workflow_file) if self.workflow_file else None,
+                "workspace": str(self.workspace),
+                "run_number": self.workspace_info.get("run_number"),
+                "timestamp": datetime.now().isoformat(),
+            },
         }
 
         # Add workflow file path if available
@@ -734,13 +742,11 @@ class WorkflowEngine:
         should_execute = True
         if condition:
             try:
-                # Resolve the template, which should result in "True" or "False" (case-insensitive)
-                resolved_condition_str = (
-                    str(self.resolve_template(condition)).strip().lower()
-                )
+                # Resolve the template; boolean True becomes string "True"
+                resolved_condition_str = str(self.resolve_template(condition)).strip()
 
-                # Check if the resolved string indicates truthiness
-                if resolved_condition_str != "true":
+                # Check if the resolved string is exactly "True"
+                if resolved_condition_str != "True":
                     should_execute = False
 
                 self.logger.debug(

@@ -257,14 +257,16 @@ def read_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     log_task_execution(logger, config.step, config._context, config.workspace)
     try:
         processed = config.process_inputs()
-        file_path = processed.get("path")
+        file_path_input = processed.get("file")
         encoding = processed.get("encoding", "utf-8")
 
-        if not file_path:
-            raise ValueError("No path provided")
+        if not file_path_input:
+            raise ValueError("No file path provided")
 
-        content = read_file_direct(file_path, config.workspace, encoding, task_name)
-        output = {"path": file_path, "content": content}
+        content = read_file_direct(
+            file_path_input, config.workspace, encoding, task_name
+        )
+        output = {"path": file_path_input, "content": content}
         log_task_result(logger, output)
         return output
     except Exception as e:
@@ -288,12 +290,12 @@ def append_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     log_task_execution(logger, config.step, config._context, config.workspace)
     try:
         processed = config.process_inputs()
-        file_path = processed.get("path")
+        file_path = processed.get("file")
         content = processed.get("content")
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("No path provided")
+            raise ValueError("No file path provided")
         if content is None:
             raise ValueError("No content provided")
 
@@ -390,10 +392,10 @@ def delete_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     log_task_execution(logger, config.step, config._context, config.workspace)
     try:
         processed = config.process_inputs()
-        file_path = processed.get("path")
+        file_path = processed.get("file")
 
         if not file_path:
-            raise ValueError("No path provided")
+            raise ValueError("No file path provided")
 
         result = delete_file_direct(file_path, config.workspace, task_name)
         output = {"path": result}
@@ -412,7 +414,7 @@ def delete_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
 
 
 @register_task("read_json")
-def read_json_task(config: TaskConfig) -> Union[Dict[str, Any], List[Any]]:
+def read_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     """Task handler for reading JSON files."""
     task_name = str(config.name or "read_json")
     task_type = config.type or "read_json"
@@ -421,14 +423,16 @@ def read_json_task(config: TaskConfig) -> Union[Dict[str, Any], List[Any]]:
 
     try:
         processed = config.process_inputs()
-        file_path = processed.get("file_path")
+        file_path = processed.get("file")
+        encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("file_path parameter is required")
+            raise ValueError("No file path provided")
 
-        result = read_json(file_path, config.workspace)
-        log_task_result(logger, result)
-        return result
+        result_data = read_json(file_path, config.workspace, encoding=encoding)
+        output = {"data": result_data}
+        log_task_result(logger, output)
+        return output
     except Exception as e:
         context = ErrorContext(
             step_name=task_name,
@@ -438,11 +442,11 @@ def read_json_task(config: TaskConfig) -> Union[Dict[str, Any], List[Any]]:
             template_context=config._context,
         )
         handle_task_error(context)
-        raise
+        return None
 
 
 @register_task("write_json")
-def write_json_task(config: TaskConfig) -> str:
+def write_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     """Write JSON data to a file."""
     task_name = str(config.name or "write_json")
     task_type = config.type or "write_json"
@@ -450,26 +454,27 @@ def write_json_task(config: TaskConfig) -> str:
     log_task_execution(logger, config.step, config._context, config.workspace)
     try:
         processed = config.process_inputs()
-        file_path = processed.get("path")
+        file_path = processed.get("file")
         data = processed.get("data")
         indent = int(processed.get("indent", 2))
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("path parameter is required")
+            raise ValueError("No file path provided")
         if data is None:
-            raise ValueError("data parameter is required")
+            raise ValueError("No data provided")
 
-        result = write_json_direct(
+        result_path = write_json_direct(
             file_path,
             data,
-            indent,
-            config.workspace,
-            encoding,
-            task_name,
+            indent=indent,
+            workspace=config.workspace,
+            encoding=encoding,
+            step_name=task_name,
         )
-        log_task_result(logger, {"path": result})
-        return result
+        output = {"path": result_path}
+        log_task_result(logger, output)
+        return output
     except Exception as e:
         context = ErrorContext(
             step_name=task_name,
@@ -479,11 +484,11 @@ def write_json_task(config: TaskConfig) -> str:
             template_context=config._context,
         )
         handle_task_error(context)
-        raise  # Re-raise after handling
+        return None
 
 
 @register_task("read_yaml")
-def read_yaml_task(config: TaskConfig) -> Dict[str, Any]:
+def read_yaml_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     """Task handler for reading YAML files."""
     task_name = str(config.name or "read_yaml")
     task_type = config.type or "read_yaml"
@@ -492,14 +497,16 @@ def read_yaml_task(config: TaskConfig) -> Dict[str, Any]:
 
     try:
         processed = config.process_inputs()
-        file_path = processed.get("file_path")
+        file_path = processed.get("file")
+        encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("file_path parameter is required")
+            raise ValueError("No file path provided")
 
-        result = read_yaml(file_path, config.workspace)
-        log_task_result(logger, result)
-        return result
+        result_data = read_yaml(file_path, config.workspace, encoding=encoding)
+        output = {"data": result_data}
+        log_task_result(logger, output)
+        return output
     except Exception as e:
         context = ErrorContext(
             step_name=task_name,
@@ -509,11 +516,11 @@ def read_yaml_task(config: TaskConfig) -> Dict[str, Any]:
             template_context=config._context,
         )
         handle_task_error(context)
-        raise
+        return None
 
 
 @register_task("write_yaml")
-def write_yaml_task(config: TaskConfig) -> str:
+def write_yaml_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     """Write YAML data to a file."""
     task_name = str(config.name or "write_yaml")
     task_type = config.type or "write_yaml"
@@ -521,20 +528,25 @@ def write_yaml_task(config: TaskConfig) -> str:
     log_task_execution(logger, config.step, config._context, config.workspace)
     try:
         processed = config.process_inputs()
-        file_path = processed.get("path")
+        file_path = processed.get("file")
         data = processed.get("data")
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("path parameter is required")
+            raise ValueError("No file path provided")
         if data is None:
-            raise ValueError("data parameter is required")
+            raise ValueError("No data provided")
 
-        result = write_yaml_direct(
-            file_path, data, config.workspace, encoding, task_name
+        result_path = write_yaml_direct(
+            file_path,
+            data,
+            workspace=config.workspace,
+            encoding=encoding,
+            step_name=task_name,
         )
-        log_task_result(logger, {"path": result})
-        return result
+        output = {"path": result_path}
+        log_task_result(logger, output)
+        return output
     except Exception as e:
         context = ErrorContext(
             step_name=task_name,
@@ -544,7 +556,7 @@ def write_yaml_task(config: TaskConfig) -> str:
             template_context=config._context,
         )
         handle_task_error(context)
-        raise  # Re-raise after handling
+        return None
 
 
 def process_templates(data: Any, context: Dict[str, Any]) -> Any:
