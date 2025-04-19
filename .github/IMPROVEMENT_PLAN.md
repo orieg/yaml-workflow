@@ -355,8 +355,36 @@ pytest
 
 ## Future Considerations / Usability
 
-- **Path Resolution Consistency**: Currently, file tasks (`read_file`, `write_file`, etc.) implicitly resolve paths relative to an `output/` subdirectory within the workspace, while `shell` tasks operate from the workspace root and require explicit `output/` prefixes to access files created by file tasks. This inconsistency can be confusing for users. Revisit this behavior to potentially:
-    - Improve documentation clarity.
-    - Introduce explicit workspace/output directory variables (`{{ workflow.workspace_root }}`, `{{ workflow.output_dir }}`).
-    - Make file tasks also require the `output/` prefix for consistency.
-    - Add configuration options to control the default path resolution behavior.
+- **Path Resolution Consistency**: 
+    - **Problem:** Currently, file tasks (`read_file`, `write_file`, etc.) implicitly resolve paths relative to an `output/` subdirectory within the workspace, while `shell` tasks operate from the workspace root and require explicit `output/` prefixes. This is inconsistent.
+    - **Chosen Solution (Option C):** Modify file tasks to resolve paths relative to the *workspace root*, just like shell tasks. Users must explicitly specify `output/` in file paths if they want files in that subdirectory.
+    - **Benefit:** Creates a consistent rule: "All relative paths in tasks are resolved relative to the workspace root."
+    - **Impact:** Minor breaking change for workflows relying on the old implicit `output/` behavior.
+
+    **Implementation Steps:**
+
+    - [ ] 1. **Modify `file_tasks.py`**: 
+        - Go through each task function in `src/yaml_workflow/tasks/file_tasks.py` (e.g., `write_file_task`, `read_file_task`, `copy_file_task`, `move_file_task`, `delete_file_task`, `append_file_task`, `read_json_task`, `write_json_task`, `read_yaml_task`, `write_yaml_task`).
+        - Identify where input paths (`file`, `source`, `destination`, etc.) are resolved.
+        - Remove any logic that automatically prepends the `output/` directory. Ensure paths are resolved directly relative to the `config.workspace` (which is the root workspace directory passed to the task).
+        - **Example (`write_file_task`)**: Change logic like `path = config.workspace / "output" / file_path` to `path = config.workspace / file_path`.
+        - **Example (`copy_file_task`)**: Change `src = config.workspace / "output" / source` to `src = config.workspace / source`, and `dst = config.workspace / "output" / destination` to `dst = config.workspace / destination`.
+        - Ensure tasks that *create* destination directories (like `copy`, `move`, `write`) use the *parent* of the resolved path (e.g., `path.parent.mkdir(parents=True, exist_ok=True)`).
+
+    - [ ] 2. **Update Example Workflows**: 
+        - Review all `.yaml` files in `src/yaml_workflow/examples/`.
+        - For any step using a file task (`write_file`, `read_file`, `write_json`, etc.), check the file paths in the `inputs`.
+        - If the intention is for the file to be in the `output` directory, prepend `output/` to the path string.
+        - **Example**: Change `file: greeting.json` to `file: output/greeting.json`.
+        - **Example**: Change `source: input.txt` to `source: output/input.txt` if `input.txt` was expected to be in the output dir previously.
+
+    - [ ] 3. **Update Tests**: 
+        - Review and update tests in `tests/test_file_tasks.py`.
+        - Ensure test setup creates files in the correct locations (workspace root or `output/` subdirectory as needed).
+        - Update step definitions within tests to use the explicit `output/` prefix where necessary (e.g., `inputs: { "file": "output/test.txt" }`).
+        - Adjust assertions checking file existence or returned paths to expect paths relative to the workspace root (e.g., `assert result["path"] == str(temp_workspace / "output" / "test.txt")`).
+        - Review and update tests in `tests/test_examples.py` that interact with files created/read by the affected workflows, ensuring paths and assertions are correct.
+
+    - [ ] 4. **Update Documentation**: 
+        - Update relevant documentation sections (e.g., task references, usage guides) to clearly state the new consistent behavior: "All relative paths specified in task inputs (`file`, `source`, `destination`, etc.) are resolved relative to the root of the workflow's workspace directory." 
+        - Provide examples showing the explicit use of `output/` when needed.
