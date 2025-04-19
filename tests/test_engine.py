@@ -390,3 +390,76 @@ def test_on_error_template_message(tmp_path):
         "'error': 'Error XYZ occurred'"
         in state["execution_state"]["failed_step"]["error"]
     )
+
+
+def test_step_output_namespace(tmp_path):
+    """Test that step outputs are correctly placed in the steps namespace."""
+    workflow_dict = {
+        "name": "test-steps-namespace",
+        "steps": [
+            {
+                "name": "echo_step",
+                "task": "echo",
+                "inputs": {"message": "Echo Output"},
+            },
+            {
+                "name": "shell_step",
+                "task": "shell",
+                "inputs": {"command": "printf 'Shell Output'"},
+            },
+            {
+                "name": "check_outputs",
+                "task": "echo",
+                "inputs": {
+                    "message": "Echo:{{ steps.echo_step.result }} Shell:{{ steps.shell_step.result.stdout }}"
+                },
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow_dict, base_dir=tmp_path)
+    result = engine.run()
+
+    assert result["status"] == "completed"
+
+    # Check final context
+    final_context = engine.context
+    assert "steps" in final_context
+    assert "echo_step" in final_context["steps"]
+    assert final_context["steps"]["echo_step"] == {"result": "Echo Output"}
+
+    assert "shell_step" in final_context["steps"]
+    shell_step_output_container = final_context["steps"]["shell_step"]
+    print(f"DEBUG: shell_step output container = {shell_step_output_container}")
+    assert (
+        "result" in shell_step_output_container
+    ), "'result' key missing from shell_step output container"
+    shell_step_result = shell_step_output_container["result"]
+    assert isinstance(shell_step_result, dict), "shell_step result should be a dict"
+    assert (
+        shell_step_result.get("stdout") == "Shell Output"
+    ), f"Unexpected stdout: {shell_step_result.get('stdout')}"
+    assert (
+        "return_code" in shell_step_result
+    ), "return_code key missing from shell_step result dict"
+    assert (
+        shell_step_result.get("return_code") == 0
+    ), f"Unexpected return code: {shell_step_result.get('return_code')}"
+
+    # Check final step output which used the previous steps' outputs
+    assert "check_outputs" in final_context["steps"]
+    # The output message should be the same as the template resolved correctly
+    expected_message = "Echo:Echo Output Shell:Shell Output"
+    assert final_context["steps"]["check_outputs"] == {
+        "result": expected_message
+    }, f"Unexpected check_outputs result: {final_context['steps']['check_outputs']}"
+
+    # Check final returned outputs dict
+    final_outputs = result["outputs"]
+    assert final_outputs["echo_step"] == {"result": "Echo Output"}
+    # Check the nested structure for shell_step in final_outputs
+    assert "shell_step" in final_outputs
+    assert "result" in final_outputs["shell_step"]
+    assert final_outputs["shell_step"]["result"]["stdout"] == "Shell Output"
+    assert final_outputs["check_outputs"] == {
+        "result": expected_message
+    }, f"Unexpected check_outputs in final_outputs: {final_outputs.get('check_outputs')}"

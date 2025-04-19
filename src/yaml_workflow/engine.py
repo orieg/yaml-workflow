@@ -786,48 +786,8 @@ class WorkflowEngine:
         # --- Handle Successful Execution (if not failed) ---
         if not step_failed:
             self.logger.debug(f"Processing successful result for step '{step_name}'.")
-            output_value_for_context: Any = (
-                None  # Value to potentially map to top-level
-            )
-
-            # Update context with step result under 'steps' namespace
-            if isinstance(result, dict):
-                self.context["steps"][step_name] = result
-                # Use the 'result' key if present, otherwise the whole dict for potential mapping
-                output_value_for_context = result.get("result", result)
-            else:  # Handle non-dict results (e.g., strings from shell)
-                self.context["steps"][step_name] = {"result": result}
-                output_value_for_context = (
-                    result  # Use the raw result for potential mapping
-                )
-
-            # *** Handle explicit 'outputs' mapping ***
-            outputs_mapping = step.get("outputs")
-            if isinstance(outputs_mapping, str):
-                # If 'outputs' is a single string, map the determined value
-                output_var_name = outputs_mapping
-                self.context[output_var_name] = output_value_for_context
-                # Also store in args namespace for compatibility/clarity? Maybe not needed.
-                # self.context["args"][output_var_name] = output_value_for_context
-                self.logger.debug(f"Mapped step output to context['{output_var_name}']")
-            elif isinstance(outputs_mapping, dict):
-                # If 'outputs' is a dict, map specified keys from the result *dict*
-                if isinstance(result, dict):
-                    for result_key, context_key in outputs_mapping.items():
-                        if result_key in result:
-                            self.context[context_key] = result[result_key]
-                            self.logger.debug(
-                                f"Mapped step output '{result_key}' to context['{context_key}']"
-                            )
-                        else:
-                            self.logger.warning(
-                                f"Output key '{result_key}' not found in result for step '{step_name}'"
-                            )
-                else:
-                    # Cannot map dict keys from non-dict result
-                    self.logger.warning(
-                        f"Cannot apply 'outputs' mapping dict to non-dict result for step '{step_name}'"
-                    )
+            # Store the raw task result under the 'result' key in the steps namespace
+            self.context["steps"][step_name] = {"result": result}
 
             # Mark step as executed successfully in state
             self.state.mark_step_success(step_name, self.context["steps"][step_name])

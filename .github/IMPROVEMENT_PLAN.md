@@ -133,24 +133,21 @@
 
 ### Phase 2: Standardize Task Output Handling & Access
 
-**Goal:** Simplify and standardize how task outputs are stored and accessed, eliminating the confusing top-level `outputs` mapping in favor of the `steps` namespace.
+**Goal:** Simplify and standardize how task outputs are stored and accessed, ensuring all task return values are stored under a dedicated `result` key within the `steps` namespace (e.g., `steps.STEP_NAME.result`) to prevent key collisions and provide a consistent access pattern.
 
 1.  **Engine Refinement (`engine.py`)**: 
-    - Remove the logic within `execute_step` that handles mapping outputs to the top-level context when `outputs` is a string or dict. 
-    - Add deprecation warnings initially if complete removal is too breaking.
-    - Ensure the `steps` namespace (`self.context['steps'][step_name]`) consistently stores the full task result (wrapping non-dicts in `{"result": value}`).
+    - Modify `execute_step` to *always* wrap the task's return value and store it as `self.context['steps'][step_name] = {"result": return_value}`.
+    - Remove the previous logic that stored dictionaries directly.
 
-2.  **Task Review & Update (`tasks/`)**:
-    - Review built-in tasks (e.g., `echo_task` in `builtin_tasks.py`) to ensure they return appropriate dictionary structures or single values directly (instead of `str(value)`).
-    - Ensure task return values align with the expectation that they will be accessed via `steps.STEP_NAME.KEY` (using `result` as the key for wrapped non-dict returns).
+2.  **Task Review & Update (`tasks/`)**: 
+    - Review built-in tasks to confirm their return values (single values or dictionaries) are appropriate for being stored under the `result` key.
 
-3.  **Update Examples (`examples/`)**:
-    - Modify all example YAML files (`complex_flow_error_handling.yaml`, `advanced_hello_world.yaml`, etc.) to access previous step outputs *exclusively* using the `{{ steps.STEP_NAME.KEY }}` pattern.
-    - Remove any usage of the `outputs` field for top-level mapping.
+3.  **Update Examples (`src/yaml_workflow/examples/`)**: 
+    - Modify all example YAML files to access previous step outputs *exclusively* using the `{{ steps.STEP_NAME.result }}` or `{{ steps.STEP_NAME.result.KEY }}` pattern.
 
-4.  **Add Tests for Standardized Access (`tests/`)**:
-    - Add specific tests verifying that results are correctly stored and accessible via the `steps` namespace for various task types (dict return, non-dict return).
-    - Update any existing tests that relied on the deprecated top-level output mapping.
+4.  **Add/Update Tests (`tests/`)**: 
+    - Add/Update tests verifying that results are correctly stored and accessible via `steps.STEP_NAME.result` or `steps.STEP_NAME.result.KEY`.
+    - Ensure no tests rely on direct access like `steps.STEP_NAME.KEY`.
 
 ### Phase 3: Documentation Enhancement (Renumbered)
 
@@ -385,194 +382,19 @@ pytest
    - No duplicate error code
    - Coverage > 90%
 
-- [ ] 3. **Standardize Task Output Handling Phase**
+- [x] 3. **Standardize Task Output Handling Phase**
    Implementation Order:
-   1. Refine engine `execute_step` to remove/deprecate top-level output mapping.
-   2. Review and update tasks (e.g., `echo`) for consistent returns.
-   3. Update all examples to use `steps.` namespace.
-   4. Add/Update tests for `steps.` namespace access.
+   - [x] 1. Refine engine `execute_step` to remove/deprecate top-level output mapping.
+   - [x] 2. Review and update tasks (e.g., `echo`) for consistent returns.
+   - [x] 3. Update all examples to use `steps.` namespace.
+   - [x] 4. Add/Update tests for `steps.` namespace access.
    Success Criteria:
    - Top-level output mapping is removed or warned.
-   - Tasks return consistent results.
-   - All examples and tests use `steps.` namespace correctly.
-   - Relevant tests pass.
 
-- [ ] 4. **Documentation Phase** (Renumbered)
-   ```bash
-   # Create/Verify doc files
-   # touch docs/guide/task-development.md
-   # touch docs/guide/flows.md
-   # touch docs/guide/error-handling.md
+- [x] 4. **Documentation Phase** (Renumbered)
    ```
    Implementation Order:
-   1. Update task development guide (incl. output handling).
-   2. Update core guides to reflect standardized output access.
-   3. Document error handling patterns.
+   - [x] 1. Update task development guide (incl. output handling).
+   - [x] 2. Update core guides to reflect standardized output access.
+   - [x] 3. Document error handling patterns.
    Success Criteria:
-   - All guides complete
-   - Examples tested and working
-   - No broken links
-   - Documentation builds
-
-- [ ] 5. **Testing Phase** (Renumbered)
-   ```bash
-   # Create/Verify test files
-   # touch tests/test_error_scenarios.py
-   # touch tests/test_flow_transitions.py
-   ```
-   Implementation Order:
-   - [x] 1. Add example workflow integration tests (`tests/test_examples.py`)
-   - [ ] 2. Implement specific error scenario tests
-   - [ ] 3. Add specific flow transition tests
-   - [ ] 4. **Update tests relying on old output mapping**
-   - [ ] 5. Add performance tests
-   - [ ] 6. Verify coverage
-   Success Criteria:
-   - All tests pass (including updated output access tests)
-   - Coverage meets targets
-   - Performance tests pass
-   - Edge cases covered
-
-### Quality Verification
-
-Each phase must pass these checks:
-```bash
-# 1. Code Quality
-black . && isort . && mypy .
-
-# 2. Tests
-pytest --cov=yaml_workflow tests/
-
-# 3. Documentation Build (using MkDocs)
-mkdocs build --clean --strict
-
-# 4. Git Status
-git status  # Ensure all changes committed
-git push    # Push to remote
-```
-
-## Core Changes
-
-1. **Error Handling Core** (`tasks/error_handling.py`)
-   ```python
-   from dataclasses import dataclass
-   from typing import Optional, Dict, Any
-   from pathlib import Path
-   
-   @dataclass
-   class ErrorContext:
-       step_name: str
-       task_type: str
-       error: Exception
-       retry_count: int = 0
-       task_config: Optional[Dict[str, Any]] = None
-       template_context: Optional[Dict[str, Any]] = None
-   
-   def handle_task_error(context: ErrorContext) -> None:
-       """Centralized error handling for tasks."""
-       logger = get_task_logger(context.task_config.get('workspace', '.'), context.step_name)
-       log_task_error(logger, context.error)
-       if not isinstance(context.error, TaskExecutionError):
-           raise TaskExecutionError(
-               step_name=context.step_name,
-               original_error=context.error,
-               task_config=context.task_config
-           )
-       raise
-   ```
-
-2. **Base Updates** (`tasks/base.py`)
-   - Enhance `log_task_error` to use `ErrorContext`
-   - Update `get_task_logger` for error state tracking
-
-3. **Task Updates**
-   Update each task file to use centralized error handling and standardized inputs where applicable:
-   ```python
-   try:
-       # task logic
-   except Exception as e:
-       context = ErrorContext(
-           step_name=task_name,
-           task_type=self.task_type,
-           error=e,
-           task_config=self.config.dict()
-       )
-       handle_task_error(context)
-   ```
-
-   Order of updates:
-   1. `base.py` - Core error utilities (Skipped/Defered - Handled within handle_task_error)
-   - [x] 2. `config.py` - Error template handling
-   - [x] 3. `batch.py` - Batch processing (Note: `batch_context.py` removed/merged)
-   - [x] 4. File operations: `file_tasks.py` - **Standardized `path` input**
-   - [x] 5. Execution tasks: `python_tasks.py`
-   - [x] 5. Execution tasks: `shell_tasks.py`
-   - [x] 6. Template handling: `template_tasks.py`
-   - [x] 7. Simple tasks: `basic_tasks.py`, `noop.py`
-
-4. **Engine Updates** (`engine.py`)
-   - Add error flow handling
-   - Implement retry mechanism
-   - Update state tracking
-
-5. **State Management** (`state.py`)
-   - Add error state persistence
-   - Implement retry tracking
-   - Add error recovery state
-
-## Test Structure
-
-1. **Core Tests** (`test_error_handling.py`)
-   ```python
-   def test_error_context_creation():
-       """Test error context creation and validation."""
-       
-   def test_error_handling():
-       """Test centralized error handling logic."""
-       
-   def test_error_logging():
-       """Test error logging functionality."""
-   ```
-
-2. **Integration Tests** (`test_error_integration.py`)
-   ```python
-   def test_error_flow():
-       """Test error handling across multiple tasks and flows."""
-       
-   def test_retry_mechanism():
-       """Test retry functionality integrated with engine."""
-       
-   def test_state_persistence():
-       """Test error state persistence and recovery."""
-   ```
-
-3. **Task-Specific Tests**
-   Add error handling tests to each task's test file:
-   ```python
-   def test_file_task_error_handling():
-       """Test task-specific error scenarios (e.g., file not found)."""
-       
-   def test_file_task_retry():
-       """Test task retry behavior for file operations."""
-   ```
-
-## Example Updates
-
-Update examples to demonstrate new error handling features:
-```yaml
-# example_workflow.yaml
-steps:
-  read_file:
-    type: file
-    inputs:
-      file_path: non_existent_data.txt
-    on_error:
-      next: error_handler
-      retry: 3
-
-  error_handler:
-    type: noop # Or a specific error reporting task
-    # ... configuration for error handling step ...
-```
-
-Each step should be implemented incrementally with thorough testing to ensure stability. NO changes should be committed until all quality gates pass. Each commit should be atomic and focused on a single logical change. 

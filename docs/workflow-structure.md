@@ -69,9 +69,6 @@ steps:
     params:
       input: "{{ args.input_file }}"
       batch_size: "{{ args.batch_size }}"
-    outputs:
-      - transformed_data
-      - metadata
     error_handling:
       undefined_variables: strict
 
@@ -112,8 +109,8 @@ steps:
       debug: "{{ env.DEBUG }}"
       
       # Access step outputs
-      data: "{{ steps.transform.output }}"
-      metadata: "{{ steps.transform.outputs.metadata }}"
+      data: "{{ steps.transform.result }}"
+      metadata: "{{ steps.transform.metadata }}"
       
       # Access workflow information
       workspace: "{{ workflow.workspace }}"
@@ -229,68 +226,4 @@ Environment variables in the workflow engine are handled through the workflow co
    ```
 
 3. **In Shell Tasks**
-   ```yaml
-   steps:
-     - name: shell_task
-       task: shell
-       params:
-         command: "echo $API_URL"
-   ```
-
-### Environment Sources
-
-Environment variables can come from multiple sources:
-
-1. **System Environment**
-   - Inherited from the parent process
-   - Available automatically in all tasks
-
-2. **Command Line Arguments**
-   - Set via workflow parameters
-   - Override system environment variables
-
-3. **Runtime Modifications**
-   - Modified by shell tasks during execution
-   - Changes persist for subsequent steps
-
-### Error Handling
-
-When using strict undefined variable handling, the engine provides helpful error messages:
-
-```yaml
-settings:
-  error_handling:
-    undefined_variables: strict
-    show_available: true  # Shows available env vars in errors
-```
-
-If an undefined environment variable is referenced, the error message will include:
-- The name of the missing variable
-- List of available environment variables
-- Context where the error occurred
-
-### Best Practices
-
-1. Use environment variables for:
-   - Configuration values
-   - Secrets and credentials
-   - System-dependent paths
-   - Runtime environment settings
-
-2. Avoid storing sensitive information in:
-   - Workflow YAML files
-   - Task outputs
-   - Log files
-
-3. Validate required environment variables early in the workflow:
-   ```yaml
-   steps:
-     - name: validate_env
-       task: python
-       params:
-         code: |
-           required = ['API_KEY', 'DATABASE_URL']
-           missing = [var for var in required if var not in os.environ]
-           if missing:
-             raise ValueError(f"Missing required environment variables: {missing}")
    ```

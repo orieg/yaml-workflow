@@ -1,269 +1,91 @@
 # Task Development Guide
 
-This guide provides instructions and best practices for creating new custom tasks for the YAML Workflow engine.
+This guide provides instructions and best practices for developing custom tasks for the YAML Workflow engine.
 
 ## Creating New Tasks
 
-### Core Concepts
+- **Using `TaskConfig`**: Understand how to access parameters, context, and workspace information via the `TaskConfig` object passed to your task function.
+- **Task Registration**: Use the `@register_task("your_task_name")` decorator to make your task available in workflow YAML files.
+- **Type Safety**: Utilize Python type hints for function arguments and return values to improve clarity and enable static analysis.
+- **Logging**: Use `get_task_logger` from `yaml_workflow.tasks.base` to get a logger specific to the task instance.
 
-- **Task Function:** The main Python function that executes the task logic.
-- **`@register_task` Decorator:** Used to register the task function with the engine.
-- **`TaskConfig` Object:** Passed to the task function, providing access to step configuration, context, and workspace.
+## Returning Results
 
-### Steps
+It's crucial that tasks return results in a predictable way so they can be accessed by subsequent steps using the `steps` namespace.
 
-1.  **Define the Task Function:**
-    - Create a Python function that accepts a single argument: `config: TaskConfig`.
-    - Implement the core logic of your task within this function.
-    - Access inputs using `config.process_inputs()` which resolves templates.
-    - Use `config.workspace` (a `Path` object) for file operations within the workflow run directory.
-    - Access workflow context (parameters, outputs from previous steps) via `config._context`.
-    - Return a dictionary containing the task's results, or `None` if there's no specific output.
+- **Returning Dictionaries**: If your task naturally produces multiple related output values (e.g., stdout, stderr, return code from a shell command), return them as a dictionary. Subsequent steps can access these values directly by key:
+  ```yaml
+  steps:
+    - name: my_shell_step
+      task: shell
+      inputs:
+        command: "ls -l"
+    - name: use_output
+      task: echo
+      inputs:
+        message: "Output was: {{ steps.my_shell_step.stdout }}"
+  ```
 
-2.  **Register the Task:**
-    - Import the `@register_task` decorator: `from yaml_workflow.tasks import register_task`.
-    - Apply the decorator to your task function: `@register_task("your_task_name")`.
-    - The string argument is the `task:` name used in the YAML workflow definition.
+- **Returning Single Values**: If your task produces a single primary result (e.g., a processed string, a calculated number, a boolean flag), return that value directly. The workflow engine will automatically wrap this single value into a dictionary under the key `"result"` within the `steps` namespace.
+  ```yaml
+  steps:
+    - name: my_echo
+      task: echo
+      inputs:
+        message: "Hello"
+    - name: use_output
+      task: echo
+      inputs:
+        message: "Echo said: {{ steps.my_echo.result }}"
+  ```
 
-3.  **Handle Inputs:**
-    - Use `processed_inputs = config.process_inputs()` to get a dictionary of inputs with templates already resolved.
-    - Access specific inputs like `processed_inputs.get("my_input")`.
-    - Perform necessary validation on the inputs.
+## Accessing Previous Step Outputs
 
-4.  **Implement Task Logic:**
-    - Perform the actions required by the task (e.g., API calls, file manipulation, calculations).
-    - Use the provided `config.workspace` for any file I/O related to the workflow run.
-    - Log information using the task-specific logger (see Error Handling section).
+Always use the `steps` namespace in your Jinja2 templates within task `inputs` to access the results of previously executed steps. 
 
-5.  **Return Results:**
-    - Return a dictionary containing key outputs of the task. Common keys include `result` or specific named outputs.
-    - This dictionary will be stored in the workflow state under `steps.your_step_name`.
-    - The engine can map outputs to the main context if the `outputs:` key is used in the YAML step definition.
-
-### Example
-
-```python
-# src/my_custom_tasks/greeting_task.py
-from pathlib import Path
-from typing import Any, Dict, Optional
-
-from yaml_workflow.tasks import TaskConfig, register_task
-from yaml_workflow.tasks.base import get_task_logger, log_task_execution, log_task_result
-from yaml_workflow.tasks.error_handling import ErrorContext, handle_task_error
-
-@register_task("custom_greet")
-def custom_greeting_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
-    """A custom task that generates a greeting."""
-    task_name = str(config.name or "custom_greet")
-    task_type = config.type or "custom_greet"
-    logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
-
-    try:
-        processed = config.process_inputs()
-        name = processed.get("name", "World")
-        prefix = processed.get("prefix", "Hello")
-
-        if not isinstance(name, str) or not name.strip():
-            raise ValueError("Input 'name' must be a non-empty string")
-
-        greeting = f"{prefix}, {name.strip()}!"
-
-        # Example of writing to a file in the workspace
-        output_file = config.workspace / f"greeting_{task_name}.txt"
-        output_file.write_text(greeting)
-
-        result = {"greeting_message": greeting, "output_file": str(output_file)}
-        log_task_result(logger, result)
-        return result
-
-    except Exception as e:
-        context = ErrorContext(
-            step_name=task_name,
-            task_type=task_type,
-            error=e,
-            task_config=config.step,
-            template_context=config._context,
-        )
-        handle_task_error(context)
-        return None # Or re-raise depending on desired flow
-```
-
-## Wrapping Existing Functions
-
-Often, you might have existing Python functions that you want to expose as workflow tasks, but their function signatures don't match the required `(config: TaskConfig)` format. You can easily integrate these functions by creating a simple wrapper task.
-
-The wrapper task function will:
-
-1.  Accept the standard `config: TaskConfig` argument.
-2.  Be decorated with `@register_task("your_wrapper_task_name")`.
-3.  Use `config.process_inputs()` to get the inputs defined in the YAML step.
-4.  Extract values from the `processed_inputs` dictionary and map them to the arguments expected by your original function.
-5.  Call your original function with the mapped arguments.
-6.  Optionally process the return value of your original function into a dictionary suitable for the workflow context.
-7.  Include standard error handling using `handle_task_error`.
-
-### Example: Wrapping a Calculation Function
-
-Let's say you have an existing utility function:
-
-```python
-# my_utils/calculations.py
-
-def perform_complex_calculation(x: float, y: float, operation: str = 'add') -> float:
-    """Performs a calculation based on the operation."""
-    if operation == 'add':
-        return x + y
-    elif operation == 'multiply':
-        return x * y
-    else:
-        raise ValueError(f"Unsupported operation: {operation}")
-
-```
-
-Here's how you can create a wrapper task to use it in a workflow:
-
-```python
-# src/my_custom_tasks/calculation_task.py
-from typing import Any, Dict, Optional
-
-from yaml_workflow.tasks import TaskConfig, register_task
-from yaml_workflow.tasks.base import get_task_logger, log_task_execution, log_task_result
-from yaml_workflow.tasks.error_handling import ErrorContext, handle_task_error
-
-# Import the existing function
-from my_utils.calculations import perform_complex_calculation
-
-@register_task("calculate")
-def calculation_wrapper_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
-    """A wrapper task to perform calculations using an existing function."""
-    task_name = str(config.name or "calculate")
-    task_type = config.type or "calculate"
-    logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
-
-    try:
-        processed = config.process_inputs()
-
-        # Extract and validate inputs for the original function
-        val1 = processed.get("value1")
-        val2 = processed.get("value2")
-        op = processed.get("operation", "add") # Default defined here or in original func
-
-        if val1 is None or val2 is None:
-            raise ValueError("Inputs 'value1' and 'value2' are required")
-        try:
-            num1 = float(val1)
-            num2 = float(val2)
-        except ValueError:
-            raise ValueError("Inputs 'value1' and 'value2' must be numbers")
-        if not isinstance(op, str):
-             raise ValueError("Input 'operation' must be a string")
-
-        # Call the original function
-        calculation_result = perform_complex_calculation(x=num1, y=num2, operation=op)
-
-        # Format the result for the workflow
-        result = {"calculation_output": calculation_result}
-        log_task_result(logger, result)
-        return result
-
-    except Exception as e:
-        context = ErrorContext(
-            step_name=task_name,
-            task_type=task_type,
-            error=e,
-            task_config=config.step,
-            template_context=config._context,
-        )
-        handle_task_error(context)
-        return None
-```
-
-**YAML Usage:**
-
-```yaml
-steps:
-  - name: add_numbers
-    task: calculate
-    inputs:
-      value1: 10
-      value2: 5
-      operation: add # Optional, defaults to 'add'
-    outputs: calculation_result # Maps result["calculation_output"] to context.calculation_result
-
-  - name: multiply_numbers
-    task: calculate
-    inputs:
-      value1: "{{ steps.add_numbers.calculation_output }}" # Use previous result
-      value2: 2
-      operation: multiply
-```
-
-## Using TaskConfig Effectively
-
-- **`config.step`**: The raw dictionary definition of the step from the YAML.
-- **`config.name`**: The `name:` defined for the step in the YAML.
-- **`config.type`**: The `task:` type defined for the step in the YAML.
-- **`config.workspace`**: A `pathlib.Path` object pointing to the root of the current workflow run's workspace.
-- **`config._context`**: The full workflow context dictionary (includes `args`, `env`, `steps` namespaces).
-- **`config.process_inputs()`**: Resolves Jinja2 templates in the `inputs:` section of the step definition using `config._context` and returns the processed dictionary.
+- **Syntax**: `{{ steps.STEP_NAME.KEY }}`
+  - `STEP_NAME`: The `name` defined for the previous step in the workflow YAML.
+  - `KEY`: 
+    - The specific key if the previous step returned a dictionary (e.g., `stdout`, `return_code`).
+    - Use `result` if the previous step returned a single value (which the engine wraps).
 
 ## Error Handling Best Practices
 
-- **Use Centralized Handling:** Import and use the `handle_task_error` utility for consistent error logging and propagation.
-- **Wrap Exceptions:** Catch specific exceptions within your task logic and use `handle_task_error` within the `except` block.
-- **`ErrorContext`:** Populate the `ErrorContext` dataclass with relevant details (step name, task type, original error, config, context) before passing it to `handle_task_error`.
-- **Standard Logging:** Use `get_task_logger`, `log_task_execution`, and `log_task_result` from `yaml_workflow.tasks.base` for standardized logging.
-
-```python
-from yaml_workflow.tasks.base import get_task_logger, log_task_execution, log_task_result
-from yaml_workflow.tasks.error_handling import ErrorContext, handle_task_error
-
-# ... inside your task function ...
-task_name = str(config.name or "default_name")
-task_type = config.type or "default_type"
-logger = get_task_logger(config.workspace, task_name)
-log_task_execution(logger, config.step, config._context, config.workspace)
-
-try:
-    # --- Your task logic --- 
-    processed = config.process_inputs()
-    # ... access inputs ...
-    if some_condition:
-        raise ValueError("Specific validation failed")
-    # ... perform actions ...
-    result = { ... }
-    log_task_result(logger, result)
-    return result
-except Exception as e:
-    context = ErrorContext(
-        step_name=task_name,
-        task_type=task_type,
-        error=e,
-        task_config=config.step,       # Pass the raw step config
-        template_context=config._context # Pass the full context
-    )
-    handle_task_error(context)
-    # handle_task_error raises by default, so this point might not be reached
-    # unless handle_task_error is modified or the raised error is caught again.
-    return None # Or handle differently if needed
-```
-
-## Type Safety Guidelines
-
-- Use type hints (`typing` module) for your task function signature and internal variables.
-- Ensure your task function has a return type hint (e.g., `-> Optional[Dict[str, Any]]`, `-> str`, `-> None`).
-- Add a `py.typed` file to your package root if distributing the custom tasks as a library, allowing `mypy` to check types.
-- Run `mypy` as part of your quality checks.
+- **Use Centralized Handling**: Import `handle_task_error` and `ErrorContext` from `yaml_workflow.tasks.error_handling`.
+- **Wrap Exceptions**: Catch specific exceptions within your task logic. If an error occurs, create an `ErrorContext` instance and pass it to `handle_task_error`. This ensures consistent error logging and propagation.
+  ```python
+  from yaml_workflow.tasks.error_handling import ErrorContext, handle_task_error
+  from yaml_workflow.exceptions import TaskExecutionError
+  
+  try:
+      # Your task logic here
+      # ...
+      if some_error_condition:
+          raise ValueError("Something went wrong")
+  except Exception as e:
+      # Avoid raising TaskExecutionError directly if possible,
+      # let handle_task_error wrap it.
+      if isinstance(e, TaskExecutionError):
+          raise # Re-raise if it's already the correct type
+      
+      err_context = ErrorContext(
+          step_name=config.name, 
+          task_type=config.type, 
+          error=e, 
+          task_config=config.step # Pass the raw step definition
+      )
+      handle_task_error(err_context) # This will raise TaskExecutionError
+  ```
+- **Specific Exceptions**: Define custom exception classes inheriting from `TaskExecutionError` for domain-specific errors if needed.
 
 ## Testing Requirements
 
 - Write unit tests for your task function's logic.
-- Mock external dependencies (APIs, complex file interactions) where appropriate.
-- Test different input scenarios, including valid and invalid inputs.
-- Test error conditions and ensure errors are handled correctly (e.g., using `pytest.raises`).
-- Consider creating small example workflow YAML files that use your custom task and test them using `WorkflowEngine` or the CLI runner within integration tests.
+- Include integration tests that run your task within a minimal workflow to verify:
+  - Parameter handling.
+  - Correct output structure (dict vs. single value).
+  - Accessing its output via the `steps` namespace in a subsequent step.
+  - Error handling behavior.
 
 ```python
 # Example test structure (using pytest)

@@ -54,7 +54,6 @@ steps:
     inputs:
       path: "output/validation_result.txt"
       encoding: "utf-8"
-    outputs: validation_message
     on_error:
       action: fail
       message: "Failed to read validation result: {{ error }}"
@@ -105,7 +104,7 @@ steps:
         cat "output/validation_passed.txt"
         echo ""
         # *** Correctly access step output using steps namespace ***
-        echo "Validation Content: {{ steps.read_validation.content }}"
+        echo "Validation Content: {{ steps.read_validation.result.content }}"
         echo "=== End Debug ==="
 
   # Step 4: Get current timestamp
@@ -114,10 +113,9 @@ steps:
   - name: get_timestamp
     task: shell
     inputs:
-      command: date -u +"%Y-%m-%dT%H:%M:%SZ"
-    outputs: current_timestamp
+      command: date -u +\"%Y-%m-%dT%H:%M:%SZ\"
     # *** Condition resolves directly to True/False string ***
-    condition: "{{ steps.read_validation.content == 'true' }}"
+    condition: "{{ steps.read_validation.result.content | trim == 'true' }}"
 
   # Step 5: Create JSON greeting
   # Only runs if validation passed
@@ -128,12 +126,12 @@ steps:
       path: "output/greeting.json"
       data: 
         greeting: "Hello, {{ args.name }}!"
-        timestamp: "{{ current_timestamp }}"
+        timestamp: "{{ steps.get_timestamp.result.stdout }}"
         run_number: "{{ run_number }}"
         language: "en"
       indent: 2
     # *** Condition resolves directly to True/False string ***
-    condition: "{{ steps.read_validation.content == 'true' }}"
+    condition: "{{ steps.read_validation.result.content | trim == 'true' }}"
 
   # Step 6: Create multi-language greetings
   # Only runs if validation passed
@@ -150,7 +148,7 @@ steps:
         Italian: "Ciao, {{ args.name }}!"
         Japanese: "こんにちは、{{ args.name }}さん！"
     # *** Condition resolves directly to True/False string ***
-    condition: "{{ steps.read_validation.content == 'true' }}"
+    condition: "{{ steps.read_validation.result.content | trim == 'true' }}"
 
   # Step 7: Format and display results
   # Only runs if validation passed
@@ -161,7 +159,7 @@ steps:
       command: |
         if [ -f "output/greeting.json" ]; then
           echo "=== Workflow Results ==="
-          echo "Run #{{ run_number }} at {{ current_timestamp }}"
+          echo "Run #{{ run_number }} at {{ steps.get_timestamp.result.stdout }}"
           echo
           echo "JSON Greeting:"
           cat "output/greeting.json"
@@ -172,7 +170,7 @@ steps:
           echo "=== End of Results ==="
         fi
     # *** Condition resolves directly to True/False string ***
-    condition: "{{ steps.read_validation.content == 'true' }}"
+    condition: "{{ steps.read_validation.result.content | trim == 'true' }}"
 
   # Step 8: Handle validation errors
   # Only runs if validation failed
@@ -190,7 +188,7 @@ steps:
         {% if args.name %}Input Value: {{ args.name }}{% else %}Input Value: [not provided]{% endif %}
         
         Validation Details:
-        {{ validation_message }}
+        {{ steps.check_validation.result.content }}
         
         Requirements:
         - Name must be provided
@@ -202,7 +200,7 @@ steps:
         2. Ensure your input meets all requirements
         3. Run the workflow again with valid input
     # *** Condition resolves directly to True/False string ***
-    condition: "{{ steps.read_validation.content == 'false' }}"
+    condition: "{{ steps.read_validation.result.content | trim == 'false' }}"
     on_error:
       action: fail
       message: "Failed to create error report: {{ error }}"

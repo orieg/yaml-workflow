@@ -45,7 +45,7 @@ def test_shell_basic(workspace, basic_context):
     result = shell_task(config)
 
     assert result["stdout"].strip() == "Hello World"
-    assert result["returncode"] == 0
+    assert result["return_code"] == 0
     assert result["stderr"] == ""
 
 
@@ -63,7 +63,7 @@ def test_shell_with_variables(workspace, basic_context):
     result = shell_task(config)
 
     assert result["stdout"].strip() == "Arg: value1, Env: value2"
-    assert result["returncode"] == 0
+    assert result["return_code"] == 0
 
 
 def test_shell_with_working_dir(workspace, basic_context):
@@ -83,7 +83,7 @@ def test_shell_with_working_dir(workspace, basic_context):
     result = shell_task(config)
 
     assert result["stdout"].strip() == "test content"
-    assert result["returncode"] == 0
+    assert result["return_code"] == 0
 
 
 def test_shell_with_env_vars(workspace, basic_context):
@@ -98,7 +98,7 @@ def test_shell_with_env_vars(workspace, basic_context):
     result = shell_task(config)
 
     assert result["stdout"].strip() == "test_value"
-    assert result["returncode"] == 0
+    assert result["return_code"] == 0
 
 
 def test_shell_command_failure(workspace, basic_context):
@@ -145,7 +145,7 @@ def test_shell_with_batch_context(workspace, basic_context):
     result = shell_task(config)
 
     assert result["stdout"].strip() == "Processing test_item"
-    assert result["returncode"] == 0
+    assert result["return_code"] == 0
 
 
 def test_shell_with_undefined_variable(workspace, basic_context):
@@ -182,7 +182,7 @@ def test_shell_with_complex_command(workspace, basic_context):
     result = shell_task(config)
 
     assert result["stdout"].strip() == "test"
-    assert result["returncode"] == 0
+    assert result["return_code"] == 0
     assert (workspace / "testdir" / "file.txt").exists()
 
 
@@ -200,4 +200,4 @@ def test_shell_with_special_chars(workspace, basic_context):
     result = shell_task(config)
 
     assert result["stdout"].strip() == "test$with|special&chars"
-    assert result["returncode"] == 0
+    assert result["return_code"] == 0
