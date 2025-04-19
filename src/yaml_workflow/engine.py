@@ -439,11 +439,11 @@ class WorkflowEngine:
             ].copy()
 
         # Determine the sequence of steps to execute
-        all_steps = self._get_flow_steps() # Get *all* defined steps for jump targets
+        all_steps = self._get_flow_steps()  # Get *all* defined steps for jump targets
         step_dict = {step["name"]: step for step in all_steps}
 
         # Determine starting point based on the *flow-specific* steps list
-        flow_steps = self._get_flow_steps(flow) # Get steps for the current flow
+        flow_steps = self._get_flow_steps(flow)  # Get steps for the current flow
         flow_step_dict = {step["name"]: step for step in flow_steps}
 
         start_index = 0
@@ -527,7 +527,7 @@ class WorkflowEngine:
                             for s in all_steps[target_index_in_all:]
                             if s["name"] not in initial_skip_set
                         ]
-                        current_index = 0 # Start from the beginning of the new list
+                        current_index = 0  # Start from the beginning of the new list
                         self.state.clear_error_flow_target()
                         # Add the target step to executed_step_names *before* continuing
                         # to prevent immediate re-execution if it was skipped initially.
@@ -542,7 +542,8 @@ class WorkflowEngine:
                         )
                         # Mark the *original* step as failed, as the jump target is invalid
                         self.state.mark_step_failed(
-                            step_name, f"Invalid on_error.next target: {error_flow_target}"
+                            step_name,
+                            f"Invalid on_error.next target: {error_flow_target}",
                         )
                         self.state.save()
                         raise WorkflowError(
