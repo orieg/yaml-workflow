@@ -719,6 +719,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#example-flow-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Flow Configuration
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1402,6 +1411,15 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#example-flow-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Flow Configuration
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1486,7 +1504,7 @@
 </ul>
 </li>
 <li><strong>Conditional Logic (High-Level):</strong> While fine-grained conditions are handled by the <code>condition</code> key within individual steps, you could potentially have different flows triggered based on input parameters passed to an external script that <em>calls</em> <code>yaml-workflow run --flow ...</code>. For example, a script might run <code>--flow full_process</code> normally, but <code>--flow quick_check</code> if a specific flag is passed.</li>
-<li><strong>Error Handling Paths:</strong> As shown in the <a href="../error-handling/#error-handling-flows">Error Handling Guide</a>, the <code>on_error.next</code> key can target a specific step. By defining flows consisting of dedicated error handling or compensation steps (e.g., <code>cleanup_flow: [rollback_step, notify_failure]</code>), you can create structured error recovery or notification sequences triggered by step failures.</li>
+<li><strong>Error Handling Paths:</strong> Recovery: Define error handling paths using <code>on_error</code> and <code>action: next</code> (see <a href="../error-handling/#error-handling-flows-action-next">Error Handling Guide</a>).</li>
 </ol>
 <p><strong>See Also:</strong> The <code>complex_flow_error_handling.yaml</code> file in the examples directory provides a practical demonstration of using different flows for standard execution, subset execution, and error handling paths.</p>
 <h2 id="interaction-with-resume">Interaction with Resume<a class="headerlink" href="#interaction-with-resume" title="Permanent link">&para;</a></h2>
@@ -1505,6 +1523,7 @@
 <li><strong>Combine with <code>condition</code>:</strong> Use step-level <code>condition</code> keys for fine-grained conditional execution <em>within</em> a flow. Flows control the overall sequence, while <code>condition</code> controls whether an individual step in that sequence runs based on the current context.</li>
 <li><strong>Keep Flows Focused:</strong> Avoid overly complex flows. If a flow becomes very long or has many branches, consider if refactoring the workflow or splitting it into multiple workflow files might be clearer. </li>
 </ul>
+<h2 id="example-flow-configuration">Example Flow Configuration<a class="headerlink" href="#example-flow-configuration" title="Permanent link">&para;</a></h2>
 
 
 

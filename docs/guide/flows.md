@@ -71,7 +71,7 @@ Flows allow for more structured and flexible workflow execution. Common use case
     *   *Validation:* A flow that runs only validation steps.
     *   *Testing:* A flow that runs a specific sequence for testing purposes.
 3.  **Conditional Logic (High-Level):** While fine-grained conditions are handled by the `condition` key within individual steps, you could potentially have different flows triggered based on input parameters passed to an external script that *calls* `yaml-workflow run --flow ...`. For example, a script might run `--flow full_process` normally, but `--flow quick_check` if a specific flag is passed.
-4.  **Error Handling Paths:** As shown in the [Error Handling Guide](error-handling.md#error-handling-flows), the `on_error.next` key can target a specific step. By defining flows consisting of dedicated error handling or compensation steps (e.g., `cleanup_flow: [rollback_step, notify_failure]`), you can create structured error recovery or notification sequences triggered by step failures.
+4.  **Error Handling Paths:** Recovery: Define error handling paths using `on_error` and `action: next` (see [Error Handling Guide](error-handling.md#error-handling-flows-action-next)).
 
 **See Also:** The `complex_flow_error_handling.yaml` file in the examples directory provides a practical demonstration of using different flows for standard execution, subset execution, and error handling paths.
 
@@ -92,3 +92,5 @@ The engine does not switch to a different flow automatically upon resuming.
 - **Validate Steps:** Ensure all step names listed within a flow definition correspond to actual steps defined in the main `steps:` block. The engine performs validation, but checking beforehand is good practice.
 - **Combine with `condition`:** Use step-level `condition` keys for fine-grained conditional execution *within* a flow. Flows control the overall sequence, while `condition` controls whether an individual step in that sequence runs based on the current context.
 - **Keep Flows Focused:** Avoid overly complex flows. If a flow becomes very long or has many branches, consider if refactoring the workflow or splitting it into multiple workflow files might be clearer. 
+
+## Example Flow Configuration 
