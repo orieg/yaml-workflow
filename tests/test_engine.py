@@ -464,3 +464,49 @@ def test_step_output_namespace(tmp_path):
     assert final_outputs["check_outputs"] == {
         "result": expected_message
     }, f"Unexpected check_outputs in final_outputs: {final_outputs.get('check_outputs')}"
+
+
+def test_basic_task_with_templated_input(tmp_path):
+    """Test a basic task registered via create_task_handler with templated input."""
+    workflow = {
+        "steps": [
+            {
+                "name": "step1",
+                "task": "echo",  # Basic task
+                "inputs": {"message": "Initial Value"},
+            },
+            {
+                "name": "step2",
+                "task": "echo",  # Basic task using output from step1
+                "inputs": {
+                    "message": "Got: {{ steps.step1.result }}"
+                },  # Templated input
+            },
+        ]
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run()
+    assert result["status"] == "completed"
+    assert "step2" in result["outputs"]
+    assert result["outputs"]["step2"]["result"] == "Got: Initial Value"
+
+
+def test_basic_task_with_default_value(tmp_path):
+    """Test a basic task where an optional arg uses its default value."""
+    workflow = {
+        "steps": [
+            {
+                "name": "step1",
+                "task": "hello_world",  # Takes optional 'name' (default: "World")
+                "inputs": {},  # Do not provide the 'name' input
+            }
+        ]
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run()
+    assert result["status"] == "completed"
+    assert "step1" in result["outputs"]
+    assert result["outputs"]["step1"]["result"] == "Hello, World!"  # Check default
+
+
+# --- Tests for tasks in basic_tasks.py ---
