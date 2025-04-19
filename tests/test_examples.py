@@ -355,6 +355,70 @@ def test_resume_workflow(run_cli, example_workflows_dir, workspace_dir):
     assert "Cannot resume: workflow is not in failed state" in err
 
 
+def test_complex_flow_error_handling(run_cli, example_workflows_dir, workspace_dir):
+    """Test the complex flow and error handling example workflow (success path)."""
+    workflow_file = example_workflows_dir / "complex_flow_error_handling.yaml"
+
+    # Run workflow with default parameters (flaky_mode=success)
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(workflow_file),
+            "--workspace",
+            str(workspace_dir),
+            "--base-dir",
+            str(workspace_dir.parent),
+        ]
+    )
+
+    # Print logs for debugging if failed
+    if exit_code != 0:
+        print("=== STDOUT ===")
+        print(out)
+        print("=== STDERR ===")
+        print(err)
+        log_files = list(workspace_dir.rglob("*.log"))
+        if log_files:
+            print(f"=== LOG FILE ({log_files[0].name}) ===")
+            print(log_files[0].read_text())
+
+    assert exit_code == 0, f"Workflow failed unexpectedly: {err}"
+
+    # Check for initial setup file
+    input_data_file = workspace_dir / "output" / "input_data.txt"
+    assert input_data_file.exists(), "output/input_data.txt was not created"
+    assert "Initial data for DemoUser" in input_data_file.read_text()
+
+    # Check for the main processing log
+    processing_log_file = workspace_dir / "output" / "processing_log.txt"
+    assert processing_log_file.exists(), "output/processing_log.txt was not created"
+
+    # Verify content of the processing log for successful run
+    log_content = processing_log_file.read_text()
+    assert (
+        "Flaky step succeeded." in log_content
+    ), "Flaky step success message missing from log"
+    assert (
+        "Status from Core 1: Core 1 OK" in log_content
+    ), "Core 1 status message missing from log"
+    assert (
+        "Flaky step result (if successful):" in log_content
+    ), "Flaky step result prefix missing from log"
+    assert "Flaky Success" in log_content, "Flaky step success output missing from log"
+    assert (
+        "Core 2 processed" in log_content
+    ), "Core 2 processed message missing from log"
+
+    # Ensure the error handler step was NOT executed (check stdout)
+    assert (
+        "ERROR HANDLED: Flaky step failed permanently." not in out
+    ), "Error handler message unexpectedly found in stdout"
+
+    # Ensure cleanup step ran
+    assert "Performing cleanup..." in out, "Cleanup start message missing from stdout"
+    assert "Cleanup finished." in out, "Cleanup finish message missing from stdout"
+
+
 # Get the root directory of the project based on the location of this file
 EXAMPLES_DIR = Path(__file__).parent.parent / "src" / "yaml_workflow" / "examples"
 ADVANCED_HELLO_WORLD_YAML = EXAMPLES_DIR / "advanced_hello_world.yaml"

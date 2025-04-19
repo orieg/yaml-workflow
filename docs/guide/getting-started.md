@@ -62,4 +62,4 @@ yaml-workflow run workflows/hello_world.yaml name=World
 
 - Learn about [workflow configuration](configuration.md)
 - Explore [built-in tasks](tasks/index.md)
-- See more [examples](../examples/index.md) 
+- See more [examples](../examples/basic-workflow.md) 

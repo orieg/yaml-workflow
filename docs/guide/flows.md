@@ -62,7 +62,7 @@ yaml-workflow run my_workflow.yaml
 
 1.  **Subset Execution:** Run only a specific sequence of steps for certain scenarios (e.g., a setup flow, a teardown flow, a testing flow).
 2.  **Conditional Logic (High-Level):** While fine-grained conditions are handled by the `condition` key within individual steps, you could potentially have different flows triggered based on input parameters passed to the workflow script that *calls* `yaml-workflow run --flow ...`.
-3.  **Error Handling Paths:** As shown in the [Error Handling Guide](error-handling.md#error-handling-flows-onerrornext), the `on_error.next` key can target a specific step. By defining flows consisting of error handling steps, you can create structured error recovery or notification sequences.
+3.  **Error Handling Paths:** As shown in the [Error Handling Guide](error-handling.md#error-handling-flows), the `on_error.next` key can target a specific step. By defining flows consisting of error handling steps, you can create structured error recovery or notification sequences.
 
 **See Also:** The `complex_flow_error_handling.yaml` file in the examples directory provides a practical demonstration of using different flows for standard execution, subset execution, and error handling paths.
 
