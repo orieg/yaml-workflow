@@ -62,6 +62,9 @@ steps:
         # Simulate a failure (e.g., trying to access a non-existent file)
         cat "non_existent_file.txt"
         echo "Optional step output (should not be reached on failure)"
+    on_error:
+      action: continue # Add this to make the workflow continue despite failure
+      message: "Optional step failed as expected, continuing..."
 
   # 5. Core Step 2 - Depends on Core Step 1 implicitly via log file
   - name: process_core_2

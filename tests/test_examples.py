@@ -531,6 +531,54 @@ def test_complex_flow_core_only_flow(run_cli, example_workflows_dir, workspace_d
     assert "Cleanup finished." in out, "Cleanup finish message missing from stdout"
 
 
+def test_complex_flow_continue_on_error(run_cli, example_workflows_dir, workspace_dir):
+    """Test the complex workflow with on_error: continue for optional_step."""
+    complex_workflow_file = example_workflows_dir / "complex_flow_error_handling.yaml"
+
+    # Run workflow with default flow (full_run) which includes optional_step
+    # Keep default flaky_mode (success)
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(complex_workflow_file),
+            "--workspace",
+            str(workspace_dir),
+            # Default flow is used
+        ],
+    )
+
+    # Print logs for debugging if failed
+    if exit_code != 0:
+        print("=== STDOUT ===")
+        print(out)
+        print("=== STDERR ===")
+        print(err)
+        log_files = list(workspace_dir.rglob("*.log"))
+        if log_files:
+            print(f"=== LOG FILE ({log_files[0].name}) ===")
+            print(log_files[0].read_text())
+
+    assert exit_code == 0, f"Workflow should complete despite optional_step failure: {err}"
+
+    # Check that optional_step attempted to run and failed (check stderr)
+    assert "Attempting optional step..." in out # Check stdout for attempt message
+    # Check stderr for the specific error from `cat non_existent_file.txt`
+    # The exact message might vary slightly by OS/shell, but should contain key parts
+    assert "non_existent_file.txt: No such file or directory" in err 
+    # assert "Optional step failed as expected, continuing..." in err # Removed: Custom message not logged to stderr on 'continue'
+
+    # Check that subsequent steps ran (process_core_2, cleanup)
+    # Check for process_core_2 output in the log file
+    processing_log_file = workspace_dir / "output" / "processing_log.txt"
+    assert processing_log_file.exists(), "output/processing_log.txt should be created by process_core_2"
+    log_content = processing_log_file.read_text()
+    assert "Core 2 processed" in log_content, "Core 2 message missing, indicating it didn't run after optional_step failed"
+
+    # Check cleanup step ran (from stdout)
+    assert "Performing cleanup..." in out, "Cleanup start message missing from stdout"
+    assert "Cleanup finished." in out, "Cleanup finish message missing from stdout"
+
+
 # Get the root directory of the project based on the location of this file
 EXAMPLES_DIR = Path(__file__).parent.parent / "src" / "yaml_workflow" / "examples"
 ADVANCED_HELLO_WORLD_YAML = EXAMPLES_DIR / "advanced_hello_world.yaml"
