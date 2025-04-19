@@ -3,12 +3,14 @@
 import time
 from pathlib import Path
 from typing import Any, Dict, List
+from unittest.mock import MagicMock, Mock
 
 import pytest
 
 from yaml_workflow.exceptions import TaskExecutionError, TemplateError
 from yaml_workflow.tasks import TaskConfig
 from yaml_workflow.tasks.batch import batch_task
+from yaml_workflow.tasks.batch_context import BatchContext
 
 
 @pytest.fixture
@@ -362,3 +364,103 @@ result = f"Processed {batch['item']}"
     assert result["stats"]["total"] == 10
     assert result["stats"]["processed"] == 10
     assert result["stats"]["failed"] == 0
+
+
+# Mock TaskConfig for testing BatchContext independently
+@pytest.fixture
+def mock_task_config():
+    config = Mock()
+    config.name = "my_batch_task"
+    config.workspace = "/fake/workspace"
+    config.inputs = {"retry": {"attempts": 3}}
+    # Simulate the internal context structure
+    config._context = {
+        "args": {"arg1": "val1"},
+        "env": {"var1": "env_val1"},
+        "steps": {"prev_step": {"result": "prev_result"}},
+        "engine": Mock(),  # Mock the engine object if needed
+    }
+    # Mock the get_variable method if BatchContext uses it
+    config.get_variable = MagicMock(return_value=config._context.get("engine"))
+    return config
+
+
+# --- Tests for BatchContext ---
+
+
+def test_batch_context_init(mock_task_config):
+    """Test BatchContext initialization."""
+    batch_ctx = BatchContext(mock_task_config)
+    assert batch_ctx.name == "my_batch_task"
+    assert batch_ctx.workspace == "/fake/workspace"
+    assert batch_ctx.retry_config == {"attempts": 3}
+    assert batch_ctx._context == mock_task_config._context
+    assert batch_ctx.engine is not None  # Check if engine was retrieved
+
+
+def test_batch_context_create_item_context(mock_task_config):
+    """Test creating context for a single batch item."""
+    batch_ctx = BatchContext(mock_task_config)
+    item = {"id": 101, "value": "data"}
+    index = 5
+    item_context = batch_ctx.create_item_context(item, index)
+
+    # Check copied namespaces
+    assert item_context["args"] == {"arg1": "val1"}
+    assert item_context["env"] == {"var1": "env_val1"}
+    assert item_context["steps"] == {"prev_step": {"result": "prev_result"}}
+
+    # Check new batch namespace
+    assert "batch" in item_context
+    assert item_context["batch"]["item"] == item
+    assert item_context["batch"]["index"] == index
+    assert item_context["batch"]["name"] == "my_batch_task"
+
+    # Ensure original context wasn't modified (though create_item_context doesn't modify)
+    assert mock_task_config._context == {
+        "args": {"arg1": "val1"},
+        "env": {"var1": "env_val1"},
+        "steps": {"prev_step": {"result": "prev_result"}},
+        "engine": mock_task_config._context["engine"],
+    }
+
+
+def test_batch_context_get_available_variables(mock_task_config):
+    """Test getting available variables grouped by namespace."""
+    batch_ctx = BatchContext(mock_task_config)
+    variables = batch_ctx.get_available_variables()
+
+    assert "args" in variables
+    assert variables["args"] == ["arg1"]
+    assert "env" in variables
+    assert variables["env"] == ["var1"]
+    assert "steps" in variables
+    assert variables["steps"] == ["prev_step"]
+    assert "batch" in variables
+    assert variables["batch"] == ["item", "index", "name"]
+
+
+def test_batch_context_get_error_context(mock_task_config):
+    """Test getting error context information."""
+    batch_ctx = BatchContext(mock_task_config)
+    try:
+        raise ValueError("Something went wrong")
+    except ValueError as e:
+        error_context = batch_ctx.get_error_context(e)
+
+        assert "error" in error_context
+        assert error_context["error"] == "Something went wrong"
+
+        assert "available_variables" in error_context
+        assert error_context["available_variables"]["args"] == ["arg1"]
+        assert error_context["available_variables"]["batch"] == [
+            "item",
+            "index",
+            "name",
+        ]
+
+        assert "namespaces" in error_context
+        # Includes 'engine' from the mock config
+        assert sorted(error_context["namespaces"]) == sorted(
+            ["args", "env", "steps", "engine"]
+        )

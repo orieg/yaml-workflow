@@ -749,9 +749,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-handling-flows" class="md-nav__link">
+  <a href="#error-handling-actions-when-to-use-what" class="md-nav__link">
     <span class="md-ellipsis">
-      Error Handling Flows
+      Error Handling Actions: When to Use What
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling-flows-action-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling Flows (action: next)
     </span>
   </a>
   
@@ -1442,9 +1451,18 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#error-handling-flows" class="md-nav__link">
+  <a href="#error-handling-actions-when-to-use-what" class="md-nav__link">
     <span class="md-ellipsis">
-      Error Handling Flows
+      Error Handling Actions: When to Use What
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling-flows-action-next" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling Flows (action: next)
     </span>
   </a>
   
@@ -1498,11 +1516,12 @@
 <li><strong>State Management</strong>: The engine tracks the status of each step (completed, failed, skipped) and the overall workflow status.</li>
 </ul>
 <h2 id="step-level-error-handling-on_error">Step-Level Error Handling (<code>on_error</code>)<a class="headerlink" href="#step-level-error-handling-on_error" title="Permanent link">&para;</a></h2>
+<p><em>For a runnable example demonstrating the concepts below (retry, continue, next, error messages), see <code>docs/examples/error_handling/workflow.yaml</code>.</em></p>
 <p>You can define how a step should react to its own failure using the <code>on_error</code> block within the step definition.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">steps</span><span class="p">:</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">risky_api_call</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">api_call</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">inputs</span><span class="p">:</span><span class="w"> </span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">inputs</span><span class="p">:</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">env.API_URL</span><span class="nv"> </span><span class="s">}}/data&quot;</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="nt">on_error</span><span class="p">:</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">retry</span><span class="w"> </span><span class="c1"># or fail, continue, next</span>
@@ -1523,28 +1542,32 @@
 </ul>
 <h3 id="custom-error-message-message">Custom Error Message (<code>message</code>)<a class="headerlink" href="#custom-error-message-message" title="Permanent link">&para;</a></h3>
 <ul>
-<li>You can provide a custom error message template using <code>message</code>.</li>
-<li>This template can use Jinja2 syntax and access context variables (<code>args</code>, <code>env</code>, <code>steps</code>).</li>
-<li>Crucially, it can access details about the error via the <code>error</code> variable. </li>
-<li><code>{{ error }}</code>: Typically the string representation of the <em>original</em> exception that caused the failure.</li>
-<li><code>{{ error.step_name }}</code>: Name of the step that failed.</li>
-<li><code>{{ error.task_type }}</code>: Type of the task that failed.</li>
-<li><code>{{ error.retry_count }}</code>: Current retry attempt number (if applicable).</li>
-<li>The <em>resolved</em> message is stored in the workflow state as the failure reason for the step and used in logs.</li>
+<li>You can provide a custom error message template using <code>message</code> for logging and state tracking.</li>
+<li>This template can use Jinja2 syntax and access standard context variables (<code>args</code>, <code>env</code>, <code>steps</code>).</li>
+<li>It can also access the core error details using the <code>error</code> variable:</li>
+<li><code>{{ error }}</code>: Provides the primary error information, often the string representation of the <em>original</em> exception that caused the failure (e.g., "FileNotFoundError: [Errno 2] No such file or directory...").</li>
+<li>The resolved <code>message</code> is stored in the workflow state for the failed step (e.g., accessible later via <code>steps.FAILED_STEP_NAME.error_message</code>) and is used in logs. Use this pattern to access formatted error messages in subsequent error-handling steps.</li>
 </ul>
 <h2 id="retry-strategies">Retry Strategies<a class="headerlink" href="#retry-strategies" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Simple Retry</strong>: Use <code>action: retry</code> with <code>retry</code> and <code>delay</code> for transient issues (e.g., network timeouts, temporary API unavailability).</li>
+<li><strong>Simple Retry</strong>: Use <code>action: retry</code> with <code>retry</code> and <code>delay</code> for transient issues (e.g., network timeouts, temporary API unavailability). Best for idempotent operations where re-running is safe.</li>
 <li><strong>Retry with Backoff</strong>: While not built-in directly as an exponential backoff flag, you could potentially implement custom retry logic within a Python task if needed, though standard linear delay is often sufficient.</li>
 <li><strong>Global Retries</strong>: A global default retry count can potentially be set in workflow <code>settings</code> (implementation may vary).</li>
 </ul>
-<h2 id="error-handling-flows">Error Handling Flows<a class="headerlink" href="#error-handling-flows" title="Permanent link">&para;</a></h2>
+<h2 id="error-handling-actions-when-to-use-what">Error Handling Actions: When to Use What<a class="headerlink" href="#error-handling-actions-when-to-use-what" title="Permanent link">&para;</a></h2>
+<ul>
+<li><strong><code>fail</code> (Default):</strong> Use when any failure in the step is critical and the entire workflow should stop immediately.</li>
+<li><strong><code>retry</code>:</strong> Use for transient errors where re-running the step might succeed (e.g., network issues, temporary service unavailability). Ensure the step is safe to re-run (idempotent).</li>
+<li><strong><code>continue</code>:</strong> Use when a step's failure is non-critical, and the workflow can proceed meaningfully without its results. Subsequent steps should not depend directly on the output of the failed step.</li>
+<li><strong><code>next</code>:</strong> Use when a failure requires specific cleanup, compensation, or notification actions before potentially stopping or continuing the workflow. Redirects execution to a dedicated error-handling sequence.</li>
+</ul>
+<h2 id="error-handling-flows-action-next">Error Handling Flows (<code>action: next</code>)<a class="headerlink" href="#error-handling-flows-action-next" title="Permanent link">&para;</a></h2>
 <p>Use <code>action: next</code> to redirect the workflow to a dedicated error handling path.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">flows</span><span class="p">:</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">main_flow</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">definitions</span><span class="p">:</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">main_flow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">step_a</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">risky_step</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">step_c</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">error_flow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">log_error</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">notify_admin</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">error_flow</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">log_error</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">notify_admin</span><span class="p p-Indicator">]</span><span class="w"> </span><span class="c1"># Defines the sequence for the error path</span>
 <a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="nt">steps</span><span class="p">:</span>
 <a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step_a</span>
@@ -1554,8 +1577,8 @@
 <a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="w">    </span><span class="c1"># ...</span>
 <a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="w">    </span><span class="nt">on_error</span><span class="p">:</span>
 <a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">      </span><span class="nt">action</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">next</span>
-<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">      </span><span class="nt">next</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log_error</span><span class="w"> </span><span class="c1"># Jump to the error flow</span>
-<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">      </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Risky</span><span class="nv"> </span><span class="s">step</span><span class="nv"> </span><span class="s">failed</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">args.id</span><span class="nv"> </span><span class="s">}}:</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">error</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">      </span><span class="nt">next</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">log_error</span><span class="w"> </span><span class="c1"># Jump to the start of the error_flow sequence</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">      </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Risky</span><span class="nv"> </span><span class="s">step</span><span class="nv"> </span><span class="s">failed</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">args.id</span><span class="nv"> </span><span class="s">}}:</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">error</span><span class="nv"> </span><span class="s">}}&quot;</span><span class="w"> </span><span class="c1"># Custom message stored in state</span>
 <a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">step_c</span>
 <a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">    </span><span class="c1"># ... only runs if risky_step succeeds ...</span>
 <a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
@@ -1566,29 +1589,29 @@
 <a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="w">      </span><span class="nt">content</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
 <a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a><span class="w">        </span><span class="no">Workflow Failure Report</span>
 <a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a><span class="w">        </span><span class="no">-----------------------</span>
-<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">        </span><span class="no">Timestamp: {{ timestamp }}</span>
-<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">        </span><span class="no">Failed Step: {{ error.step_name }}</span>
-<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="w">        </span><span class="no">Reason: {{ steps[error.step_name].error_message }}  # Access the formatted message from state</span>
-<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="w">        </span><span class="no">Original Error: {{ error }}</span>
+<a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a><span class="w">        </span><span class="no">Timestamp: {{ workflow.timestamp }}</span>
+<a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a><span class="w">        </span><span class="no">Failed Step: {{ steps.risky_step.name }} {# Assumes &#39;risky_step&#39; is the one that failed #}</span>
+<a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a><span class="w">        </span><span class="no">Reason: {{ steps.risky_step.error_message }} {# Access the formatted message defined above #}</span>
+<a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a><span class="w">        </span><span class="no">Original Error: {{ steps.risky_step.error }} {# Access raw error if needed #}</span>
 <a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>
 <a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="w">        </span><span class="no">Context:</span>
 <a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a><span class="w">        </span><span class="no">Args: {{ args | tojson }}</span>
-<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">        </span><span class="no"># Add other relevant context</span>
-<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="w">    </span><span class="c1"># Note: This step runs *after* the risky_step failed.</span>
-<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="w">    </span><span class="c1"># It can access the error details via the context implicitly populated by the engine.</span>
+<a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a><span class="w">        </span><span class="no"># Add other relevant context if available</span>
+<a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a><span class="w">    </span><span class="c1"># Note: This step runs *after* the risky_step failed and was redirected here.</span>
+<a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="w">    </span><span class="c1"># It accesses the state (name, error_message, error) of the failed step.</span>
 <a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>
 <a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">notify_admin</span>
 <a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">slack_notify</span><span class="w"> </span><span class="c1"># Example custom task</span>
 <a id="__codelineno-1-40" name="__codelineno-1-40" href="#__codelineno-1-40"></a><span class="w">    </span><span class="nt">inputs</span><span class="p">:</span>
 <a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a><span class="w">      </span><span class="nt">channel</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;#alerts&quot;</span>
-<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a><span class="w">      </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Workflow</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">workflow_name</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">failed</span><span class="nv"> </span><span class="s">at</span><span class="nv"> </span><span class="s">step</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">error.step_name</span><span class="nv"> </span><span class="s">}}.</span><span class="nv"> </span><span class="s">See</span><span class="nv"> </span><span class="s">error_log.txt</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">details.&quot;</span>
+<a id="__codelineno-1-42" name="__codelineno-1-42" href="#__codelineno-1-42"></a><span class="w">      </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Workflow</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">workflow.name</span><span class="nv"> </span><span class="s">}}</span><span class="nv"> </span><span class="s">failed</span><span class="nv"> </span><span class="s">at</span><span class="nv"> </span><span class="s">step</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">steps.risky_step.name</span><span class="nv"> </span><span class="s">}}.</span><span class="nv"> </span><span class="s">Reason:</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">steps.risky_step.error_message</span><span class="nv"> </span><span class="s">}}.</span><span class="nv"> </span><span class="s">See</span><span class="nv"> </span><span class="s">error_log.txt</span><span class="nv"> </span><span class="s">for</span><span class="nv"> </span><span class="s">details.&quot;</span>
 </code></pre></div>
 <h2 id="error-propagation">Error Propagation<a class="headerlink" href="#error-propagation" title="Permanent link">&para;</a></h2>
 <ul>
 <li>When a step fails and the action is <code>fail</code> (or retries are exhausted with no <code>continue</code>/<code>next</code>), the engine wraps the original exception (or the <code>TaskExecutionError</code> created by <code>handle_task_error</code>) within a <code>WorkflowError</code> and halts execution.</li>
 <li>The <code>WorkflowError</code> contains information about the step that failed and often includes the original exception as its cause (<code>__cause__</code> or an <code>original_error</code> attribute), allowing programmatic inspection if the engine is used as a library.</li>
 <li>If <code>action: continue</code> is used, the error is logged and recorded in the state, but execution proceeds.</li>
-<li>If <code>action: next</code> is used, the error context is preserved, and the workflow jumps to the specified step.</li>
+<li>If <code>action: next</code> is used, the error context is preserved in the failed step's state, and the workflow jumps to the specified step.</li>
 </ul>
 <h2 id="centralized-error-handling-in-custom-tasks">Centralized Error Handling in Custom Tasks<a class="headerlink" href="#centralized-error-handling-in-custom-tasks" title="Permanent link">&para;</a></h2>
 <p>As detailed in the <a href="../task-development/#error-handling-best-practices">Task Development Guide</a>, custom Python tasks should use the <code>handle_task_error</code> utility. This ensures:
