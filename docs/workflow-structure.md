@@ -110,7 +110,7 @@ steps:
       
       # Access step outputs
       data: "{{ steps.transform.result }}"
-      metadata: "{{ steps.transform.metadata }}"
+      metadata: "{{ steps.transform.result.metadata }}"
       
       # Access workflow information
       workspace: "{{ workflow.workspace }}"
@@ -161,7 +161,7 @@ steps:
     condition: "{{ args.input_file is defined }}"
   
   - name: transform
-    condition: "{{ steps.validate.status == 'completed' }}"
+    condition: "{{ steps.validate.result.status == 'completed' }}"
 ```
 
 ## Error Handling

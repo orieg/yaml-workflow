@@ -127,7 +127,7 @@ steps:
   - name: batch_process
     task: batch
     inputs:
-      items: "{{ steps.get_items.output }}"
+      items: "{{ steps.get_items.result }}"
       task:
         task: python
         inputs:

@@ -1,0 +1,68 @@
+# docs/examples/flows/workflow.yaml
+
+name: Workflow with Multiple Flows
+description: Demonstrates defining and using different execution flows.
+
+params:
+  input_data:
+    type: string
+    default: "sample.txt"
+    description: "Input data file (used conceptually)."
+  skip_cleanup:
+    type: boolean
+    default: false
+    description: "Whether to skip the cleanup step in the main flow."
+
+steps:
+  - name: validate_input
+    task: echo
+    inputs:
+      message: "Validating input: {{ args.input_data }}..."
+
+  - name: process_data
+    task: echo
+    inputs:
+      message: "Processing data from {{ args.input_data }}..."
+
+  - name: generate_report
+    task: echo
+    inputs:
+      message: "Generating report based on {{ steps.process_data.result }}..."
+
+  - name: cleanup_temp_files
+    task: echo
+    condition: "{{ not args.skip_cleanup }}" # Only run if skip_cleanup is false
+    inputs:
+      message: "Cleaning up temporary files..."
+
+flows:
+  default: main_process # The flow that runs by default
+
+  definitions:
+    # The main sequence of operations
+    - main_process:
+        - validate_input
+        - process_data
+        - generate_report
+        - cleanup_temp_files # Cleanup is part of the main flow
+
+    # A flow that only performs validation
+    - validation_only:
+        - validate_input
+
+    # A flow that only performs cleanup
+    - cleanup_only:
+        - cleanup_temp_files
+
+# How to run different flows:
+# 1. Run the default flow ('main_process'):
+#    yaml-workflow run docs/examples/flows/workflow.yaml
+#
+# 2. Run the validation flow only:
+#    yaml-workflow run docs/examples/flows/workflow.yaml --flow validation_only
+#
+# 3. Run the cleanup flow only:
+#    yaml-workflow run docs/examples/flows/workflow.yaml --flow cleanup_only
+#
+# 4. Run the main flow but skip cleanup via parameter:
+#    yaml-workflow run docs/examples/flows/workflow.yaml skip_cleanup=true 

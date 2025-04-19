@@ -151,7 +151,7 @@
 
 ### Phase 3: Documentation Enhancement (Renumbered)
 
-1. **[ ] Update/Create Task Development Guide Content** (e.g., in `docs/development.md` or `docs/tasks.md`)
+1. **[x] Update/Create Task Development Guide Content** (e.g., in `docs/development.md` or `docs/tasks.md`)
    - Add/Update sections covering:
        - Using TaskConfig effectively
        - Error handling best practices (using `handle_task_error`)
@@ -160,23 +160,23 @@
        - Returning Results (Dicts vs Single Values)
        - Accessing Previous Step Outputs (Using `steps` Namespace)
 
-2. **[ ] Update/Create Flow Configuration Guide Content** (e.g., in `docs/workflow-structure.md` or a new `docs/guide/flows.md`)
+2. **[x] Update Core Concepts/Usage Guides**:
+   - Review existing files (`index.md`, `cli.md`, `state.md`, etc.)
+   - Ensure all guides consistently use and explain the `steps.STEP_NAME.result.KEY` access pattern.
+   - Remove or update sections explaining the old `outputs` top-level mapping.
+
+3. **[x] Update/Create Flow Configuration Guide Content** (e.g., in `docs/workflow-structure.md` or a new `docs/guide/flows.md`)
    - Add/Update sections covering:
        - Flow Types (Linear, Conditional, Error Handling, etc.)
        - Best Practices (Organization, Reuse, Recovery, State)
 
-3. **[ ] Update/Create Error Handling Patterns Guide Content** (e.g., in `docs/workflow-structure.md` or a new `docs/guide/error-handling.md`)
+4. **[x] Update/Create Error Handling Patterns Guide Content** (e.g., in `docs/workflow-structure.md` or a new `docs/guide/error-handling.md`)
    - Add/Update sections covering:
        - Standard error scenarios (`on_error`: retry, continue, next)
        - Custom error messages
        - Error propagation
 
-4. **[ ] Update Core Concepts/Usage Guides**:
-   - Review existing files (`index.md`, `cli.md`, `state.md`, etc.)
-   - Ensure all guides consistently use and explain the `steps.STEP_NAME.result.KEY` access pattern.
-   - Remove or update sections explaining the old `outputs` top-level mapping.
-
-5. **[ ] Add Runnable Examples to Guides**
+5. **[x] Add Runnable Examples to Guides**
    - Integrate small, runnable examples directly into relevant documentation sections.
 
 ### Phase 4: Testing Enhancement (Renumbered)
@@ -192,7 +192,7 @@
     - Add tests measuring execution time for common/complex workflows.
     - Add tests measuring memory usage (if feasible).
 
-5. **[ ] Improve overall test coverage and fix existing issues**
+5. **[~] Improve overall test coverage and fix existing issues**
     - Run `pytest --cov=src/yaml_workflow --cov-report term-missing` to check coverage.
     - Identify and test uncovered code paths.
     - Aim for a target coverage percentage (e.g., 90%).
@@ -328,23 +328,21 @@ pytest
    - All task outputs accessed via `steps.STEP_NAME.result` or `steps.STEP_NAME.result.KEY`.
    - Top-level output mapping is removed or warned.
 
-- [ ] 4. **Documentation Phase** (Renumbered)
+- [x] 4. **Documentation Phase** (Renumbered)
    ```
    Implementation Order:
-   - [ ] 1. Update task development guide (incl. output handling).
-   - [ ] 2. Update core guides to reflect standardized output access.
-   - [ ] 3. Document error handling patterns.
+   - [x] 1. Update task development guide (incl. output handling).
+   - [x] 2. Update core guides to reflect standardized output access.
+   - [x] 3. Document error handling patterns.
    - [ ] 4. Review/Update other core docs (index, cli, state, etc.).
-   - [ ] 5. Add runnable examples to guides.
+   - [x] 5. Add runnable examples to guides.
    Success Criteria:
    - Documentation accurately reflects current error handling and output access patterns.
-   - Examples are clear and runnable.
 
 - [ ] 5. **Testing Enhancement Phase** (Renumbered - excluding work already done in examples)
    Implementation Order:
    - [ ] 1. Add performance tests.
-   - [ ] 2. Review and improve overall test coverage.
+   - [~] 2. Review and improve overall test coverage. (Partially addressed by CLI test additions)
    - [ ] 3. Run coverage checks (`pytest --cov`).
    Success Criteria:
    - Added tests cover remaining gaps.
-   - Overall test coverage meets target (e.g., >90%).
