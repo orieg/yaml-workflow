@@ -334,7 +334,7 @@ pytest
    - [x] 1. Update task development guide (incl. output handling).
    - [x] 2. Update core guides to reflect standardized output access.
    - [x] 3. Document error handling patterns.
-   - [ ] 4. Review/Update other core docs (index, cli, state, etc.).
+   - [x] 4. Review/Update other core docs (index, cli, state, etc.).
    - [x] 5. Add runnable examples to guides.
    Success Criteria:
    - Documentation accurately reflects current error handling and output access patterns.
