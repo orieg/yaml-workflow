@@ -47,9 +47,9 @@ def process_with_config(data_key: str, config: TaskConfig) -> str:
     logging.info(
         f"Task 'process_with_config': Accessing context['{data_key}'] via config"
     )
-    full_context = config._context
+    full_context = config.context
     data_to_process = full_context.get(data_key, "Default Data")
-    workspace_path = getattr(config.workspace, "path", config.workspace)
+    workspace_path = config.workspace.path
     logging.info(
         f"Task 'process_with_config': Processing data '{data_to_process}' in workspace {workspace_path}"
     )

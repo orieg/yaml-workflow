@@ -1336,6 +1336,39 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#creating-custom-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating Custom Tasks
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Creating Custom Tasks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-register_task-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using the @register_task Decorator
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-yaml-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example YAML Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1582,6 +1615,39 @@
       Package Configuration
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#creating-custom-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      Creating Custom Tasks
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Creating Custom Tasks">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-register_task-decorator" class="md-nav__link">
+    <span class="md-ellipsis">
+      Using the @register_task Decorator
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-yaml-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example YAML Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1981,6 +2047,101 @@
 <a id="__codelineno-22-47" name="__codelineno-22-47" href="#__codelineno-22-47"></a><span class="n">use_parentheses</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-22-48" name="__codelineno-22-48" href="#__codelineno-22-48"></a><span class="n">ensure_newline_before_comments</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-22-49" name="__codelineno-22-49" href="#__codelineno-22-49"></a><span class="n">line_length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">88</span><span class="w">  </span><span class="c1"># Match black&#39;s line length</span>
+</code></pre></div>
+<h2 id="creating-custom-tasks">Creating Custom Tasks<a class="headerlink" href="#creating-custom-tasks" title="Permanent link">&para;</a></h2>
+<p>The workflow engine allows you to extend its functionality by creating custom tasks written in Python. This guide covers the recommended way to define and register your own tasks.</p>
+<h3 id="using-the-register_task-decorator">Using the <code>@register_task</code> Decorator<a class="headerlink" href="#using-the-register_task-decorator" title="Permanent link">&para;</a></h3>
+<p>The simplest and preferred way to create a custom task is by using the <code>@register_task</code> decorator found in <code>yaml_workflow.tasks</code>.</p>
+<p>Below is a brief example. For the full runnable code, see:
+*   Python task definitions: <code>docs/examples/custom_tasks/my_tasks.py</code>
+*   Example workflow YAML: <code>docs/examples/custom_tasks/workflow.yaml</code></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># Example snippet from docs/examples/custom_tasks/my_tasks.py</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">yaml_workflow.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_task</span><span class="p">,</span> <span class="n">TaskConfig</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<a id="__codelineno-23-4" name="__codelineno-23-4" href="#__codelineno-23-4"></a>
+<a id="__codelineno-23-5" name="__codelineno-23-5" href="#__codelineno-23-5"></a><span class="nd">@register_task</span><span class="p">()</span> <span class="c1"># Register with default name &#39;multiply_by&#39;</span>
+<a id="__codelineno-23-6" name="__codelineno-23-6" href="#__codelineno-23-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">multiply_by</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">multiplier</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-23-7" name="__codelineno-23-7" href="#__codelineno-23-7"></a>    <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Task &#39;multiply_by&#39;: Multiplying </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2"> by </span><span class="si">{</span><span class="n">multiplier</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-23-8" name="__codelineno-23-8" href="#__codelineno-23-8"></a>    <span class="k">return</span> <span class="n">value</span> <span class="o">*</span> <span class="n">multiplier</span>
+<a id="__codelineno-23-9" name="__codelineno-23-9" href="#__codelineno-23-9"></a>
+<a id="__codelineno-23-10" name="__codelineno-23-10" href="#__codelineno-23-10"></a><span class="nd">@register_task</span><span class="p">(</span><span class="s2">&quot;custom_greeting&quot;</span><span class="p">)</span> <span class="c1"># Register with custom name</span>
+<a id="__codelineno-23-11" name="__codelineno-23-11" href="#__codelineno-23-11"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_special_greeting</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-23-12" name="__codelineno-23-12" href="#__codelineno-23-12"></a>    <span class="c1"># ... implementation ...</span>
+<a id="__codelineno-23-13" name="__codelineno-23-13" href="#__codelineno-23-13"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;✨ Special Greeting for </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">! ✨&quot;</span>
+<a id="__codelineno-23-14" name="__codelineno-23-14" href="#__codelineno-23-14"></a>
+<a id="__codelineno-23-15" name="__codelineno-23-15" href="#__codelineno-23-15"></a><span class="c1"># ... other examples including using TaskConfig ...</span>
+</code></pre></div>
+<p><strong>Key Concepts:</strong></p>
+<ol>
+<li>
+<p><strong>Registration:</strong></p>
+<ul>
+<li>Import <code>register_task</code> from <code>yaml_workflow.tasks</code>.</li>
+<li>Decorate your Python function with <code>@register_task()</code>.</li>
+<li>By default, the task name used in the YAML workflow will be the function name (e.g., <code>multiply_by</code>).</li>
+<li>You can provide a custom name: <code>@register_task("custom_name")</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Input Handling (Automatic):</strong></p>
+<ul>
+<li>The decorator automatically handles mapping inputs defined in your YAML step to the function's parameters.</li>
+<li>Define parameters in your function signature with type hints (e.g., <code>value: int</code>, <code>multiplier: int = 2</code>).</li>
+<li>Inputs are automatically processed using the template engine (e.g., <code>value: "{{ steps.previous.result }}"</code>).</li>
+<li>Default values for arguments work as expected.</li>
+</ul>
+</li>
+<li>
+<p><strong>Accessing <code>TaskConfig</code> (Optional):</strong></p>
+<ul>
+<li>If your task needs access to the full context, workspace details, or other metadata, simply include <code>config: TaskConfig</code> as a parameter in your function definition.</li>
+<li>The decorator will detect this and pass the <code>TaskConfig</code> object to your function. You <strong>do not</strong> need to provide <code>config</code> in the YAML inputs.</li>
+<li>You can mix specific arguments and the <code>config</code> parameter.</li>
+</ul>
+</li>
+<li>
+<p><strong>Return Values:</strong></p>
+<ul>
+<li>Tasks can return any Python object (strings, numbers, lists, dictionaries, etc.).</li>
+<li>The returned value is automatically wrapped and stored in the context under <code>steps.YOUR_STEP_NAME.result</code>.</li>
+<li>Subsequent steps can access this result using templates like <code>{{ steps.YOUR_STEP_NAME.result }}</code>. If the result is a dictionary, access specific keys like <code>{{ steps.YOUR_STEP_NAME.result.key }}</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Error Handling:</strong></p>
+<ul>
+<li>Standard Python exceptions raised within your task will be caught by the engine and will typically cause the workflow to fail (unless <code>on_error</code> is configured for the step).</li>
+<li>For more controlled error handling specific to the workflow engine (e.g., custom error types recognized by <code>on_error</code> logic), you can import and raise exceptions from <code>yaml_workflow.exceptions</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Discovery:</strong></p>
+<ul>
+<li>Ensure the Python module containing your decorated task functions is imported somewhere in your project <em>before</em> the workflow runs, so the decorators execute and register the tasks. A common pattern is to import them in your project's main <code>__init__.py</code> or a dedicated <code>tasks.py</code> module that is imported early.</li>
+</ul>
+</li>
+</ol>
+<h3 id="example-yaml-usage">Example YAML Usage<a class="headerlink" href="#example-yaml-usage" title="Permanent link">&para;</a></h3>
+<p>This snippet shows how the custom tasks defined above might be used in a workflow. See <code>docs/examples/custom_tasks/workflow.yaml</code> for the complete runnable example.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># Example snippet from docs/examples/custom_tasks/workflow.yaml</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="nt">steps</span><span class="p">:</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">multiply_step</span>
+<a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">multiply_by</span><span class="w"> </span><span class="c1"># Uses the function name</span>
+<a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="w">    </span><span class="nt">inputs</span><span class="p">:</span>
+<a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="w">      </span><span class="nt">value</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">args.initial_value</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">default(10)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="w">      </span><span class="nt">multiplier</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span><span class="w"> </span><span class="c1"># Override default</span>
+<a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a>
+<a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">show_multiply_result</span>
+<a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">echo</span><span class="w"> </span><span class="c1"># Use a built-in task to show the result</span>
+<a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a><span class="w">    </span><span class="nt">inputs</span><span class="p">:</span>
+<a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a><span class="w">      </span><span class="nt">message</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Multiplication</span><span class="nv"> </span><span class="s">Result:</span><span class="nv"> </span><span class="s">{{</span><span class="nv"> </span><span class="s">steps.multiply_step.result</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a>
+<a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">greeting_step</span>
+<a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">custom_greeting</span><span class="w"> </span><span class="c1"># Uses the custom registered name</span>
+<a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a><span class="w">    </span><span class="nt">inputs</span><span class="p">:</span>
+<a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a><span class="w">      </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">args.user_name</span><span class="nv"> </span><span class="s">|</span><span class="nv"> </span><span class="s">default(&#39;Example</span><span class="nv"> </span><span class="s">User&#39;)</span><span class="nv"> </span><span class="s">}}&quot;</span>
+<a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a>
+<a id="__codelineno-24-19" name="__codelineno-24-19" href="#__codelineno-24-19"></a><span class="w">  </span><span class="c1"># ... other steps using process_with_config ...</span>
 </code></pre></div>
 
 

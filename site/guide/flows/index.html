@@ -702,6 +702,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interaction-with-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      Interaction with Resume
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#best-practices" class="md-nav__link">
     <span class="md-ellipsis">
       Best Practices
@@ -1376,6 +1385,15 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#interaction-with-resume" class="md-nav__link">
+    <span class="md-ellipsis">
+      Interaction with Resume
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#best-practices" class="md-nav__link">
     <span class="md-ellipsis">
       Best Practices
@@ -1407,6 +1425,7 @@
 <p>YAML Workflow allows you to define specific execution paths, called <strong>flows</strong>, through the steps defined in your workflow. This enables more complex logic, such as running only a subset of steps, defining specific error handling paths, or having different execution sequences based on parameters.</p>
 <h2 id="defining-flows">Defining Flows<a class="headerlink" href="#defining-flows" title="Permanent link">&para;</a></h2>
 <p>Flows are defined within the optional top-level <code>flows</code> block in your workflow YAML file.</p>
+<p><em>For a runnable example demonstrating the concepts below, see <code>docs/examples/flows/workflow.yaml</code>.</em></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">My Workflow with Flows</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">params</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">{</span><span class="w"> </span><span class="nv">...</span><span class="w"> </span><span class="p p-Indicator">}</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nt">steps</span><span class="p">:</span>
@@ -1453,21 +1472,37 @@
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>yaml-workflow<span class="w"> </span>run<span class="w"> </span>my_workflow.yaml<span class="w"> </span>--flow<span class="w"> </span>short_flow
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Run the default flow (if defined, otherwise might error or run all steps)</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>yaml-workflow<span class="w"> </span>run<span class="w"> </span>my_workflow.yaml<span class="w"> </span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>yaml-workflow<span class="w"> </span>run<span class="w"> </span>my_workflow.yaml
 </code></pre></div>
 <h2 id="use-cases-for-flows">Use Cases for Flows<a class="headerlink" href="#use-cases-for-flows" title="Permanent link">&para;</a></h2>
+<p>Flows allow for more structured and flexible workflow execution. Common use cases include:</p>
 <ol>
-<li><strong>Subset Execution:</strong> Run only a specific sequence of steps for certain scenarios (e.g., a setup flow, a teardown flow, a testing flow).</li>
-<li><strong>Conditional Logic (High-Level):</strong> While fine-grained conditions are handled by the <code>condition</code> key within individual steps, you could potentially have different flows triggered based on input parameters passed to the workflow script that <em>calls</em> <code>yaml-workflow run --flow ...</code>.</li>
-<li><strong>Error Handling Paths:</strong> As shown in the <a href="../error-handling/#error-handling-flows">Error Handling Guide</a>, the <code>on_error.next</code> key can target a specific step. By defining flows consisting of error handling steps, you can create structured error recovery or notification sequences.</li>
+<li><strong>Standard Execution Path:</strong> Define a <code>default</code> flow that represents the normal, successful execution path of your core logic.</li>
+<li><strong>Subset Execution:</strong> Create shorter flows for specific tasks like:<ul>
+<li><em>Setup:</em> A flow that only runs initialization steps.</li>
+<li><em>Teardown:</em> A flow that only runs cleanup steps.</li>
+<li><em>Validation:</em> A flow that runs only validation steps.</li>
+<li><em>Testing:</em> A flow that runs a specific sequence for testing purposes.</li>
+</ul>
+</li>
+<li><strong>Conditional Logic (High-Level):</strong> While fine-grained conditions are handled by the <code>condition</code> key within individual steps, you could potentially have different flows triggered based on input parameters passed to an external script that <em>calls</em> <code>yaml-workflow run --flow ...</code>. For example, a script might run <code>--flow full_process</code> normally, but <code>--flow quick_check</code> if a specific flag is passed.</li>
+<li><strong>Error Handling Paths:</strong> As shown in the <a href="../error-handling/#error-handling-flows">Error Handling Guide</a>, the <code>on_error.next</code> key can target a specific step. By defining flows consisting of dedicated error handling or compensation steps (e.g., <code>cleanup_flow: [rollback_step, notify_failure]</code>), you can create structured error recovery or notification sequences triggered by step failures.</li>
 </ol>
 <p><strong>See Also:</strong> The <code>complex_flow_error_handling.yaml</code> file in the examples directory provides a practical demonstration of using different flows for standard execution, subset execution, and error handling paths.</p>
+<h2 id="interaction-with-resume">Interaction with Resume<a class="headerlink" href="#interaction-with-resume" title="Permanent link">&para;</a></h2>
+<p>When a workflow run fails within a specific flow (either the default or one specified via <code>--flow</code>), using the <code>--resume</code> flag on a subsequent run will:</p>
+<ol>
+<li>Attempt to restart the <strong>same flow</strong> that was originally executed.</li>
+<li>Start execution from the <strong>step that initially failed</strong>.</li>
+</ol>
+<p>The engine does not switch to a different flow automatically upon resuming.</p>
 <h2 id="best-practices">Best Practices<a class="headerlink" href="#best-practices" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>Clear Naming:</strong> Give your flows descriptive names.</li>
-<li><strong>Define a Default:</strong> If you use flows, define a <code>default</code> flow for standard execution and clarity.</li>
+<li><strong>Clear Naming:</strong> Give your flows descriptive names reflecting their purpose (e.g., <code>main_process</code>, <code>setup_resources</code>, <code>error_cleanup</code>).</li>
+<li><strong>Define a Default:</strong> If you use flows, define a <code>default</code> flow for the most common execution path and for clarity when no <code>--flow</code> is specified.</li>
+<li><strong>Step Reuse:</strong> Leverage flows to reuse the same underlying steps in different sequences, promoting modularity (e.g., a <code>validate</code> step might be part of <code>main_process</code> and also its own <code>validation_only</code> flow).</li>
 <li><strong>Validate Steps:</strong> Ensure all step names listed within a flow definition correspond to actual steps defined in the main <code>steps:</code> block. The engine performs validation, but checking beforehand is good practice.</li>
-<li><strong>Combine with <code>condition</code>:</strong> Use step-level <code>condition</code> keys for fine-grained conditional execution <em>within</em> a flow. Flows control the overall sequence, while <code>condition</code> controls whether an individual step in that sequence runs.</li>
+<li><strong>Combine with <code>condition</code>:</strong> Use step-level <code>condition</code> keys for fine-grained conditional execution <em>within</em> a flow. Flows control the overall sequence, while <code>condition</code> controls whether an individual step in that sequence runs based on the current context.</li>
 <li><strong>Keep Flows Focused:</strong> Avoid overly complex flows. If a flow becomes very long or has many branches, consider if refactoring the workflow or splitting it into multiple workflow files might be clearer. </li>
 </ul>
 
