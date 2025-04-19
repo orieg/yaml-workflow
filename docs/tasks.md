@@ -113,14 +113,17 @@ These are simple utility tasks for common operations:
 
 ## File Tasks
 
-Tasks for file operations with support for various formats:
+Tasks for file operations with support for various formats.
+
+**Path Resolution:** All relative paths specified in task inputs (`file_path`, `file`, `source`, `destination`) are resolved relative to the root of the workflow's workspace directory. To interact with files inside the standard `output/` directory, explicitly include the `output/` prefix in the path string (e.g., `output/my_file.txt`).
 
 ```yaml
 # Write a file
 - name: write_file_step
   task: write_file
   inputs:
-    file_path: "{{ args.output_dir }}/output.txt"
+    # Explicitly specify output/ for files in the output directory
+    file: "output/{{ args.output_dir }}/output.txt"
     content: "{{ steps.previous.result.content }}"
     encoding: "utf-8"  # Optional, defaults to utf-8
 
@@ -128,7 +131,7 @@ Tasks for file operations with support for various formats:
 - name: write_json_step
   task: write_json
   inputs:
-    file_path: "data.json"
+    file: "output/data.json" # Added output/ prefix
     data: 
       key: "{{ args.value }}"
       timestamp: "{{ env.TIMESTAMP }}"
@@ -138,7 +141,7 @@ Tasks for file operations with support for various formats:
 - name: write_yaml_step
   task: write_yaml
   inputs:
-    file_path: "config.yaml"
+    file: "output/config.yaml" # Added output/ prefix
     data: 
       settings: "{{ steps.load_settings.result }}"
 
@@ -146,48 +149,56 @@ Tasks for file operations with support for various formats:
 - name: read_file_step
   task: read_file
   inputs:
-    file_path: "{{ args.input_file }}"
+    # Assuming input file might be outside output/
+    file: "{{ args.input_file }}"
+    # If reading from output/, use: file: "output/{{ args.input_file }}"
     encoding: "utf-8"  # Optional, defaults to utf-8
 
 # Read JSON file
 - name: read_json_step
   task: read_json
   inputs:
-    file_path: "{{ env.CONFIG_PATH }}"
+    # Assuming config might be at root or elsewhere
+    file: "{{ env.CONFIG_PATH }}"
+    # If reading from output/, use: file: "output/{{ env.CONFIG_PATH }}"
 
 # Read YAML file
 - name: read_yaml_step
   task: read_yaml
   inputs:
-    file_path: "{{ args.config_file }}"
+    # Assuming config might be at root or elsewhere
+    file: "{{ args.config_file }}"
+    # If reading from output/, use: file: "output/{{ args.config_file }}"
 
-# Append to a file
+# Append to a file (e.g., a log file in the logs/ directory)
 - name: append_file_step
   task: append_file
   inputs:
-    file_path: "{{ env.LOG_FILE }}"
+    file: "logs/workflow.log" # Example: Log file outside output/
+    # If appending to output/, use: file: "output/{{ env.LOG_FILE }}"
     content: "{{ steps.process.result }}"
     encoding: "utf-8"  # Optional, defaults to utf-8
 
-# Copy a file
+# Copy a file (e.g., from output/ to a backup dir)
 - name: copy_file_step
   task: copy_file
   inputs:
-    source: "{{ steps.download.result.output_file }}"
+    source: "output/{{ steps.download.result.output_file }}" # Added output/ prefix to source
+    # Assuming backup dir is at workspace root
     destination: "{{ env.BACKUP_DIR }}/{{ args.filename }}"
 
-# Move a file
+# Move a file (e.g., from a temp location in output/ to final location in output/)
 - name: move_file_step
   task: move_file
   inputs:
-    source: "{{ steps.process.result.temp_file }}"
-    destination: "{{ args.output_dir }}/final.txt"
+    source: "output/{{ steps.process.result.temp_file }}" # Added output/ prefix to source
+    destination: "output/{{ args.output_dir }}/final.txt" # Added output/ prefix to destination
 
-# Delete a file
+# Delete a file (e.g., a temp file in output/)
 - name: delete_file_step
   task: delete_file
   inputs:
-    file_path: "{{ steps.process.result.temp_file }}"
+    file: "output/{{ steps.process.result.temp_file }}" # Added output/ prefix
 ```
 
 ## Template Tasks
