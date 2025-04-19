@@ -9,6 +9,7 @@
    - Task registration via `register_task` decorator
    - Good separation of task types (file, shell, python, etc.)
    - Consistent error handling pattern but duplicated across tasks
+   - **Task output handling is inconsistent**: The `outputs` field allows mapping to top-level context, creating confusion alongside the more complete `steps` namespace.
 
 2. **Workflow Engine** (`src/yaml_workflow/engine.py`)
    - Robust workflow execution with flow support
@@ -33,8 +34,9 @@
 2. **Documentation Gaps**
    - Advanced error handling strategies
    - Flow configuration best practices
-   - Task development guidelines
+   - Task development guidelines (including output handling)
    - Type system usage
+   - **Clear explanation of standardized output access (`steps` namespace)**
 
 ### Testing Coverage
 
@@ -43,6 +45,8 @@
    - Template resolution
    - State management
    - CLI operations
+   - **Verification of standardized output access (`steps` namespace)**
+   - **Tests relying on deprecated top-level output mapping need updates**
 
 2. **Testing Gaps**
    - Complex error scenarios
@@ -115,65 +119,152 @@
    - Standardize error messages
    - Add error context helpers
 
-### Phase 2: Documentation Enhancement
+3. **Standardize error messages**
+   - Update task implementations to use centralized error handling
+   - Remove duplicate try/except blocks
+   - Standardize error messages
+   - Add error context helpers
 
-1. **Task Development Guide** (`docs/guide/task-development.md`)
-   ```markdown
-   # Task Development Guide
-   
-   ## Creating New Tasks
-   - Using TaskConfig effectively
-   - Error handling best practices
-   - Type safety guidelines
-   - Testing requirements
-   
-   ## Error Handling Patterns
-   - Standard error scenarios
-   - Custom error messages
-   - Retry strategies
-   - Error propagation
-   ```
+4. **Add error context helpers**
+   - Update task implementations to use centralized error handling
+   - Remove duplicate try/except blocks
+   - Standardize error messages
+   - Add error context helpers
 
-2. **Flow Configuration Guide** (`docs/guide/flows.md`)
-   ```markdown
-   # Flow Configuration Guide
-   
-   ## Flow Types
-   - Linear flows
-   - Conditional flows
-   - Error handling flows
-   - Parallel execution
-   
-   ## Best Practices
-   - Flow organization
-   - Step reuse
-   - Error recovery
-   - State management
-   ```
+### Phase 2: Standardize Task Output Handling & Access
 
-### Phase 3: Testing Enhancement
+**Goal:** Simplify and standardize how task outputs are stored and accessed, eliminating the confusing top-level `outputs` mapping in favor of the `steps` namespace.
 
-1. **Error Scenario Tests**
-   ```python
-   def test_complex_error_handling():
-       """Test complex error scenarios with multiple handlers."""
-       # Test error propagation
-       # Test retry behavior
-       # Test notification chains
-       # Test error recovery
-   ```
+1.  **Engine Refinement (`engine.py`)**: 
+    - Remove the logic within `execute_step` that handles mapping outputs to the top-level context when `outputs` is a string or dict. 
+    - Add deprecation warnings initially if complete removal is too breaking.
+    - Ensure the `steps` namespace (`self.context['steps'][step_name]`) consistently stores the full task result (wrapping non-dicts in `{"result": value}`).
 
-2. **Flow Transition Tests**
-   ```python
-   def test_flow_transitions():
-       """Test transitions between different flows."""
-       # Test flow switching
-       # Test state preservation
-       # Test variable scope
-       # Test error recovery
-   ```
+2.  **Task Review & Update (`tasks/`)**:
+    - Review built-in tasks (e.g., `echo_task` in `builtin_tasks.py`) to ensure they return appropriate dictionary structures or single values directly (instead of `str(value)`).
+    - Ensure task return values align with the expectation that they will be accessed via `steps.STEP_NAME.KEY` (using `result` as the key for wrapped non-dict returns).
 
-## Implementation Strategy
+3.  **Update Examples (`examples/`)**:
+    - Modify all example YAML files (`complex_flow_error_handling.yaml`, `advanced_hello_world.yaml`, etc.) to access previous step outputs *exclusively* using the `{{ steps.STEP_NAME.KEY }}` pattern.
+    - Remove any usage of the `outputs` field for top-level mapping.
+
+4.  **Add Tests for Standardized Access (`tests/`)**:
+    - Add specific tests verifying that results are correctly stored and accessible via the `steps` namespace for various task types (dict return, non-dict return).
+    - Update any existing tests that relied on the deprecated top-level output mapping.
+
+### Phase 3: Documentation Enhancement (Renumbered)
+
+1.  **Task Development Guide** (`docs/guide/task-development.md`)
+    ```markdown
+    # Task Development Guide
+    
+    ## Creating New Tasks
+    - Using TaskConfig effectively
+    - Error handling best practices
+    - Type safety guidelines
+    - Testing requirements
+    
+    ## Error Handling Patterns
+    - Standard error scenarios
+    - Custom error messages
+    - Retry strategies
+    - Error propagation
+    - **Returning Results (Dicts vs Single Values)**
+    - **Accessing Previous Step Outputs (Using `steps` Namespace)**
+    ```
+
+2.  **Flow Configuration Guide** (`docs/guide/flows.md`)
+    ```markdown
+    # Flow Configuration Guide
+    
+    ## Flow Types
+    - Linear flows
+    - Conditional flows
+    - Error handling flows
+    - Parallel execution
+    
+    ## Best Practices
+    - Flow organization
+    - Step reuse
+    - Error recovery
+    - State management
+    ```
+
+3.  **Error Handling Patterns Guide** (`docs/guide/error-handling.md`)
+    ```markdown
+    # Error Handling Patterns Guide
+    
+    ## Error Handling Patterns
+    - Standard error scenarios
+    - Custom error messages
+    - Retry strategies
+    - Error propagation
+    ```
+
+4.  **Update Core Concepts/Usage Guides**:
+    - Ensure all guides consistently use and explain the `steps.STEP_NAME.KEY` access pattern.
+    - Remove or update sections explaining the old `outputs` top-level mapping.
+
+5.  **Add Runnable Examples to Guides**
+    ```markdown
+    # Runnable Examples
+    - Example 1: Basic Task Usage
+    - Example 2: Error Handling
+    - Example 3: Flow Configuration
+    - Example 4: State Management
+    ```
+
+### Phase 4: Testing Enhancement (Renumbered)
+
+1.  **Add specific complex error scenario tests**
+    ```python
+    def test_complex_error_handling():
+        """Test complex error scenarios with multiple handlers."""
+        # Test error propagation
+        # Test retry behavior
+        # Test notification chains
+        # Test error recovery
+    ```
+
+2. **Add specific flow transition tests**
+    ```python
+    def test_flow_transitions():
+        """Test transitions between different flows."""
+        # Test flow switching
+        # Test state preservation
+        # Test variable scope
+        # Test error recovery
+    ```
+
+3. **Add example workflow integration tests** (`tests/test_examples.py`)
+    ```python
+    def test_example_workflow():
+        """Test example workflow integration."""
+        # Test workflow execution
+        # Test error handling
+        # Test state management
+        # Test flow transitions
+    ```
+
+4. **Add performance tests**
+    ```python
+    def test_performance():
+        """Test performance of the workflow."""
+        # Test execution time
+        # Test memory usage
+        # Test scalability
+    ```
+
+5. **Improve overall test coverage and fix existing issues**
+    ```python
+    def test_coverage():
+        """Test overall coverage and fix existing issues."""
+        # Test all tasks
+        # Test all flows
+        # Test all error scenarios
+    ```
+
+### Implementation Strategy
 
 ### Guidelines
 
@@ -183,14 +274,20 @@
    - Preserve error context
    - Clear error messages
 
-2. **Documentation**
-   - Update docs with code changes
+2. **Output Handling**
+   - Standardize on `steps.STEP_NAME.KEY` access.
+   - Ensure tasks return predictable structures (dicts or single values).
+   - Remove/Deprecate top-level context mapping via `outputs`.
+
+3. **Documentation**
+   - Update docs with code changes (error handling, output handling)
    - Include practical examples
    - Document error patterns
    - Add troubleshooting guides
 
-3. **Testing**
+4. **Testing**
    - Test error scenarios first
+   - **Test standardized output access patterns**
    - Maintain test coverage
    - Include edge cases
    - Document test patterns
@@ -288,7 +385,19 @@ pytest
    - No duplicate error code
    - Coverage > 90%
 
-- [ ] 3. **Documentation Phase**
+- [ ] 3. **Standardize Task Output Handling Phase**
+   Implementation Order:
+   1. Refine engine `execute_step` to remove/deprecate top-level output mapping.
+   2. Review and update tasks (e.g., `echo`) for consistent returns.
+   3. Update all examples to use `steps.` namespace.
+   4. Add/Update tests for `steps.` namespace access.
+   Success Criteria:
+   - Top-level output mapping is removed or warned.
+   - Tasks return consistent results.
+   - All examples and tests use `steps.` namespace correctly.
+   - Relevant tests pass.
+
+- [ ] 4. **Documentation Phase** (Renumbered)
    ```bash
    # Create/Verify doc files
    # touch docs/guide/task-development.md
@@ -296,29 +405,30 @@ pytest
    # touch docs/guide/error-handling.md
    ```
    Implementation Order:
-   1. Write task development guide
-   2. Document error handling patterns
-   3. Create flow configuration guide
-   4. Add runnable examples
+   1. Update task development guide (incl. output handling).
+   2. Update core guides to reflect standardized output access.
+   3. Document error handling patterns.
    Success Criteria:
    - All guides complete
    - Examples tested and working
    - No broken links
    - Documentation builds
 
-- [ ] 4. **Testing Phase**
+- [ ] 5. **Testing Phase** (Renumbered)
    ```bash
    # Create/Verify test files
    # touch tests/test_error_scenarios.py
    # touch tests/test_flow_transitions.py
    ```
    Implementation Order:
-   1. Implement error scenario tests
-   2. Add flow transition tests
-   3. Add performance tests
-   4. Verify coverage
+   - [x] 1. Add example workflow integration tests (`tests/test_examples.py`)
+   - [ ] 2. Implement specific error scenario tests
+   - [ ] 3. Add specific flow transition tests
+   - [ ] 4. **Update tests relying on old output mapping**
+   - [ ] 5. Add performance tests
+   - [ ] 6. Verify coverage
    Success Criteria:
-   - All tests pass
+   - All tests pass (including updated output access tests)
    - Coverage meets targets
    - Performance tests pass
    - Edge cases covered
@@ -376,7 +486,7 @@ git push    # Push to remote
    - Update `get_task_logger` for error state tracking
 
 3. **Task Updates**
-   Update each task file to use centralized error handling:
+   Update each task file to use centralized error handling and standardized inputs where applicable:
    ```python
    try:
        # task logic
@@ -393,8 +503,8 @@ git push    # Push to remote
    Order of updates:
    1. `base.py` - Core error utilities (Skipped/Defered - Handled within handle_task_error)
    - [x] 2. `config.py` - Error template handling
-   - [x] 3. `batch.py`, `batch_context.py` - Batch processing
-   - [x] 4. File operations: `file_tasks.py`, `file_utils.py`
+   - [x] 3. `batch.py` - Batch processing (Note: `batch_context.py` removed/merged)
+   - [x] 4. File operations: `file_tasks.py` - **Standardized `path` input**
    - [x] 5. Execution tasks: `python_tasks.py`
    - [x] 5. Execution tasks: `shell_tasks.py`
    - [x] 6. Template handling: `template_tasks.py`
