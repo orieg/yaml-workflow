@@ -50,14 +50,15 @@ def handle_task_error(context: ErrorContext) -> None:
     logger = get_task_logger(workspace, context.step_name)
     log_task_error(logger, context.error)
 
-    if not isinstance(context.error, TaskExecutionError):
-        # Wrap the original error
+    if isinstance(context.error, TaskExecutionError):
+        # If it's already a TaskExecutionError, just re-raise it.
+        # Its original_error should have been set correctly when it was created.
+        raise context.error
+    else:
+        # Wrap the original standard error in a TaskExecutionError
         raise TaskExecutionError(
             step_name=context.step_name,
             original_error=context.error,
             # Pass task_config if available, otherwise None
             task_config=context.task_config,
         )
-    else:
-        # Re-raise the original TaskExecutionError
-        raise context.error

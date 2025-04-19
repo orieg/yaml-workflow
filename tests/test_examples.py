@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 from contextlib import contextmanager
@@ -352,3 +353,57 @@ def test_resume_workflow(run_cli, example_workflows_dir, workspace_dir):
 
     assert exit_code != 0, "Resuming completed workflow should fail"
     assert "Cannot resume: workflow is not in failed state" in err
+
+
+# Get the root directory of the project based on the location of this file
+EXAMPLES_DIR = Path(__file__).parent.parent / "src" / "yaml_workflow" / "examples"
+ADVANCED_HELLO_WORLD_YAML = EXAMPLES_DIR / "advanced_hello_world.yaml"
+
+
+@pytest.mark.last
+def test_advanced_hello_world_example():
+    """
+    Runs the advanced_hello_world.yaml example using the CLI command.
+    Checks for successful execution (exit code 0).
+    """
+    # Ensure the example file exists
+    assert (
+        ADVANCED_HELLO_WORLD_YAML.is_file()
+    ), f"Example file not found: {ADVANCED_HELLO_WORLD_YAML}"
+
+    # Run the workflow command
+    # Using sys.executable ensures we use the same Python interpreter (and venv) where pytest is running
+    command = [
+        sys.executable,
+        "-m",
+        "yaml_workflow",
+        "run",
+        str(ADVANCED_HELLO_WORLD_YAML),
+    ]
+
+    # Execute the command
+    result = subprocess.run(
+        command,
+        capture_output=True,
+        text=True,
+        check=False,
+        cwd=Path.cwd(),  # Run from project root
+    )
+
+    # Print output for debugging if the test fails
+    if result.returncode != 0:
+        print("STDOUT:")
+        print(result.stdout)
+        print("STDERR:")
+        print(result.stderr)
+
+    # Assert that the command executed successfully
+    assert (
+        result.returncode == 0
+    ), f"Workflow execution failed with exit code {result.returncode}"
+
+    # Optional: Add checks for specific output files or content here
+    # Example:
+    # output_json = Path.cwd() / "runs" / "Advanced_Hello_World_run_..." / "output" / "greeting.json"
+    # assert output_json.exists()
+    # Add more checks as needed

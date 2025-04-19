@@ -3,7 +3,7 @@ import json
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 import pytest
 import yaml
@@ -18,15 +18,19 @@ from yaml_workflow.tasks.base import (
 )
 from yaml_workflow.tasks.file_tasks import (
     append_file_direct,
+    append_file_task,
     copy_file_direct,
     delete_file_direct,
     move_file_direct,
     read_file_direct,
+    read_file_task,
     read_json,
     read_yaml,
     write_file_direct,
-    write_json,
-    write_yaml,
+    write_json_direct,
+    write_json_task,
+    write_yaml_direct,
+    write_yaml_task,
 )
 
 
@@ -42,7 +46,7 @@ def sample_data():
 
 
 @register_task("write_file")
-def write_file(config: TaskConfig) -> Dict[str, Any]:
+def write_file(config: TaskConfig) -> Any:
     """Write content to a file."""
     task_name = config.name or "write_file_task"
     logger = get_task_logger(config.workspace, task_name)
@@ -55,7 +59,7 @@ def write_file(config: TaskConfig) -> Dict[str, Any]:
 
     try:
         processed = config.process_inputs()
-        file_path = processed["file_path"]
+        file_path = processed["path"]
         content = processed["content"]
 
         path = config.workspace / file_path
@@ -66,14 +70,14 @@ def write_file(config: TaskConfig) -> Dict[str, Any]:
 
         result = {"path": str(path)}
         log_task_result(logger, result)
-        return result
+        return cast(Any, result)
     except Exception as e:
         log_task_error(logger, e)
         raise
 
 
 @register_task("read_file")
-def read_file(config: TaskConfig) -> Dict[str, Any]:
+def read_file(config: TaskConfig) -> Any:
     """Read content from a file."""
     task_name = config.name or "read_file_task"
     logger = get_task_logger(config.workspace, task_name)
@@ -86,7 +90,7 @@ def read_file(config: TaskConfig) -> Dict[str, Any]:
 
     try:
         processed = config.process_inputs()
-        file_path = processed["file_path"]
+        file_path = processed["path"]
 
         path = config.workspace / file_path
         if not path.exists():
@@ -97,7 +101,7 @@ def read_file(config: TaskConfig) -> Dict[str, Any]:
 
         result = {"content": content}
         log_task_result(logger, result)
-        return result
+        return cast(Any, result)
     except Exception as e:
         log_task_error(logger, e)
         raise
@@ -172,7 +176,7 @@ def move_file(config: TaskConfig) -> Dict[str, Any]:
 
 
 @register_task("delete_file")
-def delete_file(config: TaskConfig) -> Dict[str, Any]:
+def delete_file(config: TaskConfig) -> Any:
     """Delete a file."""
     task_name = config.name or "delete_file_task"
     logger = get_task_logger(config.workspace, task_name)
@@ -185,7 +189,7 @@ def delete_file(config: TaskConfig) -> Dict[str, Any]:
 
     try:
         processed = config.process_inputs()
-        file_path = processed["file_path"]
+        file_path = processed["path"]
 
         path = config.workspace / file_path
         if path.exists():
@@ -193,7 +197,7 @@ def delete_file(config: TaskConfig) -> Dict[str, Any]:
 
         result = {"path": str(path)}
         log_task_result(logger, result)
-        return result
+        return cast(Any, result)
     except Exception as e:
         log_task_error(logger, e)
         raise
@@ -216,7 +220,7 @@ def test_write_text_file_task(temp_workspace):
         "name": "write_test",
         "task": "write_file",
         "inputs": {
-            "file_path": file_path,
+            "path": file_path,
             "content": content,
         },
     }
@@ -244,7 +248,7 @@ def test_read_text_file_task(temp_workspace):
         "name": "read_test",
         "task": "read_file",
         "inputs": {
-            "file_path": file_path,
+            "path": file_path,
         },
     }
     config = TaskConfig(step, {}, temp_workspace)
@@ -359,14 +363,15 @@ def test_delete_file_direct(temp_workspace):
 
 def test_delete_file_task(temp_workspace):
     """Test deleting file using task handler."""
-    file_path = "test.txt"
-    content = "Test content"
-    (temp_workspace / file_path).write_text(content)
+    file_path = "test_to_delete.txt"
+    (temp_workspace / file_path).write_text("delete me")
+    assert (temp_workspace / file_path).exists()
+
     step = {
         "name": "delete_test",
         "task": "delete_file",
         "inputs": {
-            "file_path": file_path,
+            "path": file_path,
         },
     }
     config = TaskConfig(step, {}, temp_workspace)
@@ -397,7 +402,7 @@ def test_file_error_handling(temp_workspace):
         "name": "read_non_existent",
         "task": "read_file",
         "inputs": {
-            "file_path": non_existent,
+            "path": non_existent,
         },
     }
     config = TaskConfig(step, {}, temp_workspace)
@@ -427,7 +432,7 @@ def test_file_operations_with_directories(temp_workspace):
         "name": "write_nested",
         "task": "write_file",
         "inputs": {
-            "file_path": nested_path,
+            "path": nested_path,
             "content": content,
         },
     }
@@ -444,7 +449,7 @@ def test_file_operations_with_empty_files(temp_workspace):
         "name": "write_empty",
         "task": "write_file",
         "inputs": {
-            "file_path": file_path,
+            "path": file_path,
             "content": "",
         },
     }
@@ -462,7 +467,7 @@ def test_file_operations_with_special_characters(temp_workspace):
         "name": "write_special",
         "task": "write_file",
         "inputs": {
-            "file_path": file_path,
+            "path": file_path,
             "content": content,
         },
     }
