@@ -11,43 +11,50 @@ This guide provides instructions and best practices for developing custom tasks 
 
 ## Returning Results
 
-It's crucial that tasks return results in a predictable way so they can be accessed by subsequent steps using the `steps` namespace.
+Tasks should return the primary output they generate. This could be a single value (like a string, number, boolean) or a dictionary containing multiple related output values.
 
-- **Returning Dictionaries**: If your task naturally produces multiple related output values (e.g., stdout, stderr, return code from a shell command), return them as a dictionary. Subsequent steps can access these values directly by key:
+The workflow engine consistently stores the *entire* return value of a task under the `result` key within the `steps` namespace for the executed step. This provides a predictable access pattern regardless of the return type.
+
+## Accessing Previous Step Outputs
+
+Always use the `steps` namespace in your Jinja2 templates within task `inputs` to access the results of previously executed steps. 
+
+- **Primary Output**: Access the complete result returned by the previous step using `{{ steps.STEP_NAME.result }}`.
+  - If the step returned a single value (e.g., a string), this will be the value itself.
+  - If the step returned a dictionary (e.g., `{"stdout": "output", "code": 0}`), this will be the dictionary.
+
+- **Dictionary Keys**: If the previous step returned a dictionary, access specific keys within that dictionary using `{{ steps.STEP_NAME.result.KEY }}`.
   ```yaml
   steps:
     - name: my_shell_step
       task: shell
       inputs:
         command: "ls -l"
-    - name: use_output
-      task: echo
-      inputs:
-        message: "Output was: {{ steps.my_shell_step.stdout }}"
-  ```
-
-- **Returning Single Values**: If your task produces a single primary result (e.g., a processed string, a calculated number, a boolean flag), return that value directly. The workflow engine will automatically wrap this single value into a dictionary under the key `"result"` within the `steps` namespace.
-  ```yaml
-  steps:
+      # Shell task returns a dict: {"stdout": ..., "stderr": ..., "return_code": ...}
+      
     - name: my_echo
       task: echo
       inputs:
         message: "Hello"
-    - name: use_output
-      task: echo
+      # Echo task returns a string: "Hello"
+      
+    - name: use_results
+      task: some_other_task
       inputs:
-        message: "Echo said: {{ steps.my_echo.result }}"
+        # Access stdout from the shell step's result dictionary
+        shell_stdout: "{{ steps.my_shell_step.result.stdout }}"
+        # Access the return code from the shell step's result dictionary
+        shell_code: "{{ steps.my_shell_step.result.return_code }}"
+        
+        # Access the single string value returned by the echo step
+        echo_output: "{{ steps.my_echo.result }}"
   ```
 
-## Accessing Previous Step Outputs
-
-Always use the `steps` namespace in your Jinja2 templates within task `inputs` to access the results of previously executed steps. 
-
-- **Syntax**: `{{ steps.STEP_NAME.KEY }}`
-  - `STEP_NAME`: The `name` defined for the previous step in the workflow YAML.
-  - `KEY`: 
-    - The specific key if the previous step returned a dictionary (e.g., `stdout`, `return_code`).
-    - Use `result` if the previous step returned a single value (which the engine wraps).
+- **Step Status/Error**: Note that step metadata like `status` and `error` are accessed directly on the step object, *not* under the `result` key:
+  ```yaml
+  condition: "{{ steps.my_shell_step.status == 'completed' }}"
+  error_message: "{{ steps.my_shell_step.error }}" # Only available if step failed
+  ```
 
 ## Error Handling Best Practices
 

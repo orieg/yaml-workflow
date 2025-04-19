@@ -71,9 +71,9 @@ steps:
       command: |
         echo "Processing core step 2..."
         # process_core_1 (echo) returns {'result': 'Core 1 OK'}, stored directly
-        echo "Status from Core 1: {{ steps.process_core_1.result }}" >> "output/processing_log.txt"
+        echo "Status from Core 1: {{ steps.process_core_1.result.result }}" >> "output/processing_log.txt"
         # flaky_step (shell) returns {'stdout': ...}, stored directly
-        echo "Flaky step result (if successful): {{ steps.flaky_step.stdout | trim | default('N/A') }}" >> "output/processing_log.txt"
+        echo "Flaky step result (if successful): {{ steps.flaky_step.result.stdout | trim | default('N/A') }}" >> "output/processing_log.txt"
         echo "Core 2 processed" >> "output/processing_log.txt"
 
   # 6. Error Handler Step - Target for 'next' from flaky_step
