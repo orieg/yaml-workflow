@@ -121,7 +121,7 @@ Tasks for file operations with support for various formats:
   task: write_file
   inputs:
     file_path: "{{ args.output_dir }}/output.txt"
-    content: "{{ steps.previous.content }}"
+    content: "{{ steps.previous.result.content }}"
     encoding: "utf-8"  # Optional, defaults to utf-8
 
 # Write JSON file
@@ -166,28 +166,28 @@ Tasks for file operations with support for various formats:
   task: append_file
   inputs:
     file_path: "{{ env.LOG_FILE }}"
-    content: "{{ steps.process.output }}"
+    content: "{{ steps.process.result }}"
     encoding: "utf-8"  # Optional, defaults to utf-8
 
 # Copy a file
 - name: copy_file_step
   task: copy_file
   inputs:
-    source: "{{ steps.download.output_file }}"
+    source: "{{ steps.download.result.output_file }}"
     destination: "{{ env.BACKUP_DIR }}/{{ args.filename }}"
 
 # Move a file
 - name: move_file_step
   task: move_file
   inputs:
-    source: "{{ steps.process.temp_file }}"
+    source: "{{ steps.process.result.temp_file }}"
     destination: "{{ args.output_dir }}/final.txt"
 
 # Delete a file
 - name: delete_file_step
   task: delete_file
   inputs:
-    file_path: "{{ steps.process.temp_file }}"
+    file_path: "{{ steps.process.result.temp_file }}"
 ```
 
 ## Template Tasks

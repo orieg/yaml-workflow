@@ -12,13 +12,15 @@ YAML Workflow provides robust mechanisms for handling errors gracefully within y
 
 ## Step-Level Error Handling (`on_error`)
 
+*For a runnable example demonstrating the concepts below (retry, continue, next, error messages), see `docs/examples/error_handling/workflow.yaml`.*
+
 You can define how a step should react to its own failure using the `on_error` block within the step definition.
 
 ```yaml
 steps:
   - name: risky_api_call
     task: api_call
-    inputs: 
+    inputs:
       url: "{{ env.API_URL }}/data"
     on_error:
       action: retry # or fail, continue, next
@@ -40,22 +42,26 @@ steps:
 
 ### Custom Error Message (`message`)
 
-- You can provide a custom error message template using `message`.
-- This template can use Jinja2 syntax and access context variables (`args`, `env`, `steps`).
-- Crucially, it can access details about the error via the `error` variable. 
-  - `{{ error }}`: Typically the string representation of the *original* exception that caused the failure.
-  - `{{ error.step_name }}`: Name of the step that failed.
-  - `{{ error.task_type }}`: Type of the task that failed.
-  - `{{ error.retry_count }}`: Current retry attempt number (if applicable).
-- The *resolved* message is stored in the workflow state as the failure reason for the step and used in logs.
+- You can provide a custom error message template using `message` for logging and state tracking.
+- This template can use Jinja2 syntax and access standard context variables (`args`, `env`, `steps`).
+- It can also access the core error details using the `error` variable:
+  - `{{ error }}`: Provides the primary error information, often the string representation of the *original* exception that caused the failure (e.g., "FileNotFoundError: [Errno 2] No such file or directory...").
+- The resolved `message` is stored in the workflow state for the failed step (e.g., accessible later via `steps.FAILED_STEP_NAME.error_message`) and is used in logs. Use this pattern to access formatted error messages in subsequent error-handling steps.
 
 ## Retry Strategies
 
-- **Simple Retry**: Use `action: retry` with `retry` and `delay` for transient issues (e.g., network timeouts, temporary API unavailability).
+- **Simple Retry**: Use `action: retry` with `retry` and `delay` for transient issues (e.g., network timeouts, temporary API unavailability). Best for idempotent operations where re-running is safe.
 - **Retry with Backoff**: While not built-in directly as an exponential backoff flag, you could potentially implement custom retry logic within a Python task if needed, though standard linear delay is often sufficient.
 - **Global Retries**: A global default retry count can potentially be set in workflow `settings` (implementation may vary).
 
-## Error Handling Flows
+## Error Handling Actions: When to Use What
+
+- **`fail` (Default):** Use when any failure in the step is critical and the entire workflow should stop immediately.
+- **`retry`:** Use for transient errors where re-running the step might succeed (e.g., network issues, temporary service unavailability). Ensure the step is safe to re-run (idempotent).
+- **`continue`:** Use when a step's failure is non-critical, and the workflow can proceed meaningfully without its results. Subsequent steps should not depend directly on the output of the failed step.
+- **`next`:** Use when a failure requires specific cleanup, compensation, or notification actions before potentially stopping or continuing the workflow. Redirects execution to a dedicated error-handling sequence.
+
+## Error Handling Flows (`action: next`)
 
 Use `action: next` to redirect the workflow to a dedicated error handling path.
 
@@ -64,7 +70,7 @@ flows:
   default: main_flow
   definitions:
     - main_flow: [step_a, risky_step, step_c]
-    - error_flow: [log_error, notify_admin]
+    - error_flow: [log_error, notify_admin] # Defines the sequence for the error path
 
 steps:
   - name: step_a
@@ -74,8 +80,8 @@ steps:
     # ...
     on_error:
       action: next
-      next: log_error # Jump to the error flow
-      message: "Risky step failed for {{ args.id }}: {{ error }}"
+      next: log_error # Jump to the start of the error_flow sequence
+      message: "Risky step failed for {{ args.id }}: {{ error }}" # Custom message stored in state
   - name: step_c
     # ... only runs if risky_step succeeds ...
 
@@ -86,22 +92,22 @@ steps:
       content: |
         Workflow Failure Report
         -----------------------
-        Timestamp: {{ timestamp }}
-        Failed Step: {{ error.step_name }}
-        Reason: {{ steps[error.step_name].error_message }}  # Access the formatted message from state
-        Original Error: {{ error }}
-        
+        Timestamp: {{ workflow.timestamp }}
+        Failed Step: {{ steps.risky_step.name }} {# Assumes 'risky_step' is the one that failed #}
+        Reason: {{ steps.risky_step.error_message }} {# Access the formatted message defined above #}
+        Original Error: {{ steps.risky_step.error }} {# Access raw error if needed #}
+
         Context:
         Args: {{ args | tojson }}
-        # Add other relevant context
-    # Note: This step runs *after* the risky_step failed.
-    # It can access the error details via the context implicitly populated by the engine.
-    
+        # Add other relevant context if available
+    # Note: This step runs *after* the risky_step failed and was redirected here.
+    # It accesses the state (name, error_message, error) of the failed step.
+
   - name: notify_admin
     task: slack_notify # Example custom task
     inputs:
       channel: "#alerts"
-      message: "Workflow {{ workflow_name }} failed at step {{ error.step_name }}. See error_log.txt for details."
+      message: "Workflow {{ workflow.name }} failed at step {{ steps.risky_step.name }}. Reason: {{ steps.risky_step.error_message }}. See error_log.txt for details."
 ```
 
 ## Error Propagation
@@ -109,7 +115,7 @@ steps:
 - When a step fails and the action is `fail` (or retries are exhausted with no `continue`/`next`), the engine wraps the original exception (or the `TaskExecutionError` created by `handle_task_error`) within a `WorkflowError` and halts execution.
 - The `WorkflowError` contains information about the step that failed and often includes the original exception as its cause (`__cause__` or an `original_error` attribute), allowing programmatic inspection if the engine is used as a library.
 - If `action: continue` is used, the error is logged and recorded in the state, but execution proceeds.
-- If `action: next` is used, the error context is preserved, and the workflow jumps to the specified step.
+- If `action: next` is used, the error context is preserved in the failed step's state, and the workflow jumps to the specified step.
 
 ## Centralized Error Handling in Custom Tasks
 

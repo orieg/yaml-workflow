@@ -1,0 +1,119 @@
+# docs/examples/error_handling/workflow.yaml
+
+name: Error Handling Examples
+description: Demonstrates different on_error actions and error handling flows.
+
+params:
+  # Parameter to control whether a simulated transient error occurs
+  make_transient_fail:
+    type: boolean
+    default: true
+  # Parameter to control whether a non-critical step fails
+  make_non_critical_fail:
+    type: boolean
+    default: true
+  # Parameter to control whether the critical step fails
+  make_critical_fail:
+    type: boolean
+    default: true
+
+flows:
+  default: main_flow
+  definitions:
+    - main_flow: [step_1_retry, step_2_continue, step_3_next, final_step]
+    - error_path: [log_critical_error, notify_failure]
+
+steps:
+  - name: step_1_retry
+    task: shell
+    inputs:
+      # This command fails the first time if make_transient_fail is true,
+      # then succeeds on retry by creating the file.
+      command: |
+        if [[ "{{ args.make_transient_fail }}" == "true" && ! -f temp_retry_flag.tmp ]]; then
+          echo "Simulating transient failure..." >&2
+          touch temp_retry_flag.tmp
+          exit 1
+        else
+          echo "Step 1 simulating success (or successful retry)."
+          rm -f temp_retry_flag.tmp
+          exit 0
+        fi
+    on_error:
+      action: retry
+      retry: 2
+      delay: 1 # Wait 1 second between retries
+      message: "Step 1 failed, retrying (attempt {{ error.retry_count }}). Error: {{ error }}"
+
+  - name: step_2_continue
+    task: shell
+    inputs:
+      # This command always fails if make_non_critical_fail is true
+      command: |
+        if [[ "{{ args.make_non_critical_fail }}" == "true" ]]; then
+           echo "Simulating non-critical failure..." >&2
+           exit 1
+        else
+           echo "Step 2 simulating success."
+           exit 0
+        fi
+    on_error:
+      action: continue # Workflow continues even if this fails
+      message: "Step 2 (non-critical) failed, continuing. Error: {{ error }}"
+
+  - name: step_3_next
+    task: shell
+    inputs:
+      # This command always fails if make_critical_fail is true
+      command: |
+        if [[ "{{ args.make_critical_fail }}" == "true" ]]; then
+           echo "Simulating CRITICAL failure..." >&2
+           exit 1
+        else
+           echo "Step 3 simulating success."
+           exit 0
+        fi
+    on_error:
+      action: next
+      next: log_critical_error # Jump to the error handling flow
+      message: "Step 3 (critical) failed! Redirecting to error path. Error: {{ error }}"
+
+  # This step only runs if step_3_next succeeds
+  - name: final_step
+    task: echo
+    inputs:
+      message: "Workflow reached the final step successfully!"
+
+  # --- Error Handling Steps (part of 'error_path' flow) ---
+  - name: log_critical_error
+    task: echo
+    inputs:
+      # Access information about the step that failed and triggered the 'next' action
+      message: |
+        ERROR PATH: Logging critical failure...
+        Failed Step Name: {{ steps.step_3_next.name }}
+        Failure Reason: {{ steps.step_3_next.error_message }}
+        Original Error Snippet: {{ steps.step_3_next.error | string | truncate(100) }}
+        Timestamp: {{ workflow.timestamp }}
+
+  - name: notify_failure
+    task: echo # In a real scenario, this could be slack_notify, send_email etc.
+    inputs:
+      message: "ERROR PATH: Notifying admin about failure in step '{{ steps.step_3_next.name }}'."
+
+# How to run:
+# 1. Default run (all simulated errors trigger):
+#    yaml-workflow run docs/examples/error_handling/workflow.yaml
+#    (Expect step 1 to retry, step 2 to fail & continue, step 3 to fail & jump to error path)
+#
+# 2. Simulate success for step 1 (transient error resolved):
+#    yaml-workflow run docs/examples/error_handling/workflow.yaml make_transient_fail=false
+#
+# 3. Simulate success for step 2 (non-critical step succeeds):
+#    yaml-workflow run docs/examples/error_handling/workflow.yaml make_non_critical_fail=false
+#
+# 4. Simulate success for step 3 (critical step succeeds, workflow completes normally):
+#    yaml-workflow run docs/examples/error_handling/workflow.yaml make_critical_fail=false
+#
+# 5. Simulate all steps succeeding:
+#    yaml-workflow run docs/examples/error_handling/workflow.yaml make_transient_fail=false make_non_critical_fail=false make_critical_fail=false 

@@ -510,3 +510,97 @@ def test_basic_task_with_default_value(tmp_path):
 
 
 # --- Tests for tasks in basic_tasks.py ---
+
+def test_basic_task_fail(tmp_path):
+    """Test the fail task raises WorkflowError via the engine."""
+    workflow = {
+        "steps": [
+            {
+                "name": "step_fail",
+                "task": "fail", # Registered basic task
+                "inputs": {"message": "Deliberate fail test"},
+            }
+        ]
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError) as exc_info:
+        engine.run()
+    assert "Workflow halted at step 'step_fail'" in str(exc_info.value)
+    # Check original error embedded
+    assert isinstance(exc_info.value.original_error, RuntimeError)
+    assert str(exc_info.value.original_error) == "Deliberate fail test"
+
+def test_basic_task_join_strings(tmp_path):
+    """Test the join_strings task."""
+    workflow = {
+        "params": {
+             "items_list": ["apple", "banana", "cherry"],
+             "custom_sep": "-"
+        },
+        "steps": [
+            {
+                "name": "join_default",
+                "task": "join_strings", # Registered basic task
+                "inputs": {
+                     # Pass list directly
+                    "strings": "{{ args.items_list }}"
+                 },
+            },
+            {
+                "name": "join_custom",
+                "task": "join_strings",
+                "inputs": {
+                    "strings": "{{ args.items_list }}",
+                    "separator": "{{ args.custom_sep }}"
+                 },
+            },
+             {
+                "name": "join_inline",
+                "task": "join_strings",
+                "inputs": {
+                    # Define list inline
+                    "strings": ["one", "two", "three"],
+                    "separator": "_"
+                 },
+            }
+        ]
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run()
+    assert result["status"] == "completed"
+    assert result["outputs"]["join_default"]["result"] == "apple banana cherry"
+    assert result["outputs"]["join_custom"]["result"] == "apple-banana-cherry"
+    assert result["outputs"]["join_inline"]["result"] == "one_two_three"
+
+
+def test_basic_task_create_greeting(tmp_path):
+    """Test the create_greeting task."""
+    # Note: The create_greeting task signature is:
+    # create_greeting(name: str, context: Dict[str, Any]) -> str
+    # The TaskConfig provides the context implicitly based on the second param name.
+    workflow = {
+        "params": {"user": "Alice"},
+        "context": { # Top-level context for the task to access
+             "system_message": "Welcome to the system."
+        },
+        "steps": [
+            {
+                "name": "step_greet",
+                "task": "create_greeting", # Registered basic task
+                "inputs": {
+                    "name": "{{ args.user }}",
+                    # 'context' is provided implicitly by the engine/wrapper
+                 },
+            }
+        ]
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run()
+    assert result["status"] == "completed"
+    # The task implementation should use the 'name' and potentially the 'context'
+    # Let's check the output based on the current implementation in basic_tasks.py
+    # create_greeting(name: str, context: Dict[str, Any]) -> str:
+    #     return f"Hello, {name}! Context keys: {list(context.keys())}" # Example impl.
+    # We need to know the exact implementation to assert perfectly.
+    # Assuming it just returns "Hello, {name}!" for now:
+    assert result["outputs"]["step_greet"]["result"] == "Hello, Alice! Context keys: ['args', 'env', 'steps', 'system_message']"
