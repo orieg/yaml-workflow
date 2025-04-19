@@ -257,11 +257,11 @@ def read_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     log_task_execution(logger, config.step, config._context, config.workspace)
     try:
         processed = config.process_inputs()
-        file_path = processed.get("file")
+        file_path = processed.get("path")
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("No file path provided")
+            raise ValueError("No path provided")
 
         content = read_file_direct(file_path, config.workspace, encoding, task_name)
         output = {"path": file_path, "content": content}
@@ -288,12 +288,12 @@ def append_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     log_task_execution(logger, config.step, config._context, config.workspace)
     try:
         processed = config.process_inputs()
-        file_path = processed.get("file")
+        file_path = processed.get("path")
         content = processed.get("content")
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("No file path provided")
+            raise ValueError("No path provided")
         if content is None:
             raise ValueError("No content provided")
 
@@ -390,10 +390,10 @@ def delete_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     log_task_execution(logger, config.step, config._context, config.workspace)
     try:
         processed = config.process_inputs()
-        file_path = processed.get("file")
+        file_path = processed.get("path")
 
         if not file_path:
-            raise ValueError("No file path provided")
+            raise ValueError("No path provided")
 
         result = delete_file_direct(file_path, config.workspace, task_name)
         output = {"path": result}
@@ -443,25 +443,32 @@ def read_json_task(config: TaskConfig) -> Union[Dict[str, Any], List[Any]]:
 
 @register_task("write_json")
 def write_json_task(config: TaskConfig) -> str:
-    """Task handler for writing JSON files."""
+    """Write JSON data to a file."""
     task_name = str(config.name or "write_json")
     task_type = config.type or "write_json"
     logger = get_task_logger(config.workspace, task_name)
     log_task_execution(logger, config.step, config._context, config.workspace)
-
     try:
         processed = config.process_inputs()
-        file_path = processed.get("file_path")
+        file_path = processed.get("path")
         data = processed.get("data")
-        indent = processed.get("indent", 2)
+        indent = int(processed.get("indent", 2))
+        encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("file_path parameter is required")
+            raise ValueError("path parameter is required")
         if data is None:
             raise ValueError("data parameter is required")
 
-        result = write_json(file_path, data, indent, config.workspace)
-        log_task_result(logger, result)
+        result = write_json_direct(
+            file_path,
+            data,
+            indent,
+            config.workspace,
+            encoding,
+            task_name,
+        )
+        log_task_result(logger, {"path": result})
         return result
     except Exception as e:
         context = ErrorContext(
@@ -472,7 +479,7 @@ def write_json_task(config: TaskConfig) -> str:
             template_context=config._context,
         )
         handle_task_error(context)
-        raise
+        raise  # Re-raise after handling
 
 
 @register_task("read_yaml")
@@ -507,24 +514,26 @@ def read_yaml_task(config: TaskConfig) -> Dict[str, Any]:
 
 @register_task("write_yaml")
 def write_yaml_task(config: TaskConfig) -> str:
-    """Task handler for writing YAML files."""
+    """Write YAML data to a file."""
     task_name = str(config.name or "write_yaml")
     task_type = config.type or "write_yaml"
     logger = get_task_logger(config.workspace, task_name)
     log_task_execution(logger, config.step, config._context, config.workspace)
-
     try:
         processed = config.process_inputs()
-        file_path = processed.get("file_path")
+        file_path = processed.get("path")
         data = processed.get("data")
+        encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("file_path parameter is required")
+            raise ValueError("path parameter is required")
         if data is None:
             raise ValueError("data parameter is required")
 
-        result = write_yaml(file_path, data, config.workspace)
-        log_task_result(logger, result)
+        result = write_yaml_direct(
+            file_path, data, config.workspace, encoding, task_name
+        )
+        log_task_result(logger, {"path": result})
         return result
     except Exception as e:
         context = ErrorContext(
@@ -535,7 +544,7 @@ def write_yaml_task(config: TaskConfig) -> str:
             template_context=config._context,
         )
         handle_task_error(context)
-        raise
+        raise  # Re-raise after handling
 
 
 def process_templates(data: Any, context: Dict[str, Any]) -> Any:
@@ -595,11 +604,13 @@ def read_json(
         raise TaskExecutionError(step_name="read_json", original_error=e)
 
 
-def write_json(
+def write_json_direct(
     file_path: str,
     data: Union[Dict[str, Any], List[Any]],
     indent: int = 2,
-    workspace: Optional[Path] = None,
+    workspace: Path = Path("."),
+    encoding: str = "utf-8",
+    step_name: str = "write_json",
 ) -> str:
     """Write JSON data to a file.
 
@@ -608,6 +619,8 @@ def write_json(
         data: Data to write
         indent: Indentation level (default: 2)
         workspace: Optional workspace directory
+        encoding: File encoding (default: utf-8)
+        step_name: Name of the step for error reporting
 
     Returns:
         str: Path to written file
@@ -618,7 +631,7 @@ def write_json(
     try:
         if workspace:
             file_path = str(resolve_path(workspace, file_path))
-            ensure_directory(Path(file_path), "write_json")
+            ensure_directory(Path(file_path), step_name)
 
         with open(file_path, "w") as f:
             json.dump(data, f, indent=indent)
@@ -650,8 +663,12 @@ def read_yaml(
         raise TaskExecutionError(step_name="read_yaml", original_error=e)
 
 
-def write_yaml(
-    file_path: str, data: Dict[str, Any], workspace: Optional[Path] = None
+def write_yaml_direct(
+    file_path: str,
+    data: Dict[str, Any],
+    workspace: Path = Path("."),
+    encoding: str = "utf-8",
+    step_name: str = "write_yaml",
 ) -> str:
     """Write YAML data to a file.
 
@@ -659,6 +676,8 @@ def write_yaml(
         file_path: Path to the file
         data: Data to write
         workspace: Optional workspace directory
+        encoding: File encoding (default: utf-8)
+        step_name: Name of the step for error reporting
 
     Returns:
         str: Path to written file
@@ -669,7 +688,7 @@ def write_yaml(
     try:
         if workspace:
             file_path = str(resolve_path(workspace, file_path))
-            ensure_directory(Path(file_path), "write_yaml")
+            ensure_directory(Path(file_path), step_name)
 
         with open(file_path, "w") as f:
             yaml.dump(data, f, default_flow_style=False)

@@ -8,7 +8,9 @@ from typing import Optional
 class WorkflowError(Exception):
     """Base exception class for all workflow-related errors."""
 
-    pass
+    def __init__(self, message: str, original_error: Optional[Exception] = None):
+        super().__init__(message)
+        self.original_error = original_error
 
 
 class WorkflowValidationError(WorkflowError):
@@ -115,7 +117,10 @@ class TaskExecutionError(WorkflowRuntimeError):
         self.step_name = step_name
         self.original_error = original_error
         self.task_config = task_config
-        super().__init__(f"Task '{step_name}' failed: {str(original_error)}")
+        super().__init__(
+            message=f"Task '{step_name}' failed: {str(original_error)}",
+            original_error=original_error,
+        )
 
 
 class InputResolutionError(WorkflowRuntimeError):

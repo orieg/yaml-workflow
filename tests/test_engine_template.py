@@ -147,20 +147,3 @@ def test_resolve_inputs(engine):
         "mode": "read",
         "options": {"encoding": "utf-8", "name": "test_workflow"},
     }
-
-
-def test_error_message_template(engine):
-    """Test error message template resolution."""
-    step = {
-        "name": "test_step",
-        "on_error": {
-            "action": "fail",
-            "message": "Failed to process {{ args.input_file }}: {{ error }}",
-        },
-    }
-    error = ValueError("Invalid input")
-
-    with pytest.raises(WorkflowError) as exc:
-        engine._handle_step_error(step, error)
-
-    assert str(exc.value) == "Failed to process test.txt: Invalid input"

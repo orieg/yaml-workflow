@@ -52,7 +52,7 @@ steps:
   - name: check_validation
     task: read_file
     inputs:
-      file_path: "output/validation_result.txt"
+      path: "output/validation_result.txt"
       encoding: "utf-8"
     outputs: validation_message
     on_error:
@@ -81,9 +81,10 @@ steps:
   - name: read_validation
     task: read_file
     inputs:
-      file_path: "output/validation_passed.txt"
+      path: "output/validation_passed.txt"
       encoding: "utf-8"
-    outputs: validation_content
+    # Store the output under the default key for read_file (likely 'content')
+    # outputs: validation_content # Remove explicit output naming for simplicity
     on_error:
       action: fail
       message: "Failed to read validation status: {{ error }}"
@@ -103,7 +104,8 @@ steps:
         printf "Validation Result File Content:"
         cat "output/validation_passed.txt"
         echo ""
-        echo "Validation Content: {{ validation_content }}"
+        # *** Correctly access step output using steps namespace ***
+        echo "Validation Content: {{ steps.read_validation.content }}"
         echo "=== End Debug ==="
 
   # Step 4: Get current timestamp
@@ -114,7 +116,8 @@ steps:
     inputs:
       command: date -u +"%Y-%m-%dT%H:%M:%SZ"
     outputs: current_timestamp
-    condition: "'{{ validation_content }}' == 'true'"
+    # *** Condition resolves directly to True/False string ***
+    condition: "{{ steps.read_validation.content == 'true' }}"
 
   # Step 5: Create JSON greeting
   # Only runs if validation passed
@@ -122,14 +125,15 @@ steps:
   - name: create_greeting
     task: write_json
     inputs:
-      file_path: "output/greeting.json"
+      path: "output/greeting.json"
       data: 
         greeting: "Hello, {{ args.name }}!"
         timestamp: "{{ current_timestamp }}"
         run_number: "{{ run_number }}"
         language: "en"
       indent: 2
-    condition: "'{{ validation_content }}' == 'true'"
+    # *** Condition resolves directly to True/False string ***
+    condition: "{{ steps.read_validation.content == 'true' }}"
 
   # Step 6: Create multi-language greetings
   # Only runs if validation passed
@@ -137,7 +141,7 @@ steps:
   - name: translate_greeting
     task: write_yaml
     inputs:
-      file_path: "output/greetings.yaml"
+      path: "output/greetings.yaml"
       data:
         English: "Hello, {{ args.name }}!"
         Spanish: "¡Hola, {{ args.name }}!"
@@ -145,7 +149,8 @@ steps:
         German: "Hallo, {{ args.name }}!"
         Italian: "Ciao, {{ args.name }}!"
         Japanese: "こんにちは、{{ args.name }}さん！"
-    condition: "'{{ validation_content }}' == 'true'"
+    # *** Condition resolves directly to True/False string ***
+    condition: "{{ steps.read_validation.content == 'true' }}"
 
   # Step 7: Format and display results
   # Only runs if validation passed
@@ -166,7 +171,8 @@ steps:
           echo
           echo "=== End of Results ==="
         fi
-    condition: "'{{ validation_content }}' == 'true'"
+    # *** Condition resolves directly to True/False string ***
+    condition: "{{ steps.read_validation.content == 'true' }}"
 
   # Step 8: Handle validation errors
   # Only runs if validation failed
@@ -174,7 +180,7 @@ steps:
   - name: handle_error
     task: write_file
     inputs:
-      file_path: "output/error_report.txt"
+      path: "output/error_report.txt"
       content: |
         Workflow encountered an error:
         ====================
@@ -195,7 +201,8 @@ steps:
         1. Check the validation message above
         2. Ensure your input meets all requirements
         3. Run the workflow again with valid input
-    condition: "'{{ validation_content }}' == 'false'"
+    # *** Condition resolves directly to True/False string ***
+    condition: "{{ steps.read_validation.content == 'false' }}"
     on_error:
       action: fail
       message: "Failed to create error report: {{ error }}"
