@@ -4192,7 +4192,7 @@ task configuration. Each item is passed to the task as an argument.</p>
 <a id="__codelineno-0-44" name="__codelineno-0-44"></a>            <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
 <a id="__codelineno-0-45" name="__codelineno-0-45"></a>            <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{}</span>
 <a id="__codelineno-0-46" name="__codelineno-0-46"></a>            <span class="n">pos_args</span> <span class="o">=</span> <span class="p">[]</span>
-<a id="__codelineno-0-47" name="__codelineno-0-47"></a>            <span class="n">extra_kwargs</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># For **kwargs</span>
+<a id="__codelineno-0-47" name="__codelineno-0-47"></a>            <span class="n">extra_kwargs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># For **kwargs</span>
 <a id="__codelineno-0-48" name="__codelineno-0-48"></a>            <span class="n">unmapped_inputs</span> <span class="o">=</span> <span class="p">(</span>
 <a id="__codelineno-0-49" name="__codelineno-0-49"></a>                <span class="n">processed</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
 <a id="__codelineno-0-50" name="__codelineno-0-50"></a>            <span class="p">)</span>  <span class="c1"># Track inputs not mapped to named params</span>
