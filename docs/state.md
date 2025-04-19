@@ -6,7 +6,7 @@ YAML Workflow provides robust state management capabilities to track workflow ex
 
 ### State File Structure
 
-The workflow state is stored in `.workflow_state.json` in the workspace directory:
+The workflow state is stored in `.workflow_state.json` (or similar, often within `.workflow_metadata.json`) in the workspace directory. The exact structure evolves, but conceptually includes:
 
 ```json
 {
@@ -14,22 +14,30 @@ The workflow state is stored in `.workflow_state.json` in the workspace director
     "name": "workflow-name",
     "start_time": "2025-04-14T10:00:00Z",
     "last_updated": "2025-04-14T10:05:00Z",
-    "status": "running",
-    "current_step": "step2",
-    "completed_steps": ["step1"],
-    "failed_steps": [],
-    "step_outputs": {
-        "step1": {
-            "result": "success",
-            "output": "Step 1 output",
-            "duration": 5.2
+    "status": "running", // Overall workflow status
+    // Information about the execution progress and failures:
+    "execution_state": {
+        "status": "running", // Current execution status (running, failed, completed)
+        "current_step": "step2",
+        "failed_step": null, // Populated on failure
+        "step_outputs": {   // Stores results of successfully completed steps
+            "step1": {       // Key is the step name
+                "result": "Output from Step 1" // The actual return value of the task is here
+            }
+            // step2 output would appear here upon completion
+        },
+        "retry_state": { // Information about retries
+            "step_1_retry": {
+                "attempt": 1,
+                "max_attempts": 3
+            }
         }
+        // Other execution details like error messages might be stored here too
     },
-    "variables": {
+    "variables": { // Snapshot of context variables (args, env etc. might be here)
         "user_input": "value",
         "computed_value": 42
-    },
-    "error_info": null
+    }
 }
 ```
 
