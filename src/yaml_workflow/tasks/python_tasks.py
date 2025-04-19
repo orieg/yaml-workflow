@@ -4,6 +4,8 @@ Python task implementations for executing Python functions.
 
 import inspect
 import logging
+import pprint
+import sys
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -315,51 +317,66 @@ def handle_custom_operation(config: TaskConfig) -> Dict[str, Any]:
         return {}  # Unreachable
 
 
-def print_vars_task(config: TaskConfig) -> Dict[str, Any]:
-    """Print all available variables in the context.
+@register_task()
+def print_vars_task(config: TaskConfig) -> dict:
+    """Prints selected variables from the context for debugging."""
+    inputs = config.process_inputs()
+    context = config._context
+    message = inputs.get("message", "Current Context Variables:")
 
-    Args:
-        config: Task configuration object
+    print(f"\n--- {message} ---")  # Prints directly to runner's stdout
 
-    Returns:
-        Dict containing success status
+    # Select variables to print (add more as needed)
+    print("Workflow Variables:")
+    print("==================")
+    # Use direct context access via config.context
+    print(f"args: {context.get('args')}")
+    print(f"workflow_name: {context.get('workflow_name')}")
+    print(f"workspace: {context.get('workspace')}")
+    print(f"output: {context.get('output')}")
+    print(f"run_number: {context.get('run_number')}")
+    print(f"timestamp: {context.get('timestamp')}")
 
-    Raises:
-        TaskExecutionError: If task execution fails
-    """
-    task_name = str(config.name or "print_vars")
-    task_type = str(config.type or "print_vars")
-    logger = get_task_logger(config.workspace, task_name)
-    try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
+    # Safely access nested step results
+    print("\nStep Results:")
+    print("=============")
+    steps_context = context.get("steps", {})
+    if steps_context:
+        # Use pprint for potentially large/nested step results
+        pprint.pprint(steps_context, indent=2)
+        # for name, step_info in steps_context.items():
+        #     if step_info.get("skipped"):
+        #         print(f"  - {name}: (skipped)")
+        #     else:
+        #         # Truncate long results for clarity
+        #         result_repr = repr(step_info.get('result', 'N/A'))
+        #         if len(result_repr) > 100:
+        #             result_repr = result_repr[:100] + "..."
+        #         print(f"  - {name}: {result_repr}")
+    else:
+        print("  (No step results yet)")
 
-        processed = config.process_inputs()
-        message = processed.get("message")
-        if message:
-            print(f"\n{message}")
+    print("--------------------\n")
+    sys.stdout.flush()  # Flush after printing
+    return {"success": True}  # Indicate task success
 
-        print("\nWorkflow Variables:")
-        print("==================")
-        for key in sorted(config._context.keys()):
-            value = config._context[key]
-            print(f"{key}: {value}")
-        print("==================\n")
 
-        result = {"success": True}
-        log_task_result(logger, result)
-        return result
+@register_task(name="print_message")  # Explicitly register with desired name
+def print_message_task(config: TaskConfig) -> dict:
+    """Prints a templated message to the console."""
+    inputs = config.process_inputs()  # Render inputs using context
+    context = config._context
+    message = inputs.get("message", "")
 
-    except Exception as e:
-        # Centralized error handling
-        context = ErrorContext(
-            step_name=task_name,
-            task_type=task_type,
-            error=e,
-            task_config=config.step,
-            template_context=config._context,
-        )
-        handle_task_error(context)
-        return {}  # Unreachable
+    if not message:
+        logger.warning("print_message task called with no message.")
+        # Even if empty, consider it success, just print nothing
+        # return {"success": False, "error": "No message provided"}
+
+    # The message is already rendered by process_inputs, just print it
+    print(message)  # Prints directly to runner's stdout
+    sys.stdout.flush()  # Flush after printing
+    return {"success": True, "printed_length": len(message)}
 
 
 @register_task("python")

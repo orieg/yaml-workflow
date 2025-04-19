@@ -357,3 +357,11 @@ pytest
    - [ ] 3. Run coverage checks (`pytest --cov`).
    Success Criteria:
    - Added tests cover remaining gaps.
+
+## Future Considerations / Usability
+
+- **Path Resolution Consistency**: Currently, file tasks (`read_file`, `write_file`, etc.) implicitly resolve paths relative to an `output/` subdirectory within the workspace, while `shell` tasks operate from the workspace root and require explicit `output/` prefixes to access files created by file tasks. This inconsistency can be confusing for users. Revisit this behavior to potentially:
+    - Improve documentation clarity.
+    - Introduce explicit workspace/output directory variables (`{{ workflow.workspace_root }}`, `{{ workflow.output_dir }}`).
+    - Make file tasks also require the `output/` prefix for consistency.
+    - Add configuration options to control the default path resolution behavior.

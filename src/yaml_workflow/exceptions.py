@@ -203,5 +203,5 @@ class StepNotInFlowError(FlowError):
 class TemplateError(WorkflowError):
     """Raised when template resolution fails."""
 
-    def __init__(self, message: str):
-        super().__init__(f"Template error: {message}")
+    def __init__(self, message: str, original_error: Optional[Exception] = None):
+        super().__init__(f"Template error: {message}", original_error=original_error)

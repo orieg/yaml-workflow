@@ -116,7 +116,9 @@ extend-exclude = '''
 '''
 
 [tool.mypy]
-exclude = ["build/", ".venv/"] # Exclude build directory and virtual environment
+exclude = ["build/", ".venv/", "site/"] # Exclude build, venv, and site directories
+mypy_path = "src"
+namespace_packages = true
 
 [tool.pytest.ini_options]
 markers = [
