@@ -3,11 +3,12 @@ Command-line interface for the workflow engine.
 """
 
 import argparse
-import importlib.resources
 import json
 import logging
+import os
 import shutil
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -189,39 +190,31 @@ def run_workflow(args):
         if results.get("outputs"):
             print("=== Step Outputs ===")
             first_step = True
-            for step_name, output in results["outputs"].items():
-                # Skip empty outputs or None values
-                if output is None or (isinstance(output, str) and not output.strip()):
-                    continue
+            for step_name, output_container in results["outputs"].items():
+                # The actual result is nested under 'result'
+                output_value = output_container.get("result")
 
-                # Print step name without extra newlines
+                # Skip printing entirely if the actual result is None or empty string
+                if output_value is None or (
+                    isinstance(output_value, str) and not output_value.strip()
+                ):
+                    continue  # Skip printing this step's output section
+
+                # Print step name header (only if output is being printed)
                 if first_step:
                     print(f"• {step_name}:")
                     first_step = False
                 else:
-                    print(f"\n• {step_name}:")
+                    print(f"\n• {step_name}:")  # Add newline before subsequent steps
 
-                if isinstance(output, dict):
-                    # Clean up string values in the dictionary
-                    cleaned_output = {}
-                    for k, v in output.items():
-                        if isinstance(v, str):
-                            # Remove leading/trailing whitespace and normalize line endings
-                            lines = v.strip().split("\n")
-                            # Remove common indentation from all lines
-                            cleaned_lines = []
-                            for line in lines:
-                                cleaned_lines.append(line.strip())
-                            cleaned_output[k] = "\n".join(cleaned_lines)
-                        else:
-                            cleaned_output[k] = v
-                    output = cleaned_output
-
-                # Use YAML format for structured data
-                formatted_output = yaml.dump(
-                    output, default_flow_style=False, sort_keys=False, default_style="|"
-                ).strip()
-                sys.stdout.write(formatted_output)
+                # Print the actual output value (potentially multi-line)
+                if isinstance(output_value, str) and "\n" in output_value:
+                    print(output_value)  # Print multi-line strings directly
+                elif isinstance(output_value, dict) or isinstance(output_value, list):
+                    # Pretty print dicts/lists using YAML for readability
+                    print(yaml.dump(output_value, indent=2, default_flow_style=False))
+                else:
+                    print(f"  {output_value}")  # Indent simple values
 
         print("\n=== Workspace Info ===")
         print(f"• Location: {engine.workspace}")
@@ -358,7 +351,7 @@ def clean_workspaces(args):
                 if created < cutoff:
                     to_delete.append((run_dir, info))
             except Exception as e:
-                print(f"Warning: Could not process {run_dir}: {e}")
+                print(f"Warning: Could not process {run_dir}: {e}", file=sys.stderr)
 
     if not to_delete:
         print("No old workflow runs to clean up.")
@@ -402,7 +395,7 @@ def remove_workspaces(args):
             print(f"Warning: Run directory not found: {run_dir}")
             continue
         if not run_dir.is_dir():
-            print(f"Warning: Not a directory: {run_dir}")
+            print(f"Warning: Not a directory: {run_dir}", file=sys.stderr)
             continue
         to_remove.append(run_dir)
 
@@ -447,22 +440,60 @@ def init_project(args):
         target_dir = Path(args.dir)
         target_dir.mkdir(parents=True, exist_ok=True)
 
-        # Get examples directory from package
-        examples_dir = Path(__file__).parent / "examples"
+        # Find examples directory relative to this file's location
+        # Assumes cli.py is in src/yaml_workflow/ and examples is in src/yaml_workflow/examples
+        base_path = Path(__file__).parent
+        examples_dir = base_path / "examples"  # Try direct relative path first
+
+        # Fallback: If not found directly, try navigating up (e.g., running from source root)
+        if not examples_dir.is_dir():
+            project_root = base_path.parent  # src/yaml_workflow
+            if (
+                project_root.name == "yaml_workflow"
+                and (project_root.parent / "src").exists()
+            ):
+                # If running from src/yaml_workflow, go up twice for project root
+                examples_dir = (
+                    project_root.parent / "src" / "yaml_workflow" / "examples"
+                )
+            else:
+                # Assume current structure: src/yaml_workflow/cli.py -> src/yaml_workflow/examples
+                pass  # Keep original examples_dir = base_path / "examples"
+
+        if not examples_dir.is_dir():
+            print(
+                f"Error: Examples directory not found. Looked near: {base_path}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
         if args.example:
             # Copy specific example
             example_file = examples_dir / f"{args.example}.yaml"
             if not example_file.exists():
-                print(f"Example '{args.example}' not found", file=sys.stderr)
+                print(
+                    f"Example '{args.example}' not found in {examples_dir}",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             shutil.copy2(example_file, target_dir)
-            print(f"Initialized project with example: {args.example}")
+            print(
+                f"Initialized project with example '{example_file.name}' in: {target_dir}"
+            )
         else:
             # Copy all examples
+            copied_any = False
             for example in examples_dir.glob("*.yaml"):
                 shutil.copy2(example, target_dir)
-            print(f"Initialized project with examples in: {target_dir}")
+                copied_any = True
+
+            if not copied_any:
+                print(
+                    f"Warning: No example YAML files found in {examples_dir}",
+                    file=sys.stderr,
+                )
+            else:
+                print(f"Initialized project with examples in: {target_dir}")
 
     except Exception as e:
         print(f"Error initializing project: {e}", file=sys.stderr)

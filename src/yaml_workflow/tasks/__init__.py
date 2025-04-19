@@ -6,6 +6,7 @@ Each module provides specific functionality that can be referenced in workflow Y
 """
 
 import inspect
+import logging
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
@@ -20,21 +21,60 @@ R = TypeVar("R")
 _task_registry: Dict[str, TaskHandler] = {}
 
 
-def register_task(name: str) -> Callable[[TaskHandler], TaskHandler]:
-    """Register a task handler.
+def register_task(
+    name: Optional[str] = None,
+) -> Callable[..., Callable[[TaskConfig], R]]:
+    """Decorator to register a function as a workflow task."""
 
-    Args:
-        name: Task name
+    def task_wrapper(func: Callable[..., R]) -> Callable[[TaskConfig], R]:
+        task_name = name or func.__name__
 
-    Returns:
-        Decorator function
-    """
+        @wraps(func)
+        def wrapper(config: TaskConfig) -> R:
+            # Get function parameters
+            sig = inspect.signature(func)
+            params = sig.parameters
 
-    def decorator(handler: TaskHandler) -> TaskHandler:
-        _task_registry[name] = handler
-        return handler
+            # Check if the function expects only the TaskConfig object
+            if (
+                list(params.keys()) == ["config"]
+                and params["config"].annotation is TaskConfig
+            ):
+                # Case 1: Call directly with config
+                return func(config)
+            else:
+                # Case 2: Process inputs and potentially pass config explicitly
+                processed = config.process_inputs()
+                kwargs = {}
+                func_params = inspect.signature(func).parameters
+                needs_config_arg = "config" in func_params
 
-    return decorator
+                for name, param in func_params.items():
+                    if (
+                        name == "config"
+                    ):  # Always skip putting config in kwargs from inputs
+                        continue
+                    if name in processed:
+                        kwargs[name] = processed[name]
+                    elif param.default is not inspect.Parameter.empty:
+                        kwargs[name] = param.default
+                    else:
+                        # Raise error only if a non-config required parameter is missing
+                        raise ValueError(f"Missing required parameter: {name}")
+
+                # Call the original function, adding config if needed
+                if needs_config_arg:
+                    # Ensure we don't somehow add config twice if it was also in inputs
+                    if "config" in kwargs:
+                        del kwargs["config"]  # Should not happen due to loop skip
+                    return func(config=config, **kwargs)  # Pass config explicitly
+                else:
+                    return func(**kwargs)  # Original call without explicit config
+
+        _task_registry[task_name] = wrapper
+        return wrapper
+
+    return task_wrapper
 
 
 def get_task_handler(name: str) -> Optional[TaskHandler]:
@@ -46,46 +86,10 @@ def get_task_handler(name: str) -> Optional[TaskHandler]:
     Returns:
         Optional[TaskHandler]: Task handler if found
     """
-    return _task_registry.get(name)
-
-
-def create_task_handler(func: Callable[..., R]) -> TaskHandler:
-    """
-    Create a task handler from a function.
-
-    This function wraps a regular function to make it compatible with the task system.
-    The wrapped function will receive its arguments from the task inputs.
-
-    Args:
-        func: Function to wrap
-
-    Returns:
-        TaskHandler: Task handler function
-    """
-
-    @wraps(func)
-    def wrapper(config: TaskConfig) -> R:
-        # Get function parameters
-        sig = inspect.signature(func)
-        params = sig.parameters
-
-        # Process inputs with template support
-        processed = config.process_inputs()
-
-        # Extract arguments for the function
-        kwargs = {}
-        for name, param in params.items():
-            if name in processed:
-                kwargs[name] = processed[name]
-            elif param.default is not inspect.Parameter.empty:
-                kwargs[name] = param.default
-            else:
-                raise ValueError(f"Missing required parameter: {name}")
-
-        # Call the function with extracted arguments
-        return func(**kwargs)
-
-    return wrapper
+    handler = _task_registry.get(name)
+    # print(f"--- get_task_handler requested: '{name}', found: {handler} ---") # DEBUG
+    logging.debug(f"Retrieved handler for task '{name}': {handler}")
+    return handler
 
 
 from .basic_tasks import (
@@ -112,8 +116,9 @@ from .python_tasks import print_vars_task
 from .shell_tasks import shell_task
 from .template_tasks import render_template
 
-# Register built-in tasks
-register_task("shell")(shell_task)
+# Explicit registration calls (ensure these tasks don't use @register_task internally)
+# If a task like `shell_task` already uses `@register_task()`, this explicit call is redundant.
+# register_task("shell")(shell_task)
 register_task("write_file")(write_file_task)
 register_task("read_file")(read_file_task)
 register_task("append_file")(append_file_task)
@@ -124,19 +129,15 @@ register_task("read_yaml")(read_yaml_task)
 register_task("print_vars")(print_vars_task)
 register_task("template")(render_template)
 register_task("batch")(batch_task)
-register_task("echo")(create_task_handler(echo))
-register_task("fail")(create_task_handler(fail))
-register_task("hello_world")(create_task_handler(hello_world))
-register_task("add_numbers")(create_task_handler(add_numbers))
-register_task("join_strings")(create_task_handler(join_strings))
-register_task("create_greeting")(create_task_handler(create_greeting))
+
+# Removed redundant register_task calls for basic_tasks (echo, fail, etc.)
+# They are now registered by decorators within basic_tasks.py via the import above.
 
 __all__ = [
     "TaskConfig",
     "TaskHandler",
     "register_task",
     "get_task_handler",
-    "create_task_handler",
     "shell_task",
     "write_file_task",
     "read_file_task",
