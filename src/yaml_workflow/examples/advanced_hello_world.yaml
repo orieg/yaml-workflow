@@ -54,7 +54,7 @@ steps:
     # Default retry applies if validation_result.txt is temporarily unavailable
     retry: 3
     inputs:
-      file: validation_result.txt # Use 'file' key
+      file: output/validation_result.txt
     on_error:
       action: fail # If the file cannot be read after retries, fail hard
       message: "Failed to read validation result: {{ error }}"
@@ -85,7 +85,7 @@ steps:
     task: read_file
     retry: 3
     inputs:
-      file: processed_validation.txt
+      file: output/processed_validation.txt
     on_error:
       action: fail
       message: "Failed to read validation status: {{ error }}"
@@ -103,7 +103,7 @@ steps:
       command: |
         echo "=== Debug Info ==="
         printf "Validation Result File Content:"
-        cat "output/validation_passed.txt"
+        cat "output/processed_validation.txt"
         echo ""
         # *** Correctly access step output using steps namespace ***
         echo "Validation Content: {{ steps.read_validation.result.content }}"
@@ -128,7 +128,7 @@ steps:
   - name: create_greeting
     task: write_json
     inputs:
-      file: greeting.json
+      file: output/greeting.json
       data:
         name: "{{ args.name }}"
         message: "Hello, {{ args.name }}! Welcome to the advanced workflow."
@@ -142,7 +142,7 @@ steps:
   - name: translate_greeting
     task: write_yaml
     inputs:
-      file: greetings.yaml
+      file: output/greetings.yaml
       data:
         en: "Hello, {{ args.name }}!"
         es: "Hola, {{ args.name }}!"
@@ -170,7 +170,7 @@ steps:
   - name: handle_error
     task: write_file
     inputs:
-      file: error_report.txt
+      file: output/error_report.txt
       content: |
         Workflow failed for input name: {{ args.name }}
         Validation Status: {{ steps.read_validation.result.content.strip() }}

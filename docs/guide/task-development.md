@@ -8,6 +8,7 @@ This guide provides instructions and best practices for developing custom tasks 
 - **Task Registration**: Use the `@register_task("your_task_name")` decorator to make your task available in workflow YAML files.
 - **Type Safety**: Utilize Python type hints for function arguments and return values to improve clarity and enable static analysis.
 - **Logging**: Use `get_task_logger` from `yaml_workflow.tasks.base` to get a logger specific to the task instance.
+- **Path Handling**: If your task deals with file paths provided in `inputs`, use the `config.workspace` attribute and standard `pathlib` operations (`config.workspace / relative_path`) to resolve paths. Assume relative paths are relative to the workspace root. Avoid hardcoding subdirectories like `output/` unless intrinsic to the task's core function.
 
 ## Returning Results
 

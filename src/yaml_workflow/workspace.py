@@ -136,23 +136,21 @@ def create_workspace(
     return workspace
 
 
-def resolve_path(workspace: Path, file_path: str, use_output_dir: bool = True) -> Path:
+def resolve_path(workspace: Path, file_path: str) -> Path:
     """
     Resolve a file path relative to the workspace directory.
 
     Args:
         workspace: Workspace directory
         file_path: File path to resolve
-        use_output_dir: Whether to place files in the output directory by default
 
     Returns:
         Path: Resolved absolute path
 
-    The function handles paths in the following way:
-    1. If the path is absolute, return it as is
-    2. If the path starts with output/, logs/, or temp/, resolve it relative to workspace
-    3. If use_output_dir is True and path doesn't start with a known directory, resolve relative to workspace/output/
-    4. Otherwise, resolve relative to workspace
+    Handles paths:
+    1. If path is absolute, return it as is.
+    2. If path is relative, join it with the workspace root.
+       Users should include prefixes like 'output/', 'logs/', 'temp/' explicitly if needed.
     """
     path = Path(file_path)
 
@@ -160,15 +158,8 @@ def resolve_path(workspace: Path, file_path: str, use_output_dir: bool = True) -
     if path.is_absolute():
         return path
 
-    # If path starts with a known workspace subdirectory, resolve relative to workspace
-    if any(file_path.startswith(prefix) for prefix in ["output/", "logs/", "temp/"]):
-        return workspace / path
-
-    # If use_output_dir is True and path doesn't start with a known directory, resolve relative to workspace/output/
-    if use_output_dir:
-        return workspace / "output" / path
-
-    # Otherwise, resolve relative to workspace
+    # Otherwise, resolve relative to workspace root
+    # Implicit 'output/' prefixing removed for consistency.
     return workspace / path
 
 
