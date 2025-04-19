@@ -140,13 +140,13 @@
     - Remove the previous logic that stored dictionaries directly.
 
 2. **[x] Task Review & Update (`tasks/`)**: 
-    - Review built-in tasks to confirm their return values (single values or dictionaries) are appropriate for being stored under the `result` key. (Implicitly done for echo/shell via examples/tests).
+    - Review built-in tasks to confirm their return values (single values or dictionaries) are appropriate for being stored under the `result` key. (Implicitly done for echo/shell via examples/tests, file tasks refactored).
 
 3. **[x] Update Examples (`src/yaml_workflow/examples/`)**: 
-    - Modify all example YAML files to access previous step outputs *exclusively* using the `{{ steps.STEP_NAME.result }}` or `{{ steps.STEP_NAME.result.KEY }}` pattern. (Done for complex_flow_error_handling).
+    - Modify all example YAML files to access previous step outputs *exclusively* using the `{{ steps.STEP_NAME.result }}` or `{{ steps.STEP_NAME.result.KEY }}` pattern. (Done for complex_flow_error_handling, advanced_hello_world).
 
 4. **[x] Add/Update Tests (`tests/`)**: 
-    - Add/Update tests verifying that results are correctly stored and accessible via `steps.STEP_NAME.result` or `steps.STEP_NAME.result.KEY`. (Done for complex_flow_error_handling tests).
+    - Add/Update tests verifying that results are correctly stored and accessible via `steps.STEP_NAME.result` or `steps.STEP_NAME.result.KEY`. (Done for complex_flow_error_handling, advanced_hello_world, file_tasks tests).
     - Ensure no tests rely on direct access like `steps.STEP_NAME.KEY`.
 
 ### Phase 3: Documentation Enhancement (Renumbered)
@@ -185,19 +185,14 @@
 
 2. **[x] Add specific flow transition tests** (Addressed via `test_examples.py` for `complex_flow_error_handling.yaml`. Consider adding more if needed.)
 
-3. **[x] Add example workflow integration tests** (`tests/test_examples.py`) (Partially done for `complex_flow_error_handling.yaml`. Review other examples.)
+3. **[x] Add example workflow integration tests** (`tests/test_examples.py`) (Partially done for `complex_flow_error_handling.yaml` & `advanced_hello_world`. File task examples moved to task tests. Review other examples.)
 
-4. **[ ] Add performance tests**
-    - Create `tests/test_performance.py`.
-    - Add tests measuring execution time for common/complex workflows.
-    - Add tests measuring memory usage (if feasible).
-
-5. **[~] Improve overall test coverage and fix existing issues**
+4. **[~] Improve overall test coverage and fix existing issues**
     - Run `pytest --cov=src/yaml_workflow --cov-report term-missing` to check coverage.
     - Current overall coverage ~77%. `batch_context.py` at 100%.
     - Identify and test uncovered code paths. Key areas needing significant improvement:
-        - `src/yaml_workflow/tasks/file_tasks.py`
-        - `src/yaml_workflow/tasks/python_tasks.py`
+        - `src/yaml_workflow/tasks/file_tasks.py` (Coverage significantly improved)
+        - `src/yaml_workflow/tasks/python_tasks.py` (Coverage improved)
         - `src/yaml_workflow/tasks/shell_tasks.py`
         - `src/yaml_workflow/engine.py`
         - `src/yaml_workflow/template.py`
@@ -207,6 +202,7 @@
         - `src/yaml_workflow/exceptions.py`
         - Other task modules (`basic_tasks`, `noop`, `template_tasks`)
     - Aim for a target coverage percentage (e.g., 90%).
+    - *(Note: Performance testing moved to `.github/PERFORMANCE_TESTING_PLAN.md`)*
 
 ### Implementation Strategy
 
@@ -219,7 +215,7 @@
    - Clear error messages
 
 2. **Output Handling**
-   - Standardize on `steps.STEP_NAME.KEY` access.
+   - Standardize on `steps.STEP_NAME.result` access.
    - Ensure tasks return predictable structures (dicts or single values).
    - Remove/Deprecate top-level context mapping via `outputs`.
 
@@ -352,9 +348,8 @@ pytest
 
 - [ ] 5. **Testing Enhancement Phase** (Renumbered - excluding work already done in examples)
    Implementation Order:
-   - [ ] 1. Add performance tests.
-   - [~] 2. Review and improve overall test coverage. (Partially addressed by CLI test additions)
-   - [ ] 3. Run coverage checks (`pytest --cov`).
+   - [~] 1. Review and improve overall test coverage. (Partially addressed by CLI test additions, file task refactor, advanced_hello_world fixes)
+   - [ ] 2. Run coverage checks (`pytest --cov`).
    Success Criteria:
    - Added tests cover remaining gaps.
 
