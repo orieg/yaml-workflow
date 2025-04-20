@@ -264,7 +264,7 @@ def handle_divide_operation(config: TaskConfig) -> Dict[str, Any]:
         if "divisor" not in processed:
             raise ValueError("divisor parameter is required for divide operation")
         divisor_raw = processed.get("divisor")  # Now we know it exists
-        assert divisor_raw is not None # Add assertion for type checker
+        assert divisor_raw is not None  # Add assertion for type checker
 
         try:
             dividend = float(dividend)
