@@ -189,10 +189,9 @@
 
 4. **[~] Improve overall test coverage and fix existing issues**
     - Run `pytest --cov=src/yaml_workflow --cov-report term-missing` to check coverage.
-    - Current overall coverage **87%** (up from 79%). `batch_context.py` at 100%. `step.py` at 100%.
-    - *(Progress: Added tests for `runner.py`, significantly improving its coverage from 0%. Fixed related issues in `step.py`).*
+    - Current overall coverage **88%** (up from 79%). `batch_context.py` at 100%. `step.py` at 100%. `exceptions.py` at 98%.
+    - *(Progress: Added tests for `runner.py`, significantly improving its coverage. Fixed existing issue in `test_exceptions.py` contributing to 98% coverage for `exceptions.py`).*
     - Identify and test uncovered code paths. Key areas still needing significant improvement:
-        - `src/yaml_workflow/exceptions.py` (72%)
         - `src/yaml_workflow/template.py` (73%)
         - `src/yaml_workflow/tasks/basic_tasks.py` (76%)
         - `src/yaml_workflow/workspace.py` (80%)
