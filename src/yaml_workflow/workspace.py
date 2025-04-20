@@ -30,7 +30,7 @@ def sanitize_name(name: str) -> str:
 
 def get_next_run_number(base_dir: Path, workflow_name: str) -> int:
     """
-    Get the next available run number for a workflow by checking metadata files.
+    Get the next available run number for a workflow by checking existing run directories.
 
     Args:
         base_dir: Base directory containing workflow runs
@@ -40,24 +40,41 @@ def get_next_run_number(base_dir: Path, workflow_name: str) -> int:
         int: Next available run number
     """
     sanitized_name = sanitize_name(workflow_name)
-    workspace = base_dir / sanitized_name
+    highest_run_number = 0
+    latest_run_dir = None
 
-    if not workspace.is_dir():
-        return 1
+    # Find existing run directories for this workflow
+    if base_dir.is_dir():  # Check if base_dir exists
+        for item in base_dir.iterdir():
+            if item.is_dir() and item.name.startswith(f"{sanitized_name}_run_"):
+                try:
+                    # Extract run number from directory name
+                    run_num_str = item.name.split("_run_")[-1]
+                    run_num = int(run_num_str)
+                    if run_num > highest_run_number:
+                        highest_run_number = run_num
+                        latest_run_dir = item
+                except (ValueError, IndexError):
+                    continue  # Ignore directories with malformed names
 
-    # Check metadata file
-    metadata_path = workspace / METADATA_FILE
-    if metadata_path.exists():
-        try:
-            with open(metadata_path) as f:
-                metadata = json.load(f)
-                run_number = metadata.get("run_number", 0)
-                if run_number and isinstance(run_number, int):
-                    return run_number + 1
-        except (json.JSONDecodeError, IOError):
-            pass
+    # If we found existing runs, try to get the run number from the latest one's metadata
+    # This is more reliable than just parsing the directory name in case of manual renaming/gaps
+    if latest_run_dir:
+        metadata_path = latest_run_dir / METADATA_FILE
+        if metadata_path.exists():
+            try:
+                with open(metadata_path) as f:
+                    metadata = json.load(f)
+                    meta_run_number = metadata.get("run_number")
+                    if isinstance(meta_run_number, int):
+                        # Use the metadata run number if valid
+                        highest_run_number = meta_run_number
+            except (json.JSONDecodeError, IOError):
+                # If metadata is corrupt, we might fall back to the highest number found from dir names
+                pass
 
-    return 1
+    # The next run number is the highest found + 1
+    return highest_run_number + 1
 
 
 def save_metadata(workspace: Path, metadata: Dict[str, Any]) -> None:
