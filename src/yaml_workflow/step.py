@@ -30,7 +30,21 @@ class Step:
         self.task = step_data.get("task", "")
         self.inputs = step_data.get("inputs", {})
         self.condition = step_data.get("condition")
-        self.on_error = step_data.get("on_error", {})
+
+        # Normalize on_error
+        on_error_config = step_data.get("on_error", {})  # Default to empty dict
+        if isinstance(on_error_config, str):
+            # If it's just a string (like 'continue'), normalize it
+            self.on_error = {"action": on_error_config}
+        elif isinstance(on_error_config, dict):
+            self.on_error = on_error_config
+        else:
+            # Invalid type, default to standard failure
+            logger.warning(
+                f"Invalid type for on_error in step '{self.name}': "
+                f"{type(on_error_config).__name__}. Defaulting to 'fail'."
+            )
+            self.on_error = {}
 
     def evaluate_condition(self) -> bool:
         """Evaluate the step's condition."""

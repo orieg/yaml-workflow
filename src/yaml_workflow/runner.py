@@ -168,39 +168,47 @@ def run_workflow(
                 logger.error(
                     f"Template error in step '{step_name}': {e}", exc_info=True
                 )
-                final_status = step.handle_error(e, context)
-                if final_status["success"] is False:
+                step_error_status = step.handle_error(e, context)
+                if step_error_status["success"] is False:
+                    # Only update final_status and break if action was 'fail'
+                    final_status = step_error_status
                     logger.error(
                         f"Workflow aborted due to error in step '{step_name}'."
                     )
-                    break  # Stop workflow execution
+                    break
                 else:
+                    # Action was 'continue', log warning but don't change final_status message
                     logger.warning(
-                        f"Error handled in step '{step_name}', continuing workflow..."
+                        f"Step '{step_name}' failed but workflow continues: {step_error_status['message']}"
                     )
                     context["steps"][step_name] = {
                         "skipped": False,
-                        "error": str(e),
+                        "error": str(e),  # Log the original error for the step
                         "result": None,
-                    }  # Mark error but continue
+                    }
+                    # Keep final_status['success'] = True and original message
 
             except Exception as e:
                 logger.error(f"Error executing step '{step_name}': {e}", exc_info=True)
-                final_status = step.handle_error(e, context)
-                if final_status["success"] is False:
+                step_error_status = step.handle_error(e, context)
+                if step_error_status["success"] is False:
+                    # Only update final_status and break if action was 'fail'
+                    final_status = step_error_status
                     logger.error(
                         f"Workflow aborted due to error in step '{step_name}'."
                     )
-                    break  # Stop workflow execution
+                    break
                 else:
+                    # Action was 'continue', log warning but don't change final_status message
                     logger.warning(
-                        f"Error handled in step '{step_name}', continuing workflow..."
+                        f"Step '{step_name}' failed but workflow continues: {step_error_status['message']}"
                     )
                     context["steps"][step_name] = {
                         "skipped": False,
-                        "error": str(e),
+                        "error": str(e),  # Log the original error for the step
                         "result": None,
-                    }  # Mark error but continue
+                    }
+                    # Keep final_status['success'] = True and original message
 
             finally:
                 del context["current_step"]  # Clean up current step context
