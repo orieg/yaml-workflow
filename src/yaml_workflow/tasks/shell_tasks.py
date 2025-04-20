@@ -133,12 +133,10 @@ def process_command(command: str, context: Dict[str, Any]) -> str:
         template = Template(command, undefined=StrictUndefined)
         return template.render(**context)
     except UndefinedError as e:
-        task_name = context.get("step_name", "shell_template")  # Try to get step name
-        task_type = context.get("task_type", "shell")  # Try to get task type
-        # Extract the undefined variable name from the error message
+        task_name = context.get("step_name", "shell_template")
+        task_type = context.get("task_type", "shell")
         var_name = str(e).split("'")[1] if "'" in str(e) else "unknown"
 
-        # Get available variables by namespace
         available = {
             "args": list(context.get("args", {}).keys()),
             "env": list(context.get("env", {}).keys()),
@@ -148,24 +146,24 @@ def process_command(command: str, context: Dict[str, Any]) -> str:
             ),
         }
 
-        # Build a helpful error message
         msg = f"Undefined variable '{var_name}' in shell command template. "
         msg += "Available variables by namespace:\n"
         for ns, vars in available.items():
             msg += f"  {ns}: {', '.join(vars) if vars else '(empty)'}\n"
 
-        # Wrap the original UndefinedError
         template_error = TemplateError(msg)
         err_context = ErrorContext(
             step_name=str(task_name),
             task_type=str(task_type),
             error=template_error,
-            task_config=context.get("task_config"),  # Pass config if available
+            task_config=context.get("task_config"),
             template_context=context,
         )
         handle_task_error(err_context)
         return ""  # Unreachable
     except Exception as e:  # Catch other template processing errors
+        task_name = context.get("step_name", "shell_template")
+        task_type = context.get("task_type", "shell")
         handle_task_error(
             ErrorContext(
                 step_name=str(task_name),
@@ -192,7 +190,6 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
     Raises:
         TaskExecutionError: If command execution fails or template resolution fails
     """
-    # Use str() to handle None safely, default to 'shell_task' if name is None
     task_name = str(config.name or "shell_task")
     task_type = str(config.type or "shell")
     logger = get_task_logger(config.workspace, task_name)
@@ -200,19 +197,14 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
     try:
         log_task_execution(logger, config.step, config._context, config.workspace)
 
-        # Process inputs with template support
-        # process_inputs now uses handle_task_error internally
         processed = config.process_inputs()
-        config._processed_inputs = processed  # Store for potential future use
+        config._processed_inputs = processed
 
-        # Get command (required)
         if "command" not in processed:
-            # Raise ValueError for config issue, will be caught by outer handler
             missing_cmd_error = ValueError("command parameter is required")
             raise missing_cmd_error
         command = processed["command"]
 
-        # Handle working directory
         cwd = config.workspace
         if "working_dir" in processed:
             working_dir = processed["working_dir"]
@@ -221,52 +213,51 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
             else:
                 cwd = Path(working_dir)
 
-        # Get environment variables
         env = get_environment()
         if "env" in processed:
             env.update(processed["env"])
 
-        # Get shell mode - default to True for better script compatibility
         shell = processed.get("shell", True)
 
         # Get timeout
         timeout = processed.get("timeout", None)
 
-        # Process command template - process_command now uses handle_task_error
-        # Pass necessary context for error reporting within process_command
-        command_context = {
-            **config._context,
-            "step_name": task_name,
-            "task_type": task_type,
-            "task_config": config.step,
-        }
-        command = process_command(command, command_context)
+        # Process command template ONLY if it's a string
+        if isinstance(command, str):
+            # Pass necessary context for error reporting within process_command
+            command_context = {
+                **config._context,
+                "step_name": task_name,
+                "task_type": task_type,
+                "task_config": config.step,
+            }
+            command = process_command(command, command_context)
+        elif not isinstance(command, list):
+            # Raise error if command is neither string nor list
+            invalid_type_error = TypeError(
+                f"Invalid command type: {type(command).__name__}. Expected string or list."
+            )
+            raise TaskExecutionError(step_name=task_name, original_error=invalid_type_error)
 
         # Run command
         returncode, stdout, stderr = run_command(
             command, cwd=str(cwd), env=env, shell=shell, timeout=timeout
         )
 
-        # Check return code
         if returncode != 0:
-            # Create specific error for non-zero exit code
             error_message = f"Command failed with exit code {returncode}"
             if stderr:
                 error_message += f"\nStderr:\n{stderr}"
-            # Use CalledProcessError for consistency, even though we caught it manually
             cmd_error = subprocess.CalledProcessError(
                 returncode, cmd=command, output=stdout, stderr=stderr
             )
-            # Let the central handler wrap this
             raise cmd_error
 
-        # Log successful execution
         result = {"return_code": returncode, "stdout": stdout, "stderr": stderr}
         log_task_result(logger, result)
         return result
 
     except Exception as e:
-        # Centralized error handling for any exception during setup or execution
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
