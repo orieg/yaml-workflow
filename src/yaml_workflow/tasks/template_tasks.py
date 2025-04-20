@@ -4,7 +4,13 @@ import logging
 from pathlib import Path
 from typing import Any, Dict
 
-from jinja2 import StrictUndefined, Template, UndefinedError
+from jinja2 import (
+    Environment,
+    FileSystemLoader,
+    StrictUndefined,
+    Template,
+    UndefinedError,
+)
 
 from ..exceptions import TemplateError
 from . import TaskConfig, register_task
@@ -35,23 +41,28 @@ def render_template(config: TaskConfig) -> Dict[str, Any]:
     try:
         log_task_execution(logger, config.step, config._context, config.workspace)
 
-        # Process inputs with template resolution
-        processed = config.process_inputs()
+        # Get raw inputs directly, do not process them here
+        raw_inputs = config.step.get("inputs", {})
+        template_str = raw_inputs.get("template")
+        if not template_str or not isinstance(template_str, str):
+            raise ValueError("Input 'template' must be a non-empty string")
 
-        template_str = processed.get("template")
-        if not template_str:
-            raise ValueError("No template provided")
+        output_file = raw_inputs.get("output")
+        if not output_file or not isinstance(output_file, str):
+            raise ValueError("Input 'output' must be a non-empty string")
 
-        output_file = processed.get("output")
-        if not output_file:
-            raise ValueError("No output file specified")
+        # Get the shared template engine from config
+        template_engine = config._template_engine
 
-        # Render template with strict undefined handling
-        template = Template(template_str, undefined=StrictUndefined)
-        rendered = template.render(**config._context)
+        # Render template using the engine, providing the workspace as searchpath
+        # Pass the full context for rendering
+        rendered = template_engine.process_template(
+            template_str,
+            variables=config._context,  # Pass the full context
+            searchpath=str(config.workspace),  # Enable includes relative to workspace
+        )
 
-        # Save to file
-        # Assuming output_file is relative to workspace
+        # Save to file (use the raw output_file path)
         output_path = config.workspace / output_file
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(rendered)

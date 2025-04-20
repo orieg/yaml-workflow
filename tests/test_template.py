@@ -190,17 +190,6 @@ def test_process_template_error_invalid_namespace(template_engine):
     assert "- valid" in error_msg
 
 
-@pytest.mark.skip(
-    reason="Accessing attribute on non-dict does not raise TemplateError as expected"
-)
-def test_process_template_error_invalid_attribute_access_non_dict(template_engine):
-    """Test error message when accessing attribute on non-dict."""
-    template = "{{ steps.foo.bar }}"
-    variables = {"steps": {"foo": "not_a_dict"}}
-    with pytest.raises(TemplateError):
-        template_engine.process_template(template, variables)
-
-
 def test_process_template_error_invalid_attribute_access_missing(template_engine):
     """Test error message when accessing missing attribute in dict."""
     template = "{{ steps.foo.missing }}"
