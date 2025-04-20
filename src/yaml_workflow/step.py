@@ -89,8 +89,8 @@ class Step:
         action = self.on_error.get("action", "fail")
         message_template = self.on_error.get("message")
 
-        # Ensure error is in context for message rendering
-        error_context = {**context, "error": str(error)}
+        # Ensure error and step name are in context for message rendering
+        error_context = {**context, "error": str(error), "name": self.name}
 
         final_message = f"Error in step '{self.name}': {error}"
         if message_template:

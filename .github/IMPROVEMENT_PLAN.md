@@ -189,18 +189,19 @@
 
 4. **[~] Improve overall test coverage and fix existing issues**
     - Run `pytest --cov=src/yaml_workflow --cov-report term-missing` to check coverage.
-    - Current overall coverage ~77%. `batch_context.py` at 100%.
-    - Identify and test uncovered code paths. Key areas needing significant improvement:
-        - `src/yaml_workflow/tasks/file_tasks.py` (Coverage significantly improved)
-        - `src/yaml_workflow/tasks/python_tasks.py` (Coverage improved)
+    - Current overall coverage ~79% (up from 77%). `batch_context.py` at 100%.
+    - *(Progress: Added tests for `runner.py`, significantly improving its coverage from 0%. Fixed related issues in `step.py`).*
+    - Identify and test uncovered code paths. Key areas still needing significant improvement:
+        - `src/yaml_workflow/step.py` (Likely improved but needs direct tests)
         - `src/yaml_workflow/tasks/shell_tasks.py`
+        - `src/yaml_workflow/tasks/python_tasks.py`
         - `src/yaml_workflow/engine.py`
         - `src/yaml_workflow/template.py`
         - `src/yaml_workflow/state.py`
         - `src/yaml_workflow/cli.py`
         - `src/yaml_workflow/workspace.py`
         - `src/yaml_workflow/exceptions.py`
-        - Other task modules (`basic_tasks`, `noop`, `template_tasks`)
+        - Other task modules (`basic_tasks`, `noop`, `template_tasks`, `file_tasks`)
     - Aim for a target coverage percentage (e.g., 90%).
     - *(Note: Performance testing moved to `.github/PERFORMANCE_TESTING_PLAN.md`)*
 
