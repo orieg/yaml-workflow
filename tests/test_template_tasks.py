@@ -177,26 +177,25 @@ def test_template_from_file(temp_workspace):
 
 def test_template_with_includes(temp_workspace):
     """Test template rendering with includes."""
-    # Note: The current render_template implementation doesn't support includes
-    # This test is marked as expected to fail until include support is added
-    pytest.skip("Template includes not yet supported in the current implementation")
-
-    # Create included template
-    include_dir = temp_workspace / "templates"
-    include_dir.mkdir()
-    header_file = include_dir / "header.txt"
+    # Create included template directly in workspace
+    header_file = temp_workspace / "header.txt"
     header_file.write_text("Welcome to {{ app_name }}")
 
     step = {
-        "template": """{% include 'header.txt' %}
-Content for {{ user }}""",
-        "output": "page.txt",
-        "include_path": str(include_dir),
+        "name": "test_include",
+        "task": "template",
+        "inputs": {
+            "template": "{% include 'header.txt' %}\nContent for {{ user }}",
+            "output": "page.txt",
+        },
     }
 
-    result = render_template(
-        step, {"app_name": "My App", "user": "Alice"}, temp_workspace
-    )
+    # Define the context needed for the templates
+    context = {"app_name": "My App", "user": "Alice"}
+    config = TaskConfig(step, context, temp_workspace)
+
+    # Call render_template with the config
+    result = render_template(config)
 
     output_file = temp_workspace / "page.txt"
     assert output_file.exists()
