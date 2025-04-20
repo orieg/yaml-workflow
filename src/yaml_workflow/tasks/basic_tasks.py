@@ -100,13 +100,5 @@ def create_greeting(name: str, context: Dict[str, Any]) -> str:
     try:
         template = Template("Hello {{ name }}!", undefined=StrictUndefined)
         return template.render(name=name, **context)
-    except UndefinedError as e:
-        available = {
-            "name": name,
-            "args": list(context["args"].keys()) if "args" in context else [],
-            "env": list(context["env"].keys()) if "env" in context else [],
-            "steps": list(context["steps"].keys()) if "steps" in context else [],
-        }
-        raise TemplateError(f"{str(e)}. Available variables: {available}")
     except Exception as e:
         raise TemplateError(f"Failed to create greeting: {str(e)}")
