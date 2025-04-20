@@ -266,7 +266,9 @@ def test_python_script_fail_no_check(tmp_path: Path, test_script_file):
     status = engine.run()
     assert status["status"] == "completed"
     assert status["outputs"]["run_script_fail"]["result"]["returncode"] == 1
-    assert "Exiting with error" in status["outputs"]["run_script_fail"]["result"]["stderr"]
+    assert (
+        "Exiting with error" in status["outputs"]["run_script_fail"]["result"]["stderr"]
+    )
 
 
 def test_python_script_fail_with_check(tmp_path: Path, test_script_file):
