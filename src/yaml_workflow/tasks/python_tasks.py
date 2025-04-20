@@ -148,7 +148,10 @@ def execute_function(code: str, config: TaskConfig) -> Any:
 
                     processed_args.append(ast.literal_eval(arg))
                 except (ValueError, SyntaxError):
-                    processed_args.append(arg)
+                    # If eval fails, raise an error instead of silently using the string
+                    raise ValueError(
+                        f"Failed to evaluate argument string as literal: {arg!r}"
+                    )
             else:
                 processed_args.append(arg)
 
@@ -255,17 +258,29 @@ def handle_divide_operation(config: TaskConfig) -> Dict[str, Any]:
         if "item" in processed:
             dividend = processed["item"]
         if dividend is None:
-            raise ValueError("Dividend must be provided for divide operation")
+            raise ValueError("dividend parameter is required for divide operation")
 
-        divisor = float(processed.get("divisor", 1))
+        # Check for divisor *before* getting with default
+        if "divisor" not in processed:
+            raise ValueError("divisor parameter is required for divide operation")
+        divisor_raw = processed.get("divisor")  # Now we know it exists
+        assert divisor_raw is not None # Add assertion for type checker
+
+        try:
+            dividend = float(dividend)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Invalid dividend: {str(e)}")
+
+        try:
+            divisor = float(divisor_raw)
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Invalid divisor: {str(e)}")
+
         if divisor == 0:
-            raise ZeroDivisionError("Division by zero")
+            raise ValueError("Division by zero")
 
-        dividend = float(dividend)
-        # This check seems wrong, removing: if dividend == 0:
-        #    raise TemplateError("Cannot divide zero by a number")
-        division_result = dividend / divisor
-        return {"result": division_result}
+        result = dividend / divisor
+        return {"result": float(result)}
 
     except Exception as e:
         # Centralized error handling
@@ -432,46 +447,73 @@ def python_task(config: TaskConfig) -> Dict[str, Any]:
         log_task_execution(logger, config.step, config._context, config.workspace)
 
         # Process inputs first to handle any templates
-        # This now uses the refactored config.process_inputs which calls handle_task_error internally
         processed = config.process_inputs()
-        # Store processed inputs back in config for helper functions to use
-        config._processed_inputs = processed
+        config._processed_inputs = processed  # Store for use in helpers
+
+        # --- Input Validation ---
+        has_code = "code" in processed
+        has_operation = "operation" in processed
+
+        # Allow code and operation ONLY if operation is 'function'
+        if has_code and has_operation and processed.get("operation") != "function":
+            raise ValueError(
+                "Cannot specify both 'code' and 'operation' unless operation is 'function'"
+            )
+        # Still require at least one
+        if not has_code and not has_operation:
+            raise ValueError(
+                "Either 'code' or 'operation' must be specified for Python task"
+            )
+
+        operation = processed.get("operation")
 
         result = None
+        operation_result = None  # Initialize operation_result
 
         if "code" in processed:
             if "operation" not in processed:
-                result = execute_code(processed["code"], config)
+                code_result = execute_code(processed["code"], config)
+                # Create the result dict for code-only execution
+                operation_result = {"result": code_result}
             elif processed["operation"] == "function":
-                result = execute_function(processed["code"], config)
-            # else: # Should we handle invalid operation here?
-            #     raise ValueError("Cannot specify both 'code' and 'operation' unless operation is 'function'")
-        else:
-            operation = processed.get("operation")
-            if not operation:
-                raise ValueError(
-                    "Either 'code' or 'operation' must be specified for Python task"
-                )
-
-            if operation == "multiply":
+                if not has_code:
+                    raise ValueError(
+                        "'code' parameter is required for function operation"
+                    )
+                # Capture the result from execute_function
+                func_result = execute_function(processed["code"], config)
+                operation_result = {"result": func_result}
+            elif operation == "multiply":
                 operation_result = handle_multiply_operation(config)
-                result = operation_result.get("result")
             elif operation == "divide":
                 operation_result = handle_divide_operation(config)
-                result = operation_result.get("result")
             elif operation == "custom":
-                # Assuming handle_custom_operation uses config.type or similar
                 operation_result = handle_custom_operation(config)
-                result = operation_result.get("result")
+            else:
+                # This path should technically be unreachable due to earlier checks
+                # but raising here for safety.
+                raise ValueError(f"Unknown or unhandled operation: {operation}")
+        else:
+            if operation == "multiply":
+                operation_result = handle_multiply_operation(config)
+            elif operation == "divide":
+                operation_result = handle_divide_operation(config)
+            elif operation == "custom":
+                operation_result = handle_custom_operation(config)
             else:
                 raise ValueError(f"Unknown operation: {operation}")
 
-        output = {
-            "result": result,
-            # Add other potential outputs based on specific operations if needed
-        }
-        log_task_result(logger, output)
-        return output
+        # Return the dictionary produced by the operation handlers or code execution
+        if operation_result is None:
+            # This case should ideally not be hit if validation is correct,
+            # but provide a default empty dict for safety.
+            logger.warning(
+                "Operation result was unexpectedly None for step %s", task_name
+            )
+            operation_result = {}
+
+        log_task_result(logger, operation_result)
+        return operation_result
 
     except Exception as e:
         # Centralized error handling for python_task specific errors (e.g., config validation)

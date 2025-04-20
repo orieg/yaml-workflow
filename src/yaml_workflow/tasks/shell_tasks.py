@@ -237,7 +237,9 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
             invalid_type_error = TypeError(
                 f"Invalid command type: {type(command).__name__}. Expected string or list."
             )
-            raise TaskExecutionError(step_name=task_name, original_error=invalid_type_error)
+            raise TaskExecutionError(
+                step_name=task_name, original_error=invalid_type_error
+            )
 
         # Run command
         returncode, stdout, stderr = run_command(
