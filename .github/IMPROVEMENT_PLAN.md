@@ -189,23 +189,23 @@
 
 4. **[~] Improve overall test coverage and fix existing issues**
     - Run `pytest --cov=src/yaml_workflow --cov-report term-missing` to check coverage.
-    - Current overall coverage **85%** (up from 79%). `batch_context.py` at 100%. `step.py` at 100%.
+    - Current overall coverage **87%** (up from 79%). `batch_context.py` at 100%. `step.py` at 100%.
     - *(Progress: Added tests for `runner.py`, significantly improving its coverage from 0%. Fixed related issues in `step.py`).*
     - Identify and test uncovered code paths. Key areas still needing significant improvement:
-        - `src/yaml_workflow/tasks/python_tasks.py` (71%)
         - `src/yaml_workflow/exceptions.py` (72%)
         - `src/yaml_workflow/template.py` (73%)
         - `src/yaml_workflow/tasks/basic_tasks.py` (76%)
         - `src/yaml_workflow/workspace.py` (80%)
+        - `src/yaml_workflow/tasks/python_tasks.py` (81%)
         - `src/yaml_workflow/tasks/file_tasks.py` (83%)
         - `src/yaml_workflow/engine.py` (84%)
         - `src/yaml_workflow/state.py` (87%)
         - `src/yaml_workflow/utils/yaml_utils.py` (88%)
         - `src/yaml_workflow/tasks/__init__.py` (91%)
         - `src/yaml_workflow/tasks/template_tasks.py` (91%)
+        - `src/yaml_workflow/tasks/shell_tasks.py` (91%)
         - `src/yaml_workflow/tasks/noop.py` (92%)
         - `src/yaml_workflow/cli.py` (92%)
-        - `src/yaml_workflow/tasks/shell_tasks.py` (92%)
         - `src/yaml_workflow/tasks/batch.py` (94%)
         - `src/yaml_workflow/tasks/config.py` (94%)
     - Aim for a target coverage percentage (e.g., 90%).
@@ -355,7 +355,7 @@ pytest
 
 - [~] 5. **Testing Enhancement Phase** (Renumbered - excluding work already done in examples)
    Implementation Order:
-   - [~] 1. Review and improve overall test coverage. (Progress: Coverage increased to 86%. `shell_tasks.py` improved to 92%. Key modules identified.)
+   - [~] 1. Review and improve overall test coverage. (Progress: Coverage increased to 87%. `shell_tasks.py` at 91%, `python_tasks.py` at 81%. Key modules identified.)
    - [ ] 2. Run coverage checks (`pytest --cov`). (Done, see results above)
    Success Criteria:
    - Added tests cover remaining gaps. Target 90% overall.
