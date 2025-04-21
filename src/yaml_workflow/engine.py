@@ -146,18 +146,62 @@ class WorkflowEngine:
                 "Invalid workflow file: missing both 'steps' and 'flows' sections"
             )
 
-        # --- 4. Create Workspace & Get Info ---
-        # Create workspace path first
-        self.workspace = create_workspace(
-            workflow_name=self.name,
-            custom_dir=workspace,  # Use the passed workspace arg as custom_dir
+        # --- Determine Workflow Name EARLY ---
+        # Needed for logger and workspace setup
+        workflow_name_from_def = self.workflow.get("name")
+        if not workflow_name_from_def and self.workflow_file:
+            workflow_name_final = self.workflow_file.stem
+        elif workflow_name_from_def:
+            workflow_name_final = workflow_name_from_def
+        else:
+            workflow_name_final = "Unnamed Workflow"
+
+        # --- Setup Logging EARLY --- (Moved up)
+        # Need logger before step normalization
+        # Requires workspace to be created first
+        temp_workspace = create_workspace(
+            workflow_name=workflow_name_final,  # Use determined name
+            custom_dir=workspace,
             base_dir=base_dir,
         )
-        # Get info immediately after creation
+        self.logger = setup_logging(
+            temp_workspace, workflow_name_final
+        )  # Use determined name
+
+        # --- 3. Normalize Steps (Convert dict to list if necessary) ---
+        if "steps" in self.workflow and isinstance(self.workflow["steps"], dict):
+            self.logger.debug("Normalizing steps dictionary to list format.")
+            steps_list = []
+            for step_name, step_config in self.workflow["steps"].items():
+                if not isinstance(step_config, dict):
+                    raise ConfigurationError(
+                        f"Invalid step definition for '{step_name}': must be a dictionary."
+                    )
+                # Ensure the step config has a 'name' key, using the dict key if absent
+                if "name" not in step_config:
+                    step_config["name"] = step_name
+                elif step_config["name"] != step_name:
+                    self.logger.warning(
+                        f"Step dictionary key '{step_name}' differs from 'name' field '{step_config['name']}' in step config. Using '{step_config['name']}'."
+                    )
+                # Prefer the name inside the config if both exist but differ
+                steps_list.append(step_config)
+            self.workflow["steps"] = steps_list
+        elif "steps" in self.workflow and not isinstance(self.workflow["steps"], list):
+            raise ConfigurationError("Workflow 'steps' must be a list or a dictionary.")
+        elif "steps" in self.workflow:
+            # Ensure all steps in list have a name
+            for i, step_config in enumerate(self.workflow["steps"]):
+                if not isinstance(step_config, dict) or "name" not in step_config:
+                    raise ConfigurationError(f"Step at index {i} is missing a 'name'.")
+
+        # --- 4. Create Workspace & Get Info --- (Now uses temp_workspace)
+        # Workspace path already created for logger setup
+        self.workspace = temp_workspace
         self.workspace_info = get_workspace_info(self.workspace)
 
-        # --- 5. Setup Logging ---
-        self.logger = setup_logging(self.workspace, self.name)
+        # --- 5. Setup Logging --- (Moved up)
+        # self.logger = setup_logging(self.workspace, self.name)
 
         # --- 6. Initialize State ---
         self.state = WorkflowState(self.workspace, metadata)
@@ -287,10 +331,14 @@ class WorkflowEngine:
         # if self.context.get("workflow_name"):
         #     return self.context["workflow_name"]
         # Fallback to workflow definition name or derive from file
-        workflow_name = self.workflow.get("name")
-        if not workflow_name and self.workflow_file:
-            workflow_name = self.workflow_file.stem
-        return workflow_name or "Unnamed Workflow"
+        # (Logic moved earlier in __init__ to be available for workspace/logger)
+        workflow_name_from_def = self.workflow.get("name")
+        if not workflow_name_from_def and self.workflow_file:
+            return self.workflow_file.stem
+        elif workflow_name_from_def:
+            return workflow_name_from_def
+        else:
+            return "Unnamed Workflow"
 
     def _validate_params(self):
         """Validate parameters defined in the workflow against their schemas."""
@@ -708,17 +756,48 @@ class WorkflowEngine:
         # Check status before marking completed
         final_state = cast(ExecutionState, self.state.metadata["execution_state"])
         if final_state["status"] != "failed":
-            self.state.mark_workflow_completed()
-            self.state.save()
-            self.logger.info("Workflow completed successfully.")
-            self.logger.info("Final workflow outputs:")
-            for key, value in self.context["steps"].items():
-                self.logger.info(f"  {key}: {value}")
+            # Mark any remaining steps in the original planned list as skipped
+            # (This handles jumps caused by on_error: next)
+            all_planned_steps = {s["name"] for s in flow_steps}
+            executed_or_failed_steps = set(final_state["step_outputs"].keys())
+            skipped_by_jump = all_planned_steps - executed_or_failed_steps
+            for skipped_step_name in skipped_by_jump:
+                if (
+                    skipped_step_name not in final_state["step_outputs"]
+                ):  # Avoid overwriting if skipped by condition
+                    self.logger.info(
+                        f"Marking step '{skipped_step_name}' as skipped due to workflow jump/completion."
+                    )
+                    self.state.mark_step_skipped(
+                        skipped_step_name,
+                        reason="Workflow execution path skipped this step",
+                    )
 
+            self.state.mark_workflow_completed()
+            # No need to save state here, mark_workflow_completed and mark_step_skipped already do
+            # self.state.save()
+
+        # Return the final status and the complete final context
+        final_status = self.state.get_state()["execution_state"]["status"]
+        final_step_states = self.state.get_state()["steps"]
+
+        # Extract outputs from successful steps (including the {'result': ...} wrapper)
+        final_outputs = {
+            step_name: {"result": data.get("result")}
+            for step_name, data in final_step_states.items()
+            if data.get("status") == "completed"
+        }
+
+        # DO NOT overwrite context steps with full state steps
+        # self.context["steps"] = self.state.get_state()["steps"]
         return {
-            "status": "completed",
-            "outputs": self.context["steps"],
-            "execution_state": self.state.metadata["execution_state"],
+            "status": final_status,
+            "outputs": final_outputs,  # Add the outputs key
+            # Return the context as it was built during the run
+            "context": self.context.copy(),
+            # Also return the full execution state for detailed inspection
+            "execution_state": self.state.get_state()["execution_state"],
+            "steps_state": final_step_states,  # Keep detailed step states as well
         }
 
     def execute_step(self, step: Dict[str, Any], global_max_retries: int) -> None:
@@ -793,8 +872,11 @@ class WorkflowEngine:
             self.logger.info(
                 f"Skipping step '{step_name}' due to condition: {condition}"
             )
-            # NOTE: We might want to record skipped steps in the state later.
-            # For now, just return without executing or marking success/failure.
+            # Mark step as skipped in state
+            self.state.mark_step_skipped(
+                step_name, reason=f"Condition '{condition}' not met"
+            )
+            self.state.save()  # Save state after marking skipped
             return
 
         # --- Refactored Execution and Error Handling ---
@@ -853,8 +935,44 @@ class WorkflowEngine:
 
         self.logger.debug(f"Processing failure for step '{step_name}'.")
         # --- Retry and Error Flow Logic ---
-        on_error_config = step.get("on_error", {})
-        max_retries_for_step = on_error_config.get("retry", global_max_retries)
+        on_error_config_raw = step.get("on_error", {})
+
+        # Normalize on_error shorthand (e.g., "continue")
+        if isinstance(on_error_config_raw, str):
+            if on_error_config_raw == "continue":
+                on_error_config = {"action": "continue"}
+            else:
+                # If it's a string but not "continue", treat as invalid config
+                # (Could also default to action: fail, but explicit error is safer)
+                self.logger.warning(
+                    f"Invalid shorthand '{on_error_config_raw}' for on_error in step '{step_name}'. Defaulting to fail."
+                )
+                on_error_config = {"action": "fail"}
+        elif isinstance(on_error_config_raw, dict):
+            on_error_config = on_error_config_raw
+        else:
+            # Handle unexpected type for on_error
+            self.logger.warning(
+                f"Invalid type '{type(on_error_config_raw).__name__}' for on_error in step '{step_name}'. Defaulting to fail."
+            )
+            on_error_config = {"action": "fail"}
+
+        # Ensure max_retries is an integer, falling back to global default
+        try:
+            max_retries_for_step = int(on_error_config.get("retry", global_max_retries))
+        except (ValueError, TypeError):
+            self.logger.warning(
+                f"Invalid value for on_error.retry in step '{step_name}'. Using global default: {global_max_retries}"
+            )
+            max_retries_for_step = global_max_retries
+
+        # Ensure max_retries is non-negative
+        if max_retries_for_step < 0:
+             self.logger.warning(
+                f"Negative value for on_error.retry ({max_retries_for_step}) in step '{step_name}'. Using 0 retries."
+            )
+             max_retries_for_step = 0
+
         retry_count = self.state.get_step_retry_count(step_name)
 
         error_to_propagate = step_error.original_error or step_error
@@ -916,6 +1034,8 @@ class WorkflowEngine:
                 self.logger.info(
                     f"Proceeding to error handling step: {error_next_step}"
                 )
+                # Mark the step as failed before setting the jump target
+                self.state.mark_step_failed(step_name, final_error_message_for_state)
                 self.state.set_error_flow_target(error_next_step)
                 # Save state before raising exception for jump
                 self.state.save()

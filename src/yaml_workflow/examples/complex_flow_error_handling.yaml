@@ -58,9 +58,11 @@ steps:
     task: shell
     inputs:
       command: |
+        set -e # Exit immediately if a command exits with a non-zero status.
         echo "Attempting optional step..."
         # Simulate a failure (e.g., trying to access a non-existent file)
         cat "non_existent_file.txt"
+        echo "THIS SHOULD NOT PRINT IF CAT FAILED" # This line should now not be reached
         echo "Optional step output (should not be reached on failure)"
     on_error:
       action: continue # Add this to make the workflow continue despite failure
