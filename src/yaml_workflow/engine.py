@@ -16,6 +16,7 @@ import yaml
 from jinja2 import StrictUndefined, Template
 
 from .exceptions import (
+    ConfigurationError,
     FlowError,
     FlowNotFoundError,
     FunctionNotFoundError,
@@ -108,7 +109,7 @@ class WorkflowEngine:
         Raises:
             WorkflowError: If workflow file not found or invalid
         """
-        # Load workflow definition
+        # --- 1. Load Workflow Definition ---
         if isinstance(workflow, dict):
             self.workflow = workflow
             self.workflow_file = None
@@ -116,19 +117,15 @@ class WorkflowEngine:
             self.workflow_file = Path(workflow)
             if not self.workflow_file.exists():
                 raise WorkflowError(f"Workflow file not found: {workflow}")
-
-            # Load workflow from file
             try:
                 with open(self.workflow_file) as f:
                     self.workflow = yaml.load(f, Loader=get_safe_loader())
             except yaml.YAMLError as e:
                 raise WorkflowError(f"Invalid YAML in workflow file: {e}")
 
-        # Validate workflow structure
+        # --- 2. Validate Workflow Structure & Keys ---
         if not isinstance(self.workflow, dict):
             raise WorkflowError("Invalid workflow format: root must be a mapping")
-
-        # Validate top-level keys
         allowed_keys = {
             "name",
             "description",
@@ -139,107 +136,201 @@ class WorkflowEngine:
         }
         for key in self.workflow:
             if key not in allowed_keys:
-                # Import ConfigurationError locally to avoid circular dependency
-                from .exceptions import ConfigurationError
-
                 raise ConfigurationError(
                     f"Unexpected top-level key '{key}' found in workflow definition. "
                     f"Allowed keys are: {', '.join(sorted(allowed_keys))}. "
                     f"Use the 'params' section for workflow inputs."
                 )
-
-        # Validate required sections
         if "steps" not in self.workflow and "flows" not in self.workflow:
             raise WorkflowError(
                 "Invalid workflow file: missing both 'steps' and 'flows' sections"
             )
 
-        # Get workflow name
-        self.name = self.workflow.get("name")
-        if not self.name:
-            if self.workflow_file:
-                self.name = self.workflow_file.stem
-            else:
-                self.name = "workflow"
-
-        # Create workspace
-        self.workspace = create_workspace(self.name, workspace, base_dir)
+        # --- 4. Create Workspace & Get Info ---
+        # Create workspace path first
+        self.workspace = create_workspace(
+            workflow_name=self.name,
+            custom_dir=workspace,  # Use the passed workspace arg as custom_dir
+            base_dir=base_dir,
+        )
+        # Get info immediately after creation
         self.workspace_info = get_workspace_info(self.workspace)
 
-        # Set up logging
+        # --- 5. Setup Logging ---
         self.logger = setup_logging(self.workspace, self.name)
 
-        # Initialize workflow state with pre-loaded metadata if available
+        # --- 6. Initialize State ---
         self.state = WorkflowState(self.workspace, metadata)
 
-        # Initialize template engine
+        # --- 7. Initialize Template Engine ---
         self.template_engine = TemplateEngine()
 
-        # Initialize context with default parameter values
+        # --- 8. Initialize Context ---
+        # Now that workspace and info are ready, initialize the context
+        run_number = self.workspace_info.get("run_number", 1)
+        workflow_file_path = (
+            str(self.workflow_file.absolute()) if self.workflow_file else ""
+        )
+        workspace_path_str = str(self.workspace.absolute())
+        current_timestamp = datetime.now().isoformat()  # Use consistent ISO format
+
         self.context = {
             "workflow_name": self.name,
-            "workspace": str(self.workspace),
-            "run_number": self.workspace_info.get("run_number"),
-            "timestamp": datetime.now().isoformat(),
-            # Initialize namespaced variables
-            "args": {},
+            "workspace": workspace_path_str,
+            "run_number": run_number,
+            "timestamp": current_timestamp,
+            "workflow_file": workflow_file_path,  # Top-level access
+            # Namespaced variables
+            "args": {},  # Populated below
             "env": dict(os.environ),
-            "steps": {},
-            # Add workflow namespace
+            "steps": {},  # Populated by execution/state restore
+            # Workflow namespace
             "workflow": {
                 "name": self.name,
-                "file": str(self.workflow_file) if self.workflow_file else None,
-                "workspace": str(self.workspace),
-                "run_number": self.workspace_info.get("run_number"),
-                "timestamp": datetime.now().isoformat(),
+                "file": workflow_file_path if workflow_file_path else None,
+                "workspace": workspace_path_str,
+                "run_number": run_number,
+                "timestamp": current_timestamp,
             },
+            # Settings namespace
+            "settings": self.workflow.get("settings", {}),
+            # Error placeholder
+            "error": None,
         }
 
-        # Add workflow file path if available
-        self.context["workflow_file"] = str(self.workflow_file.absolute()) if self.workflow_file else ""
-
-        # Load default parameter values from workflow file
+        # --- 9. Load Default Params into Context['args'] ---
         params = self.workflow.get("params", {})
         for param_name, param_config in params.items():
             if isinstance(param_config, dict) and "default" in param_config:
-                # Store ONLY in args namespace
-                default_value = param_config["default"]
-                # self.context[param_name] = default_value  # REMOVED for consistency
-                self.context["args"][param_name] = default_value
+                self.context["args"][param_name] = param_config["default"]
             elif isinstance(param_config, dict):
-                # Handle case where param is defined but no default
-                self.context["args"][param_name] = None
+                self.context["args"][param_name] = None  # Param defined, no default
             else:
-                # Handle simple parameter definition
-                # self.context[param_name] = param_config # REMOVED for consistency
+                # Simple param definition (value is the default)
                 self.context["args"][param_name] = param_config
 
-        # If there's existing state, restore step outputs to context
-        # NOTE: This section might need review if old state files relied on root context params
+        # --- 10. Restore State Outputs to Context['steps'] ---
+        # (Corrected to only restore to steps namespace)
         if self.state.metadata.get("execution_state", {}).get("step_outputs"):
             step_outputs = self.state.metadata["execution_state"]["step_outputs"]
-            for step_name, outputs in step_outputs.items():
-                if isinstance(outputs, dict):
-                    # If outputs is a dict with a single key matching step name, use its value
-                    if len(outputs) == 1 and step_name in outputs:
-                        self.context[step_name] = outputs[step_name]
-                    else:
-                        self.context[step_name] = outputs
-                else:
-                    self.context[step_name] = outputs
+            # Direct assignment is fine as state saves the correct structure
+            self.context["steps"] = step_outputs.copy()
 
-        # Validate flows if present
+        # --- 11. Validate Flows ---
+        # (Validation needs workflow steps, so do after definition load)
         self._validate_flows()
+        # --- 12. Validate Params Schema ---
+        # (Validation of default values defined in the schema)
+        self._validate_params()
 
+        # --- Post-Init Logging ---
         self.logger.info(f"Initialized workflow: {self.name}")
         self.logger.info(f"Workspace: {self.workspace}")
         self.logger.info(f"Run number: {self.context['run_number']}")
-        if params:
+        if self.context["args"]:
             self.logger.info("Default parameters loaded:")
             for name, value in self.context["args"].items():
                 self.logger.info(f"  {name}: {value}")
 
         self.current_step = None  # Track current step for error handling
+
+    # Re-adding template resolution methods that were removed during refactoring
+    def resolve_template(self, template_str: str) -> str:
+        """
+        Resolve template with both direct and namespaced variables.
+
+        Args:
+            template_str: Template string to resolve
+
+        Returns:
+            str: Resolved template string
+
+        Raises:
+            TemplateError: If template resolution fails
+        """
+        return self.template_engine.process_template(template_str, self.context)
+
+    def resolve_value(self, value: Any) -> Any:
+        """
+        Resolve a single value that might contain templates.
+
+        Args:
+            value: Value to resolve, can be any type
+
+        Returns:
+            Resolved value with templates replaced
+        """
+        if isinstance(value, str):
+            return self.template_engine.process_template(value, self.context)
+        elif isinstance(value, dict):
+            return {k: self.resolve_value(v) for k, v in value.items()}
+        elif isinstance(value, (list, tuple)):
+            return [self.resolve_value(v) for v in value]
+        return value
+
+    def resolve_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Resolve all inputs using Jinja2 template resolution.
+
+        Args:
+            inputs: Input dictionary
+
+        Returns:
+            Dict[str, Any]: Resolved inputs
+        """
+        return self.template_engine.process_value(inputs, self.context)
+
+    @property
+    def name(self) -> str:
+        """Return the name of the workflow."""
+        # Use workflow_name from context if available (set during setup_workspace)
+        # if self.context.get("workflow_name"):
+        #     return self.context["workflow_name"]
+        # Fallback to workflow definition name or derive from file
+        workflow_name = self.workflow.get("name")
+        if not workflow_name and self.workflow_file:
+            workflow_name = self.workflow_file.stem
+        return workflow_name or "Unnamed Workflow"
+
+    def _validate_params(self):
+        """Validate parameters defined in the workflow against their schemas."""
+        params = self.workflow.get("params", {})
+        for name, config in params.items():
+            if not isinstance(config, dict):
+                continue  # Skip simple param definitions without schema
+
+            # Get the default value if present
+            default_value = config.get("default")
+
+            # Validate allowedValues
+            if "allowedValues" in config:
+                allowed = config["allowedValues"]
+                if not isinstance(allowed, list):
+                    raise ConfigurationError(
+                        f"Invalid schema for parameter '{name}': 'allowedValues' must be a list"
+                    )
+                # Check default value against allowedValues if default exists
+                if default_value is not None and default_value not in allowed:
+                    raise ConfigurationError(
+                        f"Invalid default value '{default_value}' for parameter '{name}'. "
+                        f"Allowed values: {allowed}"
+                    )
+
+            # Validate minLength for string type
+            if config.get("type") == "string" and "minLength" in config:
+                min_len = config["minLength"]
+                if not isinstance(min_len, int) or min_len < 0:
+                    raise ConfigurationError(
+                        f"Invalid schema for parameter '{name}': 'minLength' must be a non-negative integer"
+                    )
+                # Check default value length if default exists
+                if default_value is not None and len(str(default_value)) < min_len:
+                    raise ConfigurationError(
+                        f"Invalid default value for parameter '{name}'. "
+                        f"Value '{default_value}' is shorter than minimum length {min_len}"
+                    )
+
+            # Add more validations here (e.g., type checking, regex pattern)
 
     def _validate_flows(self) -> None:
         """Validate workflow flows configuration."""
@@ -629,79 +720,6 @@ class WorkflowEngine:
             "outputs": self.context["steps"],
             "execution_state": self.state.metadata["execution_state"],
         }
-
-    def setup_workspace(self, base_dir: str, workspace: Optional[str]) -> Path:
-        """Set up the workspace directory for the workflow run."""
-        # Determine workflow name (used for subfolder)
-        if self.workflow_file:
-            workflow_name = self.workflow_file.stem
-        else:
-            workflow_name = self.workflow.get("name", "workflow")
-
-        # Create workspace
-        workspace_path, run_number = create_workspace(
-            base_dir=base_dir,
-            workflow_name=workflow_name,
-            workspace=workspace,
-        )
-
-        # Update context with workspace details
-        self.context["workflow_name"] = workflow_name
-        self.context["run_number"] = run_number
-        self.context["timestamp"] = datetime.now().strftime("%Y%m%d_%H%M%S")
-        # <<< Ensure workflow_file path is set in context >>>
-        self.context["workflow_file"] = (
-            str(self.workflow_file.absolute()) if self.workflow_file else ""
-        )
-        # <<< Also set the main workspace path in context >>>
-        self.context["workspace"] = str(workspace_path.absolute())
-
-        return workspace_path
-
-    def resolve_template(self, template_str: str) -> str:
-        """
-        Resolve template with both direct and namespaced variables.
-
-        Args:
-            template_str: Template string to resolve
-
-        Returns:
-            str: Resolved template string
-
-        Raises:
-            TemplateError: If template resolution fails
-        """
-        return self.template_engine.process_template(template_str, self.context)
-
-    def resolve_value(self, value: Any) -> Any:
-        """
-        Resolve a single value that might contain templates.
-
-        Args:
-            value: Value to resolve, can be any type
-
-        Returns:
-            Resolved value with templates replaced
-        """
-        if isinstance(value, str):
-            return self.template_engine.process_template(value, self.context)
-        elif isinstance(value, dict):
-            return {k: self.resolve_value(v) for k, v in value.items()}
-        elif isinstance(value, (list, tuple)):
-            return [self.resolve_value(v) for v in value]
-        return value
-
-    def resolve_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Resolve all inputs using Jinja2 template resolution.
-
-        Args:
-            inputs: Input dictionary
-
-        Returns:
-            Dict[str, Any]: Resolved inputs
-        """
-        return self.template_engine.process_value(inputs, self.context)
 
     def execute_step(self, step: Dict[str, Any], global_max_retries: int) -> None:
         """
