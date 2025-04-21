@@ -67,7 +67,7 @@ def test_batch_basic(workspace, basic_context, sample_items):
     assert result["stats"]["success_rate"] == 100.0
     # Verify each result is properly processed
     for i, res in enumerate(result["results"]):
-        assert res["result"] == f"Processing {sample_items[i]}"
+        assert res == f"Processing {sample_items[i]}"
 
 
 def test_batch_with_failures(workspace, basic_context):
@@ -99,8 +99,8 @@ result = f"Processed {item}"\
     assert result["stats"]["failed"] == 2
     assert result["stats"]["success_rate"] == 50.0
     # Verify successful results
-    assert result["results"][0]["result"] == "Processed success1"
-    assert result["results"][1]["result"] == "Processed success2"
+    assert result["results"][0] == "Processed success1"
+    assert result["results"][1] == "Processed success2"
 
 
 def test_batch_chunk_processing(workspace, basic_context, sample_items):
@@ -130,7 +130,7 @@ def test_batch_chunk_processing(workspace, basic_context, sample_items):
     # Verify chunk processing
     for i, res in enumerate(result["results"]):
         chunk_index = i // 3  # Calculate expected chunk index
-        assert res["result"] == f"Processing {sample_items[i]} in chunk {chunk_index}"
+        assert res == f"Processing {sample_items[i]} in chunk {chunk_index}"
 
 
 def test_batch_template_resolution(workspace, basic_context):
@@ -179,10 +179,10 @@ result = {
     # Verify individual item processing
     expected_items = ["APPLE", "BANANA", "CHERRY"]
     for i, res in enumerate(result["results"]):
-        assert res["result"]["item"] == expected_items[i]
-        assert res["result"]["prefix"] == "fruit"
-        assert res["result"]["conditional"] == "yes"
-        assert res["result"]["original"] == expected_items[i].lower()
+        assert res["item"] == expected_items[i]
+        assert res["prefix"] == "fruit"
+        assert res["conditional"] == "yes"
+        assert res["original"] == expected_items[i].lower()
 
 
 def test_batch_validation(workspace, basic_context):
@@ -276,13 +276,11 @@ def test_batch_context_variables(workspace, basic_context, sample_items):
 
     assert len(result["results"]) == 3
     for i, res in enumerate(result["results"]):
-        assert res["result"]["item"] == sample_items[i]
-        assert res["result"]["index"] == i
-        assert res["result"]["total"] == 3
-        assert res["result"]["chunk_index"] == (
-            0 if i < 2 else 1
-        )  # First chunk: 0,1; Second chunk: 2
-        assert res["result"]["chunk_size"] == 2
+        assert res["item"] == sample_items[i]
+        assert res["index"] == i
+        assert res["total"] == 3
+        assert res["chunk_index"] == i // 2
+        assert res["chunk_size"] == 2
 
 
 def test_batch_empty_items(workspace, basic_context):
