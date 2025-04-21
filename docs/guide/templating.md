@@ -24,22 +24,27 @@ steps:
       debug: "{{ env.DEBUG | default('false') }}"  # With default
 ```
 
-### Step Outputs
-```yaml
-steps:
-  - name: use_results
-    params:
-      # Direct output
-      data: "{{ steps.process.output }}"
-      
-      # Named outputs
-      result: "{{ steps.process.outputs.result }}"
-      metadata: "{{ steps.process.outputs.metadata }}"
-      
-      # Step status
-      status: "{{ steps.process.status }}"
-      error: "{{ steps.process.error }}"
-```
+### Step Results (`steps`)
+
+   Access results from previous steps using the `steps` namespace. All primary outputs are nested under a `result` key for consistency. Step status and errors are accessed directly.
+
+   ```yaml
+   steps:
+     - name: use_results
+       params:
+         # Access the entire result (if it's a single value or you need the whole dict)
+         data: "{{ steps.process.result }}"
+         
+         # Access a specific key if the 'process' step's result is a dictionary
+         # e.g., if steps.process.result == {'file': '/data.txt', 'count': 100}
+         file_processed: "{{ steps.process.result.file }}"
+         item_count: "{{ steps.process.result.count }}"
+         
+         # Step status (completed, failed, skipped) - accessed directly
+         status: "{{ steps.process.status }}"
+         # Step error message if failed - accessed directly
+         error: "{{ steps.process.error }}"
+   ```
 
 ### Workflow Information
 ```yaml
@@ -83,7 +88,7 @@ steps:
       debug: "{{ env.DEBUG | default('false') | lower }}"
       
       # Complex default with condition
-      value: "{{ steps.process.output | default(args.fallback if args.fallback is defined else 'default') }}"
+      value: "{{ steps.process.result | default(args.fallback if args.fallback is defined else 'default') }}"
 ```
 
 ### Error Messages
@@ -122,9 +127,9 @@ steps:
   - name: batch_process
     task: batch
     inputs:
-      items: "{{ steps.get_items.output }}"
+      items: "{{ steps.get_items.result }}"
       task:
-        task: python
+        task: python_code
         inputs:
           code: |
             {% for opt in args.options %}
@@ -150,7 +155,7 @@ steps:
       max_workers: {{ args.max_workers | default(4) }}
       
       # Previous results
-      last_run: {{ steps.previous.outputs.timestamp }}
+      last_run: {{ steps.previous.result.timestamp }}
       status: {{ steps.previous.status }}
     output: "{{ args.output_file }}"
     error_handling:
@@ -162,7 +167,7 @@ steps:
 ```yaml
 steps:
   - name: process_data
-    task: python
+    task: python_code
     params:
       function: process_batch
       args:
@@ -170,9 +175,8 @@ steps:
         batch_size: "{{ args.batch_size }}"
       error_handling:
         undefined_variables: strict
-    outputs:
-      - processed_data
-      - statistics
+    # The return value of the 'process_batch' function will be accessible
+    # via 'steps.process_data.result'
 ```
 
 ### Batch Processing
@@ -182,13 +186,13 @@ steps:
     task: batch
     inputs:
       # Input configuration
-      items: "{{ steps.get_items.output }}"
+      items: "{{ steps.get_items.result }}"
       chunk_size: "{{ args.chunk_size }}"
       max_workers: "{{ args.max_workers }}"
       
       # Processing task
       task:
-        task: python
+        task: python_code
         inputs:
           code: "process_item()"
       
@@ -228,132 +232,29 @@ steps:
    debug: "{{ env.DEBUG }}"
    ```
 
-4. **Clear Error Messages**
-   ```yaml
-   # Good: Context in errors
-   {% if not args.input_file %}
-   {{ raise('Input file is required. Available args: ' ~ args.keys()) }}
-   {% endif %}
-   
-   # Bad: Unclear errors
-   {{ args.input_file }}  # Raises UndefinedError
-   ```
+# Accessing complex data structures
+- name: access_complex_data
+  task: python_code
+  inputs:
+    code: |
+      user_name = steps.load_user.result.name
+      first_permission = steps.load_user.result.permissions[0]
+      result = f"User {user_name} has permission: {first_permission}"
 
-5. **Document Dependencies**
-   ```yaml
-   # Required variables:
-   # args:
-   #   - input_file: Path to input file
-   #   - batch_size: Number of items to process
-   # env:
-   #   - API_KEY: Service API key
-   #   - ENVIRONMENT: Deployment environment
-   
-   steps:
-     - name: documented_step
-       # ... step configuration ...
-   ```
+- name: process_values
+  task: python_code
+  inputs:
+    code: |
+      print(f"Processing user: {user}")
+      # Use api_key securely
+      result = user + api_key
 
-## Security Considerations
-
-1. **Variable Access**
-   - Use appropriate namespaces for variables
-   - Validate variable existence before use
-   - Use strict mode to catch undefined variables
-
-2. **Error Handling**
-   - Enable strict undefined checking
-   - Show available variables in error messages
-   - Use appropriate error handlers
-
-3. **Type Safety**
-   - Use type-safe conversions
-   - Provide appropriate defaults
-   - Validate variable types
-
-4. **File Operations**
-   - Use workspace-relative paths
-   - Validate file paths
-   - Check file permissions
-
-## Basic Syntax
-
-### Variable Substitution
-
-Use double curly braces to substitute variables:
-```yaml
-steps:
-  - name: greet
-    task: template
-    template: |
-      Hello, {{ name }}!
-      This is run #{{ run_number }} of the {{ workflow_name }} workflow.
-```
-
-### Expressions
-
-You can use expressions inside the curly braces:
-```yaml
-steps:
-  - name: calculate
-    task: template
-    template: "Result: {{ value * 2 + 5 }}"
-```
-
-## Available Variables
-
-### Built-in Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `workflow_name` | Name of the current workflow | `{{ workflow_name }}` |
-| `run_number` | Current run number | `{{ run_number }}` |
-| `workspace` | Path to workspace directory | `{{ workspace }}` |
-| `timestamp` | Current timestamp | `{{ timestamp }}` |
-
-### Environment Variables
-
-Access environment variables through the `env` object:
-```yaml
-steps:
-  - name: show_env
-    task: template
-    template: |
-      API URL: {{ env.API_URL }}
-      Debug Mode: {{ env.DEBUG | default('false') }}
-```
-
-### Parameters
-
-Access workflow parameters directly or through the `params` object:
-```yaml
-steps:
-  - name: use_params
-    task: template
-    template: |
-      Direct access: {{ name }}
-      Via params: {{ params.name }}
-      With default: {{ params.optional | default('default_value') }}
-```
-
-### Step Outputs
-
-Access outputs from previous steps:
-```yaml
-steps:
-  - name: first_step
-    task: shell
-    command: echo "Hello"
-    outputs: greeting
-
-  - name: second_step
-    task: template
-    template: "Previous step said: {{ steps.first_step.output }}"
-```
-
-## Filters
-
-Jinja2 provides several built-in filters to transform data:
-
-### String Filters
-```
+# Using includes in a Python task
+- name: dynamic_python_logic
+  task: python_code
+  inputs:
+    code: |
+      {% include 'path/to/python_helper.py' %}
+      
+      # Now call functions defined in the included file
+      result = helper_function(args.input)

@@ -158,7 +158,7 @@ def test_noop_undefined_variable(workspace, basic_context):
     }
 
     config = TaskConfig(step, basic_context, workspace)
-    with pytest.raises(TemplateError) as exc_info:
+    with pytest.raises(TaskExecutionError) as exc_info:
         noop_task(config)
 
     assert "nonexistent" in str(exc_info.value)
@@ -177,7 +177,7 @@ def test_noop_instruct_error_handling(workspace, basic_context):
     }
 
     config = TaskConfig(step, basic_context, workspace)
-    with pytest.raises(TemplateError) as exc_info:
+    with pytest.raises(TaskExecutionError) as exc_info:
         noop_task(config)
 
     error_msg = str(exc_info.value)

@@ -1,0 +1,212 @@
+# This workflow demonstrates an automated process for analyzing Jira tickets and their associated
+# Confluence pages using Ollama for content evaluation and summarization.
+#
+# Task Definition Methods:
+# 1. Task Registry (Recommended):
+#    - Use the 'task' field with a registered task name
+#    - Parameters are passed through the 'params' field
+#    Example:
+#      - name: my_step
+#        task: template
+#        params:
+#          template: "Hello {{ name }}"
+#          output_file: output.txt
+#
+# 2. Module/Function (Legacy):
+#    - Use 'module' and 'function' fields to specify Python path
+#    - Parameters are passed through the 'inputs' field
+#    Example:
+#      - name: my_step
+#        module: yaml_workflow_engine.tasks.template_tasks
+#        function: render_template
+#        inputs:
+#          template: "Hello {{ name }}"
+#          output_file: output.txt
+#
+# Built-in tasks:
+# - template: Template rendering and file generation
+# - shell: Shell command execution
+# - file_utils: File system operations
+# - batch_processor: Parallel processing with resume capability
+# - read_file, write_file: File I/O operations
+# - read_json, write_json: JSON file operations
+# - read_yaml, write_yaml: YAML file operations
+#
+# Custom tasks must be registered in the codebase before use.
+
+name: Jira-Confluence Analysis
+description: Automated analysis of Jira tickets and associated Confluence pages using Ollama
+version: "0.1.0"
+
+# Global settings for workflow execution
+settings:
+  timeout: 3600  # 1 hour timeout
+  max_workers: 2  # Limit concurrent Ollama calls
+  retry_count: 3  # Retry failed API calls
+
+# Environment variables needed for API access
+env:
+  JIRA_API_KEY: ${env:JIRA_API_KEY}
+  CONFLUENCE_API_KEY: ${env:CONFLUENCE_API_KEY}
+  OLLAMA_API_URL: ${env:OLLAMA_API_URL}
+
+# Workflow parameters
+params:
+  jql_query:
+    description: JQL query string to fetch relevant Jira tickets
+    type: string
+    required: true
+  model_name:
+    description: Ollama model to use for analysis
+    type: string
+    default: llama2
+  batch_size:
+    description: Number of documents to process in parallel
+    type: integer
+    default: 5
+
+steps:
+  # Step 1: Query Jira to get relevant tickets
+  # Input: JQL query provided at runtime via params.jql_query
+  # Output: List of Jira ticket objects stored in 'tickets' variable
+  - name: fetch_jira_tickets
+    task: jira
+    params:
+      operation: fetch_tickets
+      jql_query: ${jql_query}
+      fields: ["key", "summary", "description", "labels", "customfield_wikilinks"]
+
+  # Step 2: Extract Confluence wiki links from the Jira tickets
+  # Input: Jira tickets from previous step
+  # Output: List of Confluence page URLs stored in 'wiki_links' variable
+  - name: extract_wiki_links
+    task: data_processor
+    params:
+      operation: extract_links
+      input_data: ${tickets}
+      link_pattern: "confluence\\..*\\/wiki\\/.*"
+
+  # Step 3: Download the content of identified Confluence pages
+  # Input: List of wiki links from previous step
+  # Output: Dictionary of page contents in 'confluence_pages' and any failed downloads
+  - name: download_confluence_pages
+    task: batch_processor
+    params:
+      parallel: true
+      max_workers: 4
+      chunk_size: 10
+      items: ${wiki_links}
+      processing_task:
+        task: confluence
+        params:
+          operation: download_page
+          include_attachments: false
+
+  # Step 4: Convert Confluence pages to markdown format for easier processing
+  # Input: Raw Confluence pages from previous step
+  # Output: List of markdown-formatted documents stored in 'markdown_files' variable
+  - name: convert_pages_to_markdown
+    task: document_converter
+    params:
+      input_format: confluence
+      output_format: markdown
+      documents: ${confluence_pages}
+      preserve_images: false
+
+  # Step 5: First Ollama analysis - evaluates content for technical aspects
+  # Input: Markdown files and technical analysis prompt
+  # Output: First set of analysis results stored in 'ollama_results_1' variable
+  - name: ollama_evaluate_prompt1
+    task: batch_processor
+    params:
+      parallel: true
+      max_workers: ${settings.max_workers}
+      chunk_size: ${params.batch_size}
+      items: ${markdown_files}
+      processing_task:
+        task: ollama
+        params:
+          model: ${params.model_name}
+          prompt_template: |
+            Analyze this document for technical debt and implementation risks.
+            Focus on:
+            1. Code complexity and maintainability
+            2. Security considerations
+            3. Scalability concerns
+            4. Dependencies and versioning
+            
+            Document: {{document}}
+    error_handling:
+      type: retry
+      retry_count: 2
+      retry_delay: 30
+
+  # Step 6: Second Ollama analysis - evaluates content for project management aspects
+  # Input: Same markdown files with PM-focused analysis prompt
+  # Output: Second set of analysis results stored in 'ollama_results_2' variable
+  - name: ollama_evaluate_prompt2
+    task: batch_processor
+    params:
+      parallel: true
+      max_workers: ${settings.max_workers}
+      chunk_size: ${params.batch_size}
+      items: ${markdown_files}
+      processing_task:
+        task: ollama
+        params:
+          model: ${params.model_name}
+          prompt_template: |
+            Review this document for project management insights.
+            Focus on:
+            1. Resource requirements
+            2. Timeline implications
+            3. Cross-team dependencies
+            4. Success metrics and KPIs
+            
+            Document: {{document}}
+    error_handling:
+      type: retry
+      retry_count: 2
+      retry_delay: 30
+
+  # Step 7: Combine results from both Ollama analyses
+  # Input: Results from both technical and PM evaluations
+  # Output: Combined analysis data stored in 'aggregated_data' variable
+  - name: aggregate_ollama_results
+    task: data_processor
+    params:
+      operation: merge_analysis
+      primary_results: ${ollama_results_1}
+      secondary_results: ${ollama_results_2}
+      merge_strategy: combine_insights
+
+  # Step 8: Generate final executive summary
+  # Input: Aggregated analysis data from both evaluations
+  # Output: Markdown formatted executive summary with insights and recommendations
+  - name: summarize_results
+    task: template
+    params:
+      template: |
+        # Executive Summary - Technical Analysis Report
+        Generated on: {{ timestamp }}
+        
+        ## Overview
+        Analyzed {{ tickets|length }} Jira tickets and {{ confluence_pages|length }} Confluence pages.
+        
+        ## Technical Insights
+        {{ aggregated_data.technical_insights }}
+        
+        ## Project Management Insights
+        {{ aggregated_data.pm_insights }}
+        
+        ## Recommendations
+        {{ aggregated_data.recommendations }}
+        
+        ## Failed Analysis
+        {% if failed_downloads %}
+        The following pages could not be analyzed:
+        {% for page in failed_downloads %}
+        - {{ page.url }}: {{ page.error }}
+        {% endfor %}
+        {% endif %}
+      output_file: executive_summary.md

@@ -1,0 +1,22 @@
+workflow:
+  usage:
+    name: My Workflow
+    description: A simple workflow example
+    inputs:
+      name:
+        type: string
+        description: Name to greet
+  steps:
+    - name: greet
+      module: yaml_workflow_engine.tasks.basic_tasks
+      function: hello_world
+      inputs:
+        name: {{ params.name }}
+      outputs:
+        - greeting
+    - name: save_greeting
+      module: yaml_workflow_engine.tasks.file_tasks
+      function: write_file
+      inputs:
+        file_path: greetings.txt
+        content: {{ steps.greet.result }}

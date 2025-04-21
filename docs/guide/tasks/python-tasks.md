@@ -1,564 +1,163 @@
 # Python Tasks
 
-The YAML Workflow Engine allows you to execute Python code directly in your workflows using the `python` task.
+YAML Workflow provides several tasks for integrating Python logic into your workflows. These tasks allow you to execute Python code snippets, call functions from modules, run external scripts, or execute Python modules directly.
 
-Python tasks allow you to execute Python functions within your workflows. These tasks can accept parameters, which support Jinja2 template substitution (see [Templating Guide](../templating.md) for details).
+All Python tasks provide access to the standard workflow context namespaces (`args`, `env`, `steps`, `batch`) within their execution environment.
 
-## Task Configuration
+## `python_code`
 
-### Required Fields
+Executes a multi-line string containing Python code.
 
-Either `code` or `operation` must be specified for a Python task:
+**Inputs:**
 
-```yaml
-steps:
-  - name: example_task
-    task: python
-    code: |  # Either specify code...
-      result = x * 2
-    
-  - name: another_task
-    task: python
-    operation: multiply  # ...or specify an operation
-    inputs:
-      a: 5
-      b: 3
-```
+*   `code` (str, required): A string containing the Python code to execute.
+*   `result_variable` (str, optional): The name of a variable within the executed code whose value should be returned as the task's result. If omitted, the task will look for a variable named `result` and return its value. If neither `result_variable` is specified nor a `result` variable is found, the task returns `None`.
 
-Omitting both will raise a ValueError with the message "Either code or operation must be specified for Python task".
+**Execution Context:**
 
-## Result Handling
+The code is executed with access to the following variables in its local scope:
+*   `config`: The `TaskConfig` object for the step.
+*   `context`: The full workflow context dictionary.
+*   `args`, `env`, `steps`, `batch`: Direct access to the main context namespaces.
+*   Any inputs defined directly under the `inputs:` key for the task (after template rendering).
 
-### Setting Task Results
+**Result:**
 
-There are two ways a Python task can produce a result:
+The task returns a dictionary `{"result": value}`, where `value` is the value of the variable specified by `result_variable` or the variable named `result` by default.
 
-1. **Explicit Result Assignment** (Recommended)
-   ```yaml
-   steps:
-     - name: calculate
-       task: python
-       code: |
-         x = float(input_value)
-         result = x * 2  # Explicitly assign to 'result' variable
-       inputs:
-         input_value: "5.0"
-   ```
-
-2. **Last Expression Value** (Fallback)
-   ```yaml
-   steps:
-     - name: calculate
-       task: python
-       code: |
-         x = float(input_value)
-         x * 2  # Last expression's value becomes the result
-       inputs:
-         input_value: "5.0"
-   ```
-
-### Important Notes on Result Handling
-
-1. **Explicit Assignment**
-   - Always prefer explicitly assigning to the `result` variable
-   - The final value of `result` will be stored
-   - Multiple assignments are allowed; the last one wins
-   ```yaml
-   code: |
-     result = initial_value
-     # ... some processing ...
-     result = final_value  # This value will be stored
-   ```
-
-2. **Last Expression Fallback**
-   - Only used if no `result` variable is set
-   - Must be a valid expression, not just an assignment
-   - Not recommended for complex code
-   ```yaml
-   code: |
-     x = 5        # Assignment - not used as result
-     y = 3        # Assignment - not used as result
-     x * y        # Expression - this becomes the result
-   ```
-
-3. **No Result Cases**
-   - If no `result` is set and no valid last expression exists, result will be `None`
-   - Comments and empty lines are ignored
-   ```yaml
-   code: |
-     x = 5  # Just assignments
-     y = 3  # No result set
-     # Final line is a comment
-     # Result will be None
-   ```
-
-4. **Conditional Results**
-   - Results can be set conditionally
-   - The final value of `result` is used, regardless of where it was set
-   ```yaml
-   code: |
-     if condition:
-         result = value1
-     else:
-         result = value2
-   ```
-
-### Accessing Results in Other Tasks
-
-Task results are stored in the workflow context and can be accessed by subsequent tasks:
+**Example:**
 
 ```yaml
-steps:
-  - name: first_task
-    task: python
+- name: calculate_sum
+  task: python_code
+  inputs:
+    # Inputs provided here are available directly in the code
+    x: "{{ args.num1 }}"
+    y: "{{ args.num2 }}"
     code: |
-      result = calculate_something()
-
-  - name: second_task
-    task: python
-    code: |
-      # Access previous task's result
-      previous_result = context['execution_state']['step_outputs']['first_task']['result']
-      result = process_further(previous_result)
-```
-
-### Return Values
-
-Results are captured through the `result` variable assignment:
-- Simple types (str, int, float, bool)
-- Lists and dictionaries
-- JSON-serializable objects
-
-```yaml
-steps:
-  - name: analyze
-    task: python
-    code: |
-      result = {
-          'status': 'success',
-          'metrics': {
-              'mean': sum(values) / len(values),
-              'count': len(values)
-          }
-      }
-    inputs:
-      values: [1, 2, 3, 4, 5]
-    outputs: analysis
-```
-
-### Error Handling
-
-Python exceptions are caught and handled:
-
-```yaml
-steps:
-  - name: validate
-    task: python
-    code: |
-      if not isinstance(data, dict):
-          result = {'valid': False, 'error': 'Input must be a dictionary'}
-      else:
-          result = {'valid': True}
-    inputs:
-      data: "{{ input_data }}"
-    on_error:
-      action: continue
-      message: "Validation failed: {{ error }}"
-```
-
-## Task Types
-
-### Execute Code
-
-Run arbitrary Python code:
-
-```yaml
-task: python
-code: |
-  # Your Python code here
-  result = calculated_value
-```
-
-### Predefined Operations
-
-The Python task includes several predefined operations:
-
-#### Multiply
-Multiply two numbers:
-```yaml
-task: python
-operation: multiply
-inputs:
-  a: 5
-  b: 3
-outputs: product  # Returns 15
-```
-
-#### Divide
-Divide two numbers with error handling:
-```yaml
-task: python
-operation: divide
-inputs:
-  a: 10
-  b: 2
-outputs: quotient  # Returns 5
-```
-
-#### Print Variables
-Debug task by printing available variables:
-```yaml
-task: python
-operation: print_vars
-```
-
-## Configuration Options
-
-### Basic Configuration
-
-```yaml
-steps:
-  - name: python_task
-    task: python
-    description: "Execute Python code"
-    code: string | null        # Python code to execute
-    operation: string | null   # Predefined operation to run
-    inputs: object            # Input variables
-    outputs: string | object  # Where to store results
-    packages: [string]        # Additional packages to import
-    timeout: int             # Execution timeout in seconds
-```
-
-### Input Options
-
-The task accepts inputs in various formats:
-
-```yaml
-inputs:
-  # Simple values
-  x: 42
-  text: "Hello"
-  flag: true
-
-  # Template variables
-  data: "{{ previous_step.output }}"
-  config: "{{ params.settings }}"
-
-  # Lists and dictionaries
-  items: [1, 2, 3]
-  options: 
-    key1: value1
-    key2: value2
-```
-
-### Output Options
-
-Results can be captured in different ways:
-
-```yaml
-# Single variable
-outputs: result_var
-
-# Multiple outputs
-outputs:
-  data: result.data
-  status: result.status
-  count: result.count
-
-# Conditional outputs
-outputs:
-  success: "result.get('success', False)"
-  error: "result.get('error', '')"
-```
-
-## Features
-
-### Code Execution
-
-The `python` task executes Python code in an isolated environment with:
-- Access to workflow context variables
-- Standard Python library
-- Additional installed packages
-- Error handling and output capture
-
-### Input Variables
-
-Access input variables in your Python code:
-
-```yaml
-steps:
-  - name: calculate
-    task: python
-    code: |
-      x = float(x)
-      y = float(y)
-      return x * y
-    inputs:
-      x: "{{ params.value_x }}"
-      y: "{{ params.value_y }}"
-    outputs: product
-```
-
-### Return Values
-
-Return values are automatically captured and can be:
-- Simple types (str, int, float, bool)
-- Lists and dictionaries
-- JSON-serializable objects
-
-```yaml
-steps:
-  - name: analyze
-    task: python
-    code: |
-      return {
-          'status': 'success',
-          'metrics': {
-              'mean': sum(values) / len(values),
-              'count': len(values)
-          }
-      }
-    inputs:
-      values: [1, 2, 3, 4, 5]
-    outputs: analysis
-```
-
-### Error Handling
-
-Python exceptions are caught and handled:
-
-```yaml
-steps:
-  - name: validate
-    task: python
-    code: |
-      if not isinstance(data, dict):
-          raise ValueError("Input must be a dictionary")
-      return {'valid': True}
-    inputs:
-      data: "{{ input_data }}"
-    on_error:
-      action: continue
-      message: "Validation failed: {{ error }}"
-```
-
-### Package Management
-
-Specify additional packages to import:
-
-```yaml
-steps:
-  - name: process_data
-    task: python
-    packages: 
-      - pandas
-      - numpy
-      - scikit-learn
-    code: |
-      import pandas as pd
-      import numpy as np
-      from sklearn.preprocessing import StandardScaler
+      # x and y are directly available from inputs
+      sum_val = x + y 
       
-      # Process data using imported packages
-      df = pd.DataFrame(data)
-      scaled = StandardScaler().fit_transform(df)
-      return scaled.tolist()
-    inputs:
-      data: "{{ raw_data }}"
-    outputs: processed_data
+      # Set the 'result' variable for implicit return
+      result = sum_val 
+
+- name: process_data
+  task: python_code
+  inputs:
+    raw_data: "{{ steps.load_data.result }}"
+    # Explicitly specify the variable to return
+    result_variable: processed_data 
+    code: |
+      # raw_data is available from inputs
+      data = raw_data * 10
+      # ... more processing ...
+      
+      # Assign to the variable named in result_variable
+      processed_data = data 
 ```
 
-## Best Practices
+## `python_function`
 
-1. **Result Assignment**
-   - Always explicitly assign to the `result` variable
-   - Don't rely on last expression behavior
-   - Use clear and descriptive variable names
-   ```yaml
-   code: |
-     # Good
-     result = calculate_total(values)
+Calls a specified Python function within a given module.
 
-     # Avoid
-     calculate_total(values)  # Relying on last expression
-   ```
+**Inputs:**
 
-2. **Error Handling**
-   - Use try/except blocks when needed
-   - Set appropriate result values for error cases
-   ```yaml
-   code: |
-     try:
-         value = process_data(input_data)
-         result = {"status": "success", "value": value}
-     except Exception as e:
-         result = {"status": "error", "message": str(e)}
-   ```
+*   `module` (str, required): The dot-separated path to the Python module (e.g., `my_package.my_module`). The module must be importable in the environment where the workflow runs.
+*   `function` (str, required): The name of the function to call within the module.
+*   `args` (list, optional): A list of positional arguments to pass to the function. Templates can be used within the list items.
+*   `kwargs` (dict, optional): A dictionary of keyword arguments to pass to the function. Templates can be used within the dictionary values.
 
-3. **Type Safety**
-   - Convert input strings to appropriate types
-   - Validate inputs before processing
-   ```yaml
-   code: |
-     # Convert and validate inputs
-     try:
-         x = float(x)
-         y = float(y)
-         if x <= 0 or y <= 0:
-             result = {"error": "Values must be positive"}
-         else:
-             result = {"value": x * y}
-     except ValueError:
-         result = {"error": "Invalid number format"}
-   ```
+**Result:**
 
-4. **Context Access**
-   - Use proper context paths for accessing task outputs
-   - Handle missing values gracefully
-   ```yaml
-   code: |
-     # Safe context access
-     prev_output = context.get('execution_state', {}).get('step_outputs', {}).get('prev_step', {}).get('result')
-     if prev_output is None:
-         result = {"error": "Previous step output not found"}
-     else:
-         result = process_output(prev_output)
-   ```
+The task returns a dictionary `{"result": value}`, where `value` is the return value of the called Python function.
+Supports both synchronous and asynchronous (`async def`) functions.
 
-## Examples
+**Example:**
 
-### Data Processing
+Assuming a module `utils.processors` with a function `def process_user(user_id: int, active_only: bool = True) -> dict:`:
 
 ```yaml
-steps:
-  - name: process_data
-    task: python
-    code: |
-      import json
-      
-      # Process input data
-      try:
-          data = json.loads(input_json)
-          processed = [item['value'] * 2 for item in data]
-          result = {
-              "status": "success",
-              "count": len(processed),
-              "data": processed
-          }
-      except Exception as e:
-          result = {
-              "status": "error",
-              "message": str(e)
-          }
-    inputs:
-      input_json: "{{ previous_step.output }}"
+- name: process_single_user
+  task: python_function
+  inputs:
+    module: utils.processors
+    function: process_user
+    args: # Positional arguments
+      - "{{ args.user_id }}"
+    kwargs: # Keyword arguments
+      active_only: false
 ```
 
-### Conditional Processing
+## `python_script`
+
+Executes an external Python script file.
+
+**Inputs:**
+
+*   `script_path` (str, required): The path to the Python script. 
+    *   If absolute, it's used directly.
+    *   If relative, it's resolved first relative to the workflow workspace directory, then searched for in the system's `PATH`.
+*   `args` (list, optional): A list of string arguments to pass to the script command line. Templates can be used.
+*   `cwd` (str, optional): The working directory from which to run the script. Defaults to the workflow workspace. Templates can be used.
+*   `timeout` (float, optional): Maximum execution time in seconds. Raises `TimeoutError` if exceeded.
+*   `check` (bool, optional): If `true` (default), raises a `TaskExecutionError` if the script exits with a non-zero return code.
+
+**Result:**
+
+The task returns a dictionary `{"result": value}` where `value` is a dictionary containing:
+*   `returncode` (int): The exit code of the script.
+*   `stdout` (str): The standard output captured from the script.
+*   `stderr` (str): The standard error captured from the script.
+
+**Example:**
 
 ```yaml
-steps:
-  - name: conditional_calc
-    task: python
-    code: |
-      value = float(input_value)
-      
-      if value < 0:
-          result = {
-              "status": "error",
-              "message": "Value must be positive"
-          }
-      elif value < 10:
-          result = {
-              "status": "success",
-              "category": "small",
-              "processed": value * 2
-          }
-      else:
-          result = {
-              "status": "success",
-              "category": "large",
-              "processed": value * 1.5
-          }
-    inputs:
-      input_value: "{{ params.value }}"
+- name: run_analysis_script
+  task: python_script
+  inputs:
+    script_path: scripts/analyze_data.py # Relative to workspace
+    args:
+      - "--input"
+      - "{{ steps.prepare_data.result.output_file }}"
+      - "--threshold"
+      - "{{ args.threshold | default(0.95) }}"
+    cwd: "{{ workspace }}/analysis_module" # Optional working directory
+    timeout: 600 # 10 minutes
+    check: true # Fail workflow if script fails
 ```
 
-### Data Transformation
+## `python_module`
+
+Executes a Python module using `python -m <module>`.
+
+**Inputs:**
+
+*   `module` (str, required): The name of the module to execute (e.g., `my_tool.cli`).
+*   `args` (list, optional): A list of string arguments to pass to the module command line. Templates can be used.
+*   `cwd` (str, optional): The working directory from which to run the module. Defaults to the workflow workspace. Templates can be used.
+*   `timeout` (float, optional): Maximum execution time in seconds. Raises `TimeoutError` if exceeded.
+*   `check` (bool, optional): If `true` (default), raises a `TaskExecutionError` if the module exits with a non-zero return code.
+
+**Execution Environment:** The workflow's workspace directory is automatically added to the `PYTHONPATH` environment variable for the execution, allowing the module to import other local Python files or packages within the workspace.
+
+**Result:**
+
+The task returns a dictionary `{"result": value}` where `value` is a dictionary containing:
+*   `returncode` (int): The exit code of the module process.
+*   `stdout` (str): The standard output captured from the process.
+*   `stderr` (str): The standard error captured from the process.
+
+**Example:**
 
 ```yaml
-steps:
-  - name: transform_data
-    task: python
-    code: |
-      def transform_record(record):
-          return {
-              'id': record['id'],
-              'name': record['name'].upper(),
-              'score': float(record['score']),
-              'grade': 'A' if float(record['score']) >= 90 else 'B'
-          }
-      
-      # Transform all records
-      result = [transform_record(r) for r in records]
-    inputs:
-      records: "{{ input_records }}"
-    outputs: transformed_data
-```
-
-### File Processing
-
-```yaml
-steps:
-  - name: process_csv
-    task: python
-    code: |
-      import csv
-      from io import StringIO
-      
-      # Parse CSV data
-      reader = csv.DictReader(StringIO(csv_content))
-      data = list(reader)
-      
-      # Calculate statistics
-      values = [float(row['value']) for row in data]
-      result = {
-          'count': len(values),
-          'sum': sum(values),
-          'average': sum(values) / len(values)
-      }
-    inputs:
-      csv_content: "{{ steps.read_file.outputs.content }}"
-    outputs: statistics
-```
-
-### API Integration
-
-```yaml
-steps:
-  - name: process_api_data
-    task: python
-    code: |
-      import json
-      import urllib.parse
-      
-      # Process API response
-      data = json.loads(api_response)
-      
-      # Extract and transform data
-      items = data.get('items', [])
-      processed = [{
-          'id': item['id'],
-          'url': urllib.parse.urljoin(base_url, item['path']),
-          'metadata': item.get('metadata', {})
-      } for item in items]
-      
-      result = {
-          'items': processed,
-          'count': len(processed)
-      }
-    inputs:
-      api_response: "{{ steps.api_call.outputs.response }}"
-      base_url: "https://api.example.com"
-    outputs: processed_data
+- name: run_cli_tool
+  task: python_module
+  inputs:
+    module: my_project.cli_tool
+    args:
+      - "process"
+      - "--input-file"
+      - "{{ steps.download.result.file_path }}"
+      - "--verbose"
+    check: true
 ``` 

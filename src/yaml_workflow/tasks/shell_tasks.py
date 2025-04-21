@@ -12,6 +12,7 @@ from jinja2 import StrictUndefined, Template, UndefinedError
 from ..exceptions import TaskExecutionError, TemplateError
 from . import TaskConfig, register_task
 from .base import get_task_logger, log_task_error, log_task_execution, log_task_result
+from .error_handling import ErrorContext, handle_task_error
 
 
 def run_command(
@@ -126,16 +127,16 @@ def process_command(command: str, context: Dict[str, Any]) -> str:
         str: Processed shell command
 
     Raises:
-        TemplateError: If template resolution fails
+        TaskExecutionError: If template resolution fails (via handle_task_error)
     """
     try:
         template = Template(command, undefined=StrictUndefined)
         return template.render(**context)
     except UndefinedError as e:
-        # Extract the undefined variable name from the error message
+        task_name = context.get("step_name", "shell_template")
+        task_type = context.get("task_type", "shell")
         var_name = str(e).split("'")[1] if "'" in str(e) else "unknown"
 
-        # Get available variables by namespace
         available = {
             "args": list(context.get("args", {}).keys()),
             "env": list(context.get("env", {}).keys()),
@@ -145,15 +146,34 @@ def process_command(command: str, context: Dict[str, Any]) -> str:
             ),
         }
 
-        # Build a helpful error message
         msg = f"Undefined variable '{var_name}' in shell command template. "
         msg += "Available variables by namespace:\n"
         for ns, vars in available.items():
             msg += f"  {ns}: {', '.join(vars) if vars else '(empty)'}\n"
 
-        raise TemplateError(msg)
-    except Exception as e:
-        raise TemplateError(f"Failed to process shell command template: {str(e)}")
+        template_error = TemplateError(msg)
+        err_context = ErrorContext(
+            step_name=str(task_name),
+            task_type=str(task_type),
+            error=template_error,
+            task_config=context.get("task_config"),
+            template_context=context,
+        )
+        handle_task_error(err_context)
+        return ""  # Unreachable
+    except Exception as e:  # Catch other template processing errors
+        task_name = context.get("step_name", "shell_template")
+        task_type = context.get("task_type", "shell")
+        handle_task_error(
+            ErrorContext(
+                step_name=str(task_name),
+                task_type=str(task_type),
+                error=e,
+                task_config=context.get("task_config"),
+                template_context=context,
+            )
+        )
+        return ""  # Unreachable
 
 
 @register_task("shell")
@@ -170,35 +190,21 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
     Raises:
         TaskExecutionError: If command execution fails or template resolution fails
     """
-    task_name = str(config.name) if config.name is not None else "unnamed_task"
+    task_name = str(config.name or "shell_task")
+    task_type = str(config.type or "shell")
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(
-        logger,
-        {"name": task_name, "type": config.type},
-        config._context,
-        config.workspace,
-    )
 
     try:
-        # Process inputs with template support
-        try:
-            processed = config.process_inputs()
-        except TemplateError as e:
-            raise TaskExecutionError(
-                f"Failed to resolve template in shell task inputs: {str(e)}",
-                original_error=e,
-            )
+        log_task_execution(logger, config.step, config._context, config.workspace)
 
-        # Get command (required)
+        processed = config.process_inputs()
+        config._processed_inputs = processed
+
         if "command" not in processed:
             missing_cmd_error = ValueError("command parameter is required")
-            raise TaskExecutionError(
-                "No command provided for shell task",
-                original_error=missing_cmd_error,
-            )
+            raise missing_cmd_error
         command = processed["command"]
 
-        # Handle working directory
         cwd = config.workspace
         if "working_dir" in processed:
             working_dir = processed["working_dir"]
@@ -207,84 +213,59 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
             else:
                 cwd = Path(working_dir)
 
-        # Get environment variables
         env = get_environment()
         if "env" in processed:
             env.update(processed["env"])
 
-        # Get shell mode - default to True for better script compatibility
         shell = processed.get("shell", True)
 
         # Get timeout
         timeout = processed.get("timeout", None)
 
-        # Process command template
-        try:
-            command = process_command(command, config._context)
-        except TemplateError as e:
+        # Process command template ONLY if it's a string
+        if isinstance(command, str):
+            # Pass necessary context for error reporting within process_command
+            command_context = {
+                **config._context,
+                "step_name": task_name,
+                "task_type": task_type,
+                "task_config": config.step,
+            }
+            command = process_command(command, command_context)
+        elif not isinstance(command, list):
+            # Raise error if command is neither string nor list
+            invalid_type_error = TypeError(
+                f"Invalid command type: {type(command).__name__}. Expected string or list."
+            )
             raise TaskExecutionError(
-                f"Failed to process shell command template: {str(e)}",
-                original_error=e,
+                step_name=task_name, original_error=invalid_type_error
             )
 
         # Run command
-        try:
-            returncode, stdout, stderr = run_command(
-                command, cwd=str(cwd), env=env, shell=shell, timeout=timeout
-            )
-        except subprocess.TimeoutExpired as e:
-            raise TaskExecutionError(
-                f"Command timed out after {timeout} seconds",
-                original_error=e,
-            )
-        except subprocess.CalledProcessError as e:
-            raise TaskExecutionError(
-                f"Command failed with exit code {e.returncode}",
-                original_error=e,
-            )
-        except Exception as e:
-            raise TaskExecutionError(
-                f"Failed to execute command: {str(e)}",
-                original_error=e,
-            )
-
-        # Check return code
-        if returncode != 0:
-            cmd_error = subprocess.CalledProcessError(
-                returncode, command, stdout, stderr
-            )
-            raise TaskExecutionError(
-                f"Command failed with exit code {returncode}",
-                original_error=cmd_error,
-            )
-
-        # Log task completion
-        log_task_result(
-            logger,
-            {
-                "returncode": returncode,
-                "stdout": stdout,
-                "stderr": stderr,
-                "command": command,
-            },
+        returncode, stdout, stderr = run_command(
+            command, cwd=str(cwd), env=env, shell=shell, timeout=timeout
         )
 
-        # Return results with both returncode and exit_code for backward compatibility
-        return {
-            "returncode": returncode,
-            "exit_code": returncode,  # Alias for backward compatibility
-            "stdout": stdout,
-            "stderr": stderr,
-            "command": command,
-        }
+        if returncode != 0:
+            error_message = f"Command failed with exit code {returncode}"
+            if stderr:
+                error_message += f"\nStderr:\n{stderr}"
+            cmd_error = subprocess.CalledProcessError(
+                returncode, cmd=command, output=stdout, stderr=stderr
+            )
+            raise cmd_error
 
-    except TaskExecutionError as e:
-        log_task_error(logger, e)
-        raise
+        result = {"return_code": returncode, "stdout": stdout, "stderr": stderr}
+        log_task_result(logger, result)
+        return result
 
     except Exception as e:
-        log_task_error(logger, e)
-        raise TaskExecutionError(
-            f"Unexpected error in shell task: {str(e)}",
-            original_error=e,
+        context = ErrorContext(
+            step_name=task_name,
+            task_type=task_type,
+            error=e,
+            task_config=config.step,
+            template_context=config._context,
         )
+        handle_task_error(context)
+        return {}  # Unreachable

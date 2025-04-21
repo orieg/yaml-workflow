@@ -44,11 +44,17 @@ steps:
     task: file_check
     params:
       path: "{{ args.input_file }}"
+  - name: process_data
+    task: python_code
+    description: Processes input data based on environment.
+    inputs:
+      data_source: "{{ args.source }}"
   - name: process_batch
     task: batch
     inputs:
       # Input items to process
-      items: "{{ steps.get_items.output }}"
+      # Assuming get_items returns the list directly as its result
+      items: "{{ steps.get_items.result }}"
       
       # Processing configuration
       chunk_size: 10
@@ -56,254 +62,100 @@ steps:
       
       # Processing task
       task:
-        task: python
+        task: python_code
         inputs:
           code: "process_item()"
       
       # Optional argument name for items (defaults to "item")
       arg_name: data_item
-```
 
-### Environment Variables
+### Accessing Step Results
 
-Environment variables are accessed using the `env` namespace:
+   The results of completed steps are stored in the `steps` namespace. All results are nested under a `result` key for consistency and to avoid potential name collisions.
 
-1. In the workflow file:
-```yaml
-env:
-  API_URL: "https://api.example.com"
-  DEBUG: "true"
-```
+   ```yaml
+   # Example Step
+   - name: process_data
+     task: some_task
+     # ... other params ...
 
-2. Using environment variables:
-```yaml
-steps:
-  - name: api_call
-    task: http
-    params:
-      url: "{{ env.API_URL }}"
-      debug: "{{ env.DEBUG }}"
-```
+   # Accessing results in a later step
+   - name: use_result
+     task: another_task
+     inputs:
+       # If process_data returns a single value (e.g., a string or number)
+       input_value: "{{ steps.process_data.result }}"
 
-3. From a .env file in the workspace:
-```
-API_KEY=your-api-key
-DEBUG=true
-```
-
-### Parameters
-
-Parameters are accessed using the `args` namespace:
-
-```yaml
-params:
-  # Simple string parameter
-  name:
-    type: string
-    required: true
-    description: Your name
-
-  # Number with validation
-  age:
-    type: integer
-    min: 0
-    max: 150
-    default: 30
-
-  # Enum parameter
-  mode:
-    type: string
-    choices: [fast, accurate]
-    default: accurate
-
-  # File parameter
-  config_file:
-    type: string
-    description: Path to config file
-    validate:
-      - file_exists
-      - is_readable
-
-# Using parameters in steps
-steps:
-  - name: greet
-    task: python
-    params:
-      name: "{{ args.name }}"
-      mode: "{{ args.mode }}"
-```
-
-### Flow Control
-
-Flows allow organizing steps into logical groups:
-
-```yaml
-flows:
-  # Default flow to run
-  default: process
-
-  # Flow definitions
-  definitions:
-    - process: [validate, transform, save]
-    - validate: [validate]
-    - cleanup: [archive, cleanup]
-```
-
-Run specific flows using:
-```bash
-yaml-workflow run workflow.yaml --flow validate
-```
-
-### Step Configuration
-
-Each step can have:
-
-1. Basic properties:
-```yaml
-- name: process_data
-  task: shell
-  description: Process input data
-```
-
-2. Task parameters with error handling:
-```yaml
-  params:
-    input: "{{ args.input_file }}"
-    output: "{{ args.output_file }}"
-  error_handling:
-    undefined_variables: strict  # Raises error for undefined variables
-    show_available: true        # Shows available variables in error messages
-```
-
-3. Conditions with proper variable access:
-```yaml
-  condition: "{{ steps.previous_step.status == 'completed' and args.input_file }}"
-```
-
-4. Error handling with retries:
-```yaml
-  retry:
-    max_attempts: 3
-    delay: 5
-  on_error:
-    action: continue
-    message: "Processing failed: {{ error }}"
-    notify: "{{ env.ADMIN_EMAIL }}"
-```
-
-5. Output capture and access:
-```yaml
-  outputs:
-    - result
-    - metadata
-  # Access in later steps
-  # {{ steps.process_data.outputs.result }}
-  # {{ steps.process_data.outputs.metadata }}
-```
+       # If process_data returns a dictionary (e.g., {'status': 'ok', 'file_path': '/path/to/file'})
+       status_from_prev: "{{ steps.process_data.result.status }}"
+       path_from_prev: "{{ steps.process_data.result.file_path }}"
+   ```
 
 ### Batch Processing
 
 Configure batch processing tasks:
 
 ```yaml
+# Example Batch Processing Step Configuration (Replace with actual example if available)
 steps:
-  - name: process_batch
-    task: batch_processor
-    params:
-      # Input items to process
-      items: "{{ steps.get_items.output }}"
-      
-      # Processing configuration
+  - name: process_batch_example
+    task: batch_processor # Or relevant batch task type
+    inputs:
+      items: "{{ steps.get_items.result }}" # Assuming get_items returns a list
       chunk_size: 10
-      max_workers: 4
-      
-      # Processing task
-      task: python
-      function: process_item
-      
-      # Error handling
-      on_error: continue
-      error_handler: log_error
-      
-      # Result handling
-      aggregator: combine_results
-      
-      # State management
-      resume: true
+      # ... other batch parameters ...
+      task: # The task to run on each item/chunk
+        task: python_code 
+        # ... sub-task inputs ... 
 ```
 
 ### Template Variables
 
 Available template variables are organized in namespaces:
 
-1. Arguments (Parameters):
-```yaml
-{{ args.input_file }}      # Access parameter value
-{{ args.mode }}           # Access parameter with default
-```
+1.  **Arguments (`args`)**: Access parameters passed to the workflow.
+    ```yaml
+    {{ args.input_file }}      # Access parameter value
+    {{ args.mode }}           # Access parameter with default
+    ```
 
-2. Environment Variables:
-```yaml
-{{ env.API_KEY }}        # Environment variable
-{{ env.DEBUG }}         # Environment variable with default
-```
+2.  **Environment Variables (`env`)**: Access environment variables.
+    ```yaml
+    {{ env.API_KEY }}        # Environment variable
+    {{ env.DEBUG }}         # Environment variable with default
+    ```
 
-3. Step Outputs:
-```yaml
-{{ steps.process.output }}         # Direct output
-{{ steps.process.outputs.result }} # Named output
-{{ steps.process.status }}        # Step status
-{{ steps.process.error }}         # Error message if failed
-```
+3.  **Step Results (`steps`)**: Access results from previous steps.
+    ```yaml
+    # Access the entire result (if it's a single value or you need the whole dict)
+    {{ steps.previous_step.result }}
 
-4. Built-in Variables:
-```yaml
-{{ workflow.name }}          # Workflow name
-{{ workflow.workspace }}     # Workspace directory
-{{ workflow.run_id }}        # Unique run ID
-{{ workflow.timestamp }}     # Current time
-```
+    # Access a specific key if the result is a dictionary
+    {{ steps.previous_step.result.specific_key }}
 
-### Error Handling
+    # Access the status of a step (completed, failed, skipped) - accessed directly
+    {{ steps.previous_step.status }} 
+    ```
+    *Note: Step status is accessed directly via `steps.STEP_NAME.status`, not nested under `result`.*
 
-Improved error messages help diagnose issues:
+4.  **Built-in Variables (`workflow`)**: Access workflow metadata.
+    ```yaml
+    {{ workflow.name }}          # Workflow name
+    {{ workflow.workspace }}     # Workspace directory
+    {{ workflow.run_id }}        # Unique run ID
+    {{ workflow.timestamp }}     # Current time
+    ``` 
 
-1. Undefined Variables:
-```
-TemplateError: Variable 'result' is undefined. Available variables:
-- args: [input_file, mode, batch_size]
-- env: [API_KEY, DEBUG]
-- steps: [validate, process]
-```
-
-2. Invalid Access:
-```
-TemplateError: Invalid step attribute 'results'. Valid attributes:
-- output: Raw step output
-- outputs: Named outputs
-- status: Step status
-- error: Error message
-- timestamp: Execution time
-```
-
-### Workspace Configuration
-
-Create `.yaml-workflow.yaml` in your project root:
-
-```yaml
-# Project-level settings
-project:
-  name: my-project
-  description: Project description
-
-# Default settings
-defaults:
+# Use StrictUndefined to catch missing variables
+settings:
   error_handling:
     undefined_variables: strict
-    show_available: true
-  
-  batch_processing:
-    chunk_size: 10
-    max_workers: 4
-    resume: true
-``` 
+
+steps:
+  - name: task_with_potential_error
+    task: python_code # Use python_code for example
+    inputs:
+      code: |
+        # This will raise TemplateError if 'args.maybe_missing' is not provided
+        value = "{{ args.maybe_missing }}"
+        result = value.upper() 

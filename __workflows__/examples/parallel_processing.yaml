@@ -1,0 +1,67 @@
+# Example workflow demonstrating parallel processing capabilities
+# This workflow processes multiple files in parallel and aggregates the results
+
+name: Parallel Processing Example
+description: Process multiple files in parallel and aggregate results
+version: "1.0"
+
+# Define parallel processing settings
+parallel_settings:
+  max_workers: 4
+  timeout: 3600  # seconds
+
+steps:
+  - name: list_input_files
+    task: file_utils
+    function: get_files
+    inputs:
+      path: ${input_directory}
+      pattern: "*.json"
+    outputs:
+      - file_list
+  
+  # Parallel step - processes multiple files simultaneously
+  - name: process_files
+    task: processors
+    function: process_file
+    parallel: true
+    iterate_over: ${file_list}
+    inputs:
+      file_path: ${item}  # Special variable 'item' refers to current iteration value
+      config: ${processing_config}
+    outputs:
+      - processed_results  # Will collect all results in a list
+    
+  # Aggregation step - combines results from parallel processing
+  - name: aggregate_results
+    task: aggregators
+    function: combine_results
+    inputs:
+      results: ${processed_results}
+      method: "sum"
+    outputs:
+      - final_result
+  
+  # Generate reports in parallel
+  - name: generate_reports
+    task: reporting
+    function: create_report
+    parallel: true
+    inputs:
+      data: ${final_result}
+      templates:
+        - "executive_summary"
+        - "detailed_analysis"
+        - "charts_and_graphs"
+    outputs:
+      - report_files
+  
+  # Zip all reports together
+  - name: package_reports
+    task: file_utils
+    function: create_zip
+    inputs:
+      files: ${report_files}
+      output_path: ${output_zip}
+    outputs:
+      - archive_path 

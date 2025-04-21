@@ -10,22 +10,24 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union, cast
 
 import yaml
 from jinja2 import StrictUndefined, Template
 
 from .exceptions import (
+    ConfigurationError,
     FlowError,
     FlowNotFoundError,
     FunctionNotFoundError,
     InvalidFlowDefinitionError,
     StepExecutionError,
     StepNotInFlowError,
+    TaskExecutionError,
     TemplateError,
     WorkflowError,
 )
-from .state import WorkflowState
+from .state import ExecutionState, WorkflowState
 from .tasks import TaskConfig, get_task_handler
 from .template import TemplateEngine
 from .utils.yaml_utils import get_safe_loader
@@ -107,7 +109,7 @@ class WorkflowEngine:
         Raises:
             WorkflowError: If workflow file not found or invalid
         """
-        # Load workflow definition
+        # --- 1. Load Workflow Definition ---
         if isinstance(workflow, dict):
             self.workflow = workflow
             self.workflow_file = None
@@ -115,102 +117,268 @@ class WorkflowEngine:
             self.workflow_file = Path(workflow)
             if not self.workflow_file.exists():
                 raise WorkflowError(f"Workflow file not found: {workflow}")
-
-            # Load workflow from file
             try:
                 with open(self.workflow_file) as f:
                     self.workflow = yaml.load(f, Loader=get_safe_loader())
             except yaml.YAMLError as e:
                 raise WorkflowError(f"Invalid YAML in workflow file: {e}")
 
-        # Validate workflow structure
+        # --- 2. Validate Workflow Structure & Keys ---
         if not isinstance(self.workflow, dict):
             raise WorkflowError("Invalid workflow format: root must be a mapping")
-
-        # Validate required sections
-        if not self.workflow.get("steps") and not self.workflow.get("flows"):
+        allowed_keys = {
+            "name",
+            "description",
+            "params",
+            "steps",
+            "flows",
+            "settings",
+        }
+        for key in self.workflow:
+            if key not in allowed_keys:
+                raise ConfigurationError(
+                    f"Unexpected top-level key '{key}' found in workflow definition. "
+                    f"Allowed keys are: {', '.join(sorted(allowed_keys))}. "
+                    f"Use the 'params' section for workflow inputs."
+                )
+        if "steps" not in self.workflow and "flows" not in self.workflow:
             raise WorkflowError(
                 "Invalid workflow file: missing both 'steps' and 'flows' sections"
             )
 
-        # Get workflow name
-        self.name = self.workflow.get("name")
-        if not self.name:
-            if self.workflow_file:
-                self.name = self.workflow_file.stem
-            else:
-                self.name = "workflow"
+        # --- Determine Workflow Name EARLY ---
+        # Needed for logger and workspace setup
+        workflow_name_from_def = self.workflow.get("name")
+        if not workflow_name_from_def and self.workflow_file:
+            workflow_name_final = self.workflow_file.stem
+        elif workflow_name_from_def:
+            workflow_name_final = workflow_name_from_def
+        else:
+            workflow_name_final = "Unnamed Workflow"
 
-        # Create workspace
-        self.workspace = create_workspace(self.name, workspace, base_dir)
+        # --- Setup Logging EARLY --- (Moved up)
+        # Need logger before step normalization
+        # Requires workspace to be created first
+        temp_workspace = create_workspace(
+            workflow_name=workflow_name_final,  # Use determined name
+            custom_dir=workspace,
+            base_dir=base_dir,
+        )
+        self.logger = setup_logging(
+            temp_workspace, workflow_name_final
+        )  # Use determined name
+
+        # --- 3. Normalize Steps (Convert dict to list if necessary) ---
+        if "steps" in self.workflow and isinstance(self.workflow["steps"], dict):
+            self.logger.debug("Normalizing steps dictionary to list format.")
+            steps_list = []
+            for step_name, step_config in self.workflow["steps"].items():
+                if not isinstance(step_config, dict):
+                    raise ConfigurationError(
+                        f"Invalid step definition for '{step_name}': must be a dictionary."
+                    )
+                # Ensure the step config has a 'name' key, using the dict key if absent
+                if "name" not in step_config:
+                    step_config["name"] = step_name
+                elif step_config["name"] != step_name:
+                    self.logger.warning(
+                        f"Step dictionary key '{step_name}' differs from 'name' field '{step_config['name']}' in step config. Using '{step_config['name']}'."
+                    )
+                # Prefer the name inside the config if both exist but differ
+                steps_list.append(step_config)
+            self.workflow["steps"] = steps_list
+        elif "steps" in self.workflow and not isinstance(self.workflow["steps"], list):
+            raise ConfigurationError("Workflow 'steps' must be a list or a dictionary.")
+        elif "steps" in self.workflow:
+            # Ensure all steps in list have a name
+            for i, step_config in enumerate(self.workflow["steps"]):
+                if not isinstance(step_config, dict) or "name" not in step_config:
+                    raise ConfigurationError(f"Step at index {i} is missing a 'name'.")
+
+        # --- 4. Create Workspace & Get Info --- (Now uses temp_workspace)
+        # Workspace path already created for logger setup
+        self.workspace = temp_workspace
         self.workspace_info = get_workspace_info(self.workspace)
 
-        # Set up logging
-        self.logger = setup_logging(self.workspace, self.name)
+        # --- 5. Setup Logging --- (Moved up)
+        # self.logger = setup_logging(self.workspace, self.name)
 
-        # Initialize workflow state with pre-loaded metadata if available
+        # --- 6. Initialize State ---
         self.state = WorkflowState(self.workspace, metadata)
 
-        # Initialize template engine
+        # --- 7. Initialize Template Engine ---
         self.template_engine = TemplateEngine()
 
-        # Initialize context with default parameter values
+        # --- 8. Initialize Context ---
+        # Now that workspace and info are ready, initialize the context
+        run_number = self.workspace_info.get("run_number", 1)
+        workflow_file_path = (
+            str(self.workflow_file.absolute()) if self.workflow_file else ""
+        )
+        workspace_path_str = str(self.workspace.absolute())
+        current_timestamp = datetime.now().isoformat()  # Use consistent ISO format
+
         self.context = {
             "workflow_name": self.name,
-            "workspace": str(self.workspace),
-            "run_number": self.workspace_info.get("run_number"),
-            "timestamp": datetime.now().isoformat(),
-            # Initialize namespaced variables
-            "args": {},
+            "workspace": workspace_path_str,
+            "run_number": run_number,
+            "timestamp": current_timestamp,
+            "workflow_file": workflow_file_path,  # Top-level access
+            # Namespaced variables
+            "args": {},  # Populated below
             "env": dict(os.environ),
-            "steps": {},
+            "steps": {},  # Populated by execution/state restore
+            # Workflow namespace
+            "workflow": {
+                "name": self.name,
+                "file": workflow_file_path if workflow_file_path else None,
+                "workspace": workspace_path_str,
+                "run_number": run_number,
+                "timestamp": current_timestamp,
+            },
+            # Settings namespace
+            "settings": self.workflow.get("settings", {}),
+            # Error placeholder
+            "error": None,
         }
 
-        # Add workflow file path if available
-        if self.workflow_file:
-            self.context["workflow_file"] = str(self.workflow_file.absolute())
-
-        # Load default parameter values from workflow file
+        # --- 9. Load Default Params into Context['args'] ---
         params = self.workflow.get("params", {})
         for param_name, param_config in params.items():
             if isinstance(param_config, dict) and "default" in param_config:
-                # Store in both root (backward compatibility) and args namespace
-                default_value = param_config["default"]
-                self.context[param_name] = default_value
-                self.context["args"][param_name] = default_value
+                self.context["args"][param_name] = param_config["default"]
             elif isinstance(param_config, dict):
-                # Handle case where param is defined but no default
-                self.context["args"][param_name] = None
+                self.context["args"][param_name] = None  # Param defined, no default
             else:
-                # Handle simple parameter definition
-                self.context[param_name] = param_config
+                # Simple param definition (value is the default)
                 self.context["args"][param_name] = param_config
 
-        # If there's existing state, restore step outputs to context
+        # --- 10. Restore State Outputs to Context['steps'] ---
+        # (Corrected to only restore to steps namespace)
         if self.state.metadata.get("execution_state", {}).get("step_outputs"):
             step_outputs = self.state.metadata["execution_state"]["step_outputs"]
-            for step_name, outputs in step_outputs.items():
-                if isinstance(outputs, dict):
-                    # If outputs is a dict with a single key matching step name, use its value
-                    if len(outputs) == 1 and step_name in outputs:
-                        self.context[step_name] = outputs[step_name]
-                    else:
-                        self.context[step_name] = outputs
-                else:
-                    self.context[step_name] = outputs
+            # Direct assignment is fine as state saves the correct structure
+            self.context["steps"] = step_outputs.copy()
 
-        # Validate flows if present
+        # --- 11. Validate Flows ---
+        # (Validation needs workflow steps, so do after definition load)
         self._validate_flows()
+        # --- 12. Validate Params Schema ---
+        # (Validation of default values defined in the schema)
+        self._validate_params()
 
+        # --- Post-Init Logging ---
         self.logger.info(f"Initialized workflow: {self.name}")
         self.logger.info(f"Workspace: {self.workspace}")
         self.logger.info(f"Run number: {self.context['run_number']}")
-        if params:
+        if self.context["args"]:
             self.logger.info("Default parameters loaded:")
             for name, value in self.context["args"].items():
                 self.logger.info(f"  {name}: {value}")
 
         self.current_step = None  # Track current step for error handling
+
+    # Re-adding template resolution methods that were removed during refactoring
+    def resolve_template(self, template_str: str) -> str:
+        """
+        Resolve template with both direct and namespaced variables.
+
+        Args:
+            template_str: Template string to resolve
+
+        Returns:
+            str: Resolved template string
+
+        Raises:
+            TemplateError: If template resolution fails
+        """
+        return self.template_engine.process_template(template_str, self.context)
+
+    def resolve_value(self, value: Any) -> Any:
+        """
+        Resolve a single value that might contain templates.
+
+        Args:
+            value: Value to resolve, can be any type
+
+        Returns:
+            Resolved value with templates replaced
+        """
+        if isinstance(value, str):
+            return self.template_engine.process_template(value, self.context)
+        elif isinstance(value, dict):
+            return {k: self.resolve_value(v) for k, v in value.items()}
+        elif isinstance(value, (list, tuple)):
+            return [self.resolve_value(v) for v in value]
+        return value
+
+    def resolve_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Resolve all inputs using Jinja2 template resolution.
+
+        Args:
+            inputs: Input dictionary
+
+        Returns:
+            Dict[str, Any]: Resolved inputs
+        """
+        return self.template_engine.process_value(inputs, self.context)
+
+    @property
+    def name(self) -> str:
+        """Return the name of the workflow."""
+        # Use workflow_name from context if available (set during setup_workspace)
+        # if self.context.get("workflow_name"):
+        #     return self.context["workflow_name"]
+        # Fallback to workflow definition name or derive from file
+        # (Logic moved earlier in __init__ to be available for workspace/logger)
+        workflow_name_from_def = self.workflow.get("name")
+        if not workflow_name_from_def and self.workflow_file:
+            return self.workflow_file.stem
+        elif workflow_name_from_def:
+            return workflow_name_from_def
+        else:
+            return "Unnamed Workflow"
+
+    def _validate_params(self):
+        """Validate parameters defined in the workflow against their schemas."""
+        params = self.workflow.get("params", {})
+        for name, config in params.items():
+            if not isinstance(config, dict):
+                continue  # Skip simple param definitions without schema
+
+            # Get the default value if present
+            default_value = config.get("default")
+
+            # Validate allowedValues
+            if "allowedValues" in config:
+                allowed = config["allowedValues"]
+                if not isinstance(allowed, list):
+                    raise ConfigurationError(
+                        f"Invalid schema for parameter '{name}': 'allowedValues' must be a list"
+                    )
+                # Check default value against allowedValues if default exists
+                if default_value is not None and default_value not in allowed:
+                    raise ConfigurationError(
+                        f"Invalid default value '{default_value}' for parameter '{name}'. "
+                        f"Allowed values: {allowed}"
+                    )
+
+            # Validate minLength for string type
+            if config.get("type") == "string" and "minLength" in config:
+                min_len = config["minLength"]
+                if not isinstance(min_len, int) or min_len < 0:
+                    raise ConfigurationError(
+                        f"Invalid schema for parameter '{name}': 'minLength' must be a non-negative integer"
+                    )
+                # Check default value length if default exists
+                if default_value is not None and len(str(default_value)) < min_len:
+                    raise ConfigurationError(
+                        f"Invalid default value for parameter '{name}'. "
+                        f"Value '{default_value}' is shorter than minimum length {min_len}"
+                    )
+
+            # Add more validations here (e.g., type checking, regex pattern)
 
     def _validate_flows(self) -> None:
         """Validate workflow flows configuration."""
@@ -264,9 +432,9 @@ class WorkflowEngine:
         if not all_steps:
             raise WorkflowError("No steps defined in workflow")
 
-        # If no flows defined or flow is "all", return all steps
+        # If no flows defined or flow is None or flow is "all", return all steps
         flows = self.workflow.get("flows", {})
-        if not flows or flow_name == "all":
+        if not flows or flow_name is None or flow_name == "all":
             return all_steps
 
         # Get flow definition
@@ -304,6 +472,7 @@ class WorkflowEngine:
         start_from: Optional[str] = None,
         skip_steps: Optional[List[str]] = None,
         flow: Optional[str] = None,
+        max_retries: int = 3,
     ) -> Dict[str, Any]:
         """
         Run the workflow.
@@ -314,6 +483,7 @@ class WorkflowEngine:
             start_from: Optional step name to start execution from (fresh start)
             skip_steps: Optional list of step names to skip during execution
             flow: Optional flow name to execute. If not specified, uses default flow.
+            max_retries: Global maximum number of retries for failed steps (default: 3)
 
         Returns:
             dict: Workflow results
@@ -425,469 +595,470 @@ class WorkflowEngine:
             if flows or (flow and flow != "all"):
                 self.state.set_flow(flow)
 
-        # Run steps
-        results: Dict[str, Any] = {}
-        for i, step in enumerate(steps, 1):
-            if not isinstance(step, dict):
-                raise WorkflowError(f"Invalid step format at position {i}")
+        # Initialize execution state if not resuming
+        if not resume_from:
+            self.state.initialize_execution()
 
-            # Get step info
-            name = step.get("name", f"step_{i}")
+        # Restore step outputs from state if resuming or has previous state
+        if self.state.metadata.get("execution_state", {}).get("step_outputs"):
+            self.context["steps"] = self.state.metadata["execution_state"][
+                "step_outputs"
+            ].copy()
 
-            # Skip steps that are in the skip list
-            if skip_steps and name in skip_steps:
-                self.logger.info(f"Skipping step: {name} (explicitly skipped)")
+        # Determine the sequence of steps to execute
+        all_steps = self._get_flow_steps()  # Get *all* defined steps for jump targets
+        step_dict = {step["name"]: step for step in all_steps}
+
+        # Determine starting point based on the *flow-specific* steps list
+        flow_steps = self._get_flow_steps(flow)  # Get steps for the current flow
+        flow_step_dict = {step["name"]: step for step in flow_steps}
+
+        start_index = 0
+        if resume_from:
+            if resume_from not in flow_step_dict:
+                raise StepNotInFlowError(
+                    resume_from,
+                    flow or "default",
+                )
+            start_index = next(
+                (i for i, step in enumerate(flow_steps) if step["name"] == resume_from),
+                0,
+            )
+            self.logger.info(f"Resuming workflow from step: {resume_from}")
+        elif start_from:
+            if start_from not in flow_step_dict:
+                raise StepNotInFlowError(start_from, flow or "default")
+            start_index = next(
+                (i for i, step in enumerate(flow_steps) if step["name"] == start_from),
+                0,
+            )
+            self.logger.info(f"Starting workflow from step: {start_from}")
+
+        # Apply initial skips only - runtime skips are handled in execute_step
+        steps_to_execute_initially = flow_steps[start_index:]
+        initial_skip_set = set(skip_steps or [])
+        steps_to_execute = [
+            step
+            for step in steps_to_execute_initially
+            if step["name"] not in initial_skip_set
+        ]
+
+        # Main execution loop
+        current_index = 0
+        executed_step_names: Set[str] = set(self.state.get_executed_steps())
+        while current_index < len(steps_to_execute):
+            step = steps_to_execute[current_index]
+            step_name = step["name"]
+
+            # Skip if already executed (in case of resume/retry jumps)
+            if step_name in executed_step_names:
+                self.logger.info(f"Skipping already executed step: {step_name}")
+                current_index += 1
                 continue
 
-            # Handle resume vs start from logic
-            if resume_from:
-                # Skip already completed steps when resuming
-                if name in self.state.metadata["execution_state"]["completed_steps"]:
-                    self.logger.info(f"Skipping completed step: {name}")
-                    continue
-
-                # Skip steps until we reach the resume point
-                if (
-                    name != resume_from
-                    and not self.state.metadata["execution_state"]["completed_steps"]
-                ):
-                    self.logger.info(f"Skipping step before resume point: {name}")
-                    continue
-            elif start_from:
-                # For start-from, simply skip until we reach the starting point
-                if name != start_from and not results:
-                    self.logger.info(f"Skipping step before start point: {name}")
-                    continue
-
-            # Check if step has a condition and evaluate it
-            if "condition" in step:
-                try:
-                    template = Template(step["condition"])
-                    condition_result = template.render(**self.context)
-                    # Evaluate the rendered condition
-                    if not eval(condition_result):
-                        self.logger.info(f"Skipping step {name}: condition not met")
-                        continue
-                except Exception as e:
-                    raise WorkflowError(
-                        f"Error evaluating condition in step {name}: {str(e)}"
-                    )
-
-            task_type = step.get("task")
-            if not task_type:
-                raise WorkflowError(f"No task type specified for step: {name}")
-
-            # Get task handler
-            handler = get_task_handler(task_type)
-            if not handler:
-                raise WorkflowError(f"Unknown task type: {task_type}")
-
-            # Run task
-            self.logger.info(f"Running step {i}: {name}")
+            # Execute step with retry/error handling
             try:
-                # Call on_step_start callback if defined
-                if hasattr(self, "on_step_start") and self.on_step_start:
-                    try:
-                        self.on_step_start(name)
-                    except Exception as e:
-                        self.state.mark_step_failed(name, str(e))
-                        raise WorkflowError(f"Error in step {name}: {str(e)}") from e
-
-                result = self._call_task_handler(handler, step)
-                self.logger.debug(
-                    f"Task returned result of type {type(result)}: {result}"
-                )
-                results[name] = result
-                # Update context with step result
-                self.context[name] = result
-                # Update workflow state
-                self.state.mark_step_complete(name, {name: result})
-            except Exception as e:
-                # Handle error according to on_error configuration
-                result = self._handle_step_error(step, e)
-                if result is None:
-                    # Error handling indicated workflow should fail
-                    raise WorkflowError(f"Error in step {name}: {str(e)}") from e
-                # Error was handled, store result and continue
-                results[name] = result
-                self.context[name] = result
-
-            # Store outputs in context
-            outputs: Union[List[str], str, None] = step.get("outputs")
-            if outputs is not None:
-                self.logger.debug(
-                    f"Storing outputs in context. Current context before: {self.context}"
-                )
-                self.logger.debug(f"Task result type: {type(result)}, value: {result}")
-                if isinstance(outputs, str):
-                    # Ensure we store raw strings for template variables
-                    if isinstance(result, dict) and "content" in result:
-                        self.logger.warning(
-                            f"Task '{name}' returned a dict with 'content' property - using raw content value"
-                        )
-                        self.context[outputs] = result["content"]
-                    else:
-                        self.context[outputs] = result
+                self.execute_step(step, max_retries)
+                executed_step_names.add(step_name)
+                current_index += 1
+            except TaskExecutionError as e:
+                # Check if it was a retry request first!
+                if isinstance(e, RetryStepException):
                     self.logger.debug(
-                        f"Stored single output '{outputs}' = {self.context[outputs]}"
+                        f"Caught RetryStepException for step '{step_name}'. Looping."
                     )
-                elif isinstance(outputs, list):
-                    if len(outputs) == 1:
-                        if isinstance(result, dict) and "content" in result:
-                            self.logger.warning(
-                                f"Task '{name}' returned a dict with 'content' property - using raw content value"
-                            )
-                            self.context[outputs[0]] = result["content"]
-                        else:
-                            self.context[outputs[0]] = result
-                        self.logger.debug(
-                            f"Stored single output from list '{outputs[0]}' = {self.context[outputs[0]]}"
+                    # Don't increment current_index, just continue the loop
+                    continue
+
+                # Not a retry, so it's either a jump or a final halt
+                self.logger.debug(
+                    f"TaskExecutionError caught in run loop for step '{step_name}'. Checking for error flow."
+                )
+                error_flow_target = self.state.get_error_flow_target()
+                if error_flow_target:
+                    # --- Handle Error Flow Jump ---
+                    self.logger.info(
+                        f"Jumping to error handling step: {error_flow_target}"
+                    )
+                    # Find the index of the target step in the original *full* list of steps
+                    try:
+                        target_index_in_all = next(
+                            i
+                            for i, s in enumerate(all_steps)
+                            if s["name"] == error_flow_target
                         )
-                    elif len(outputs) > 1 and isinstance(result, (list, tuple)):
-                        for output, value in zip(outputs, result):
-                            if isinstance(value, dict) and "content" in value:
-                                self.logger.warning(
-                                    f"Task '{name}' returned a dict with 'content' property - using raw content value"
-                                )
-                                self.context[output] = value["content"]
-                            else:
-                                self.context[output] = value
-                            self.logger.debug(
-                                f"Stored multiple output '{output}' = {self.context[output]}"
-                            )
+                        # Reset the execution queue to start from the target step,
+                        # using the main list of all steps and respecting skips.
+                        steps_to_execute = [
+                            s
+                            for s in all_steps[target_index_in_all:]
+                            if s["name"] not in initial_skip_set
+                        ]
+                        current_index = 0  # Start from the beginning of the new list
+                        self.state.clear_error_flow_target()
+                        # Add the target step to executed_step_names *before* continuing
+                        # to prevent immediate re-execution if it was skipped initially.
+                        # However, let execute_step handle adding it after successful run.
+                        # We might need to clear executed_step_names specific to the failed branch?
+                        # For now, just continue loop.
+                        continue
+                    except StopIteration:
+                        # This means the target step from on_error.next doesn't exist in the workflow steps
+                        self.logger.error(
+                            f"Configuration error: on_error.next target '{error_flow_target}' not found in workflow steps."
+                        )
+                        # Mark the *original* step as failed, as the jump target is invalid
+                        self.state.mark_step_failed(
+                            step_name,
+                            f"Invalid on_error.next target: {error_flow_target}",
+                        )
+                        self.state.save()
+                        raise WorkflowError(
+                            f"Invalid on_error.next target '{error_flow_target}' for step '{step_name}'"
+                        ) from e
+                else:
+                    # --- Handle Terminal Failure (No Jump Target) ---
+                    # The error was already marked as terminally failed in execute_step
+                    # which also sets the workflow state to failed.
+                    # Re-raise a WorkflowError to signal the end of execution
+                    root_cause = e.original_error or e  # Get the actual root cause
+                    final_error_message = f"Workflow halted at step '{step_name}' due to unhandled error: {root_cause}"  # Use root cause in message
+                    self.logger.error(final_error_message)
+                    # No need to call mark_workflow_failed here; mark_step_failed in execute_step handles it.
+                    raise WorkflowError(
+                        final_error_message, original_error=root_cause
+                    ) from root_cause
+            except Exception as e:
+                # Catch unexpected errors during engine loop logic itself
+                self.logger.error(
+                    f"Unexpected engine error during step '{step_name}': {e}",
+                    exc_info=True,
+                )
+                # Mark the step as failed (which also marks workflow as failed)
+                # Use a generic error message as this is an engine-level failure
+                engine_error_msg = (
+                    f"Unexpected engine error during step '{step_name}': {e}"
+                )
+                if (
+                    self.current_step
+                ):  # current_step might be None if error happens outside a step
+                    self.state.mark_step_failed(self.current_step, engine_error_msg)
+                else:
+                    # If we don't know the step, mark the workflow directly (though this is less ideal)
+                    # We might need a way to handle non-step-specific failures better.
+                    # For now, let's just log and re-raise, assuming execute_step handled state.
+                    pass  # Avoid redundant state marking if possible
 
-            self.logger.debug(f"Final context after step '{name}': {self.context}")
-            self.logger.info(f"Step '{name}' completed. Outputs: {self.context}")
+                # Wrap this in StepExecutionError for clarity, only passing original_error
+                raise StepExecutionError(step_name, original_error=e)
 
-        self.state.mark_workflow_completed()
-        self.logger.info("Workflow completed successfully.")
-        self.logger.info("Final workflow outputs:")
-        for key, value in results.items():
-            self.logger.info(f"  {key}: {value}")
+        # Save final state only if no exceptions occurred during the loop
+        # Check status before marking completed
+        final_state = cast(ExecutionState, self.state.metadata["execution_state"])
+        if final_state["status"] != "failed":
+            # Mark any remaining steps in the original planned list as skipped
+            # (This handles jumps caused by on_error: next)
+            all_planned_steps = {s["name"] for s in flow_steps}
+            executed_or_failed_steps = set(final_state["step_outputs"].keys())
+            skipped_by_jump = all_planned_steps - executed_or_failed_steps
+            for skipped_step_name in skipped_by_jump:
+                if (
+                    skipped_step_name not in final_state["step_outputs"]
+                ):  # Avoid overwriting if skipped by condition
+                    self.logger.info(
+                        f"Marking step '{skipped_step_name}' as skipped due to workflow jump/completion."
+                    )
+                    self.state.mark_step_skipped(
+                        skipped_step_name,
+                        reason="Workflow execution path skipped this step",
+                    )
 
-        return {
-            "status": "completed",
-            "outputs": results,
-            "execution_state": self.state.metadata["execution_state"],
+            self.state.mark_workflow_completed()
+            # No need to save state here, mark_workflow_completed and mark_step_skipped already do
+            # self.state.save()
+
+        # Return the final status and the complete final context
+        final_status = self.state.get_state()["execution_state"]["status"]
+        final_step_states = self.state.get_state()["steps"]
+
+        # Extract outputs from successful steps (including the {'result': ...} wrapper)
+        final_outputs = {
+            step_name: {"result": data.get("result")}
+            for step_name, data in final_step_states.items()
+            if data.get("status") == "completed"
         }
 
-    def setup_workspace(self) -> Path:
+        # DO NOT overwrite context steps with full state steps
+        # self.context["steps"] = self.state.get_state()["steps"]
+        return {
+            "status": final_status,
+            "outputs": final_outputs,  # Add the outputs key
+            # Return the context as it was built during the run
+            "context": self.context.copy(),
+            # Also return the full execution state for detailed inspection
+            "execution_state": self.state.get_state()["execution_state"],
+            "steps_state": final_step_states,  # Keep detailed step states as well
+        }
+
+    def execute_step(self, step: Dict[str, Any], global_max_retries: int) -> None:
         """
-        Set up the workspace for this workflow run.
-
-        Returns:
-            Path: Path to the workspace directory
-        """
-        # Get workflow name from usage section or file name
-        workflow_name = self.workflow.get("usage", {}).get("name") or (
-            self.workflow_file.stem if self.workflow_file else "unnamed_workflow"
-        )
-
-        # Create workspace
-        self.workspace = create_workspace(
-            workflow_name=workflow_name,
-            custom_dir=getattr(self, "workspace_dir", None),
-            base_dir=getattr(self, "base_dir", "runs"),
-        )
-
-        # Initialize workspace info in context
-        workspace_info = get_workspace_info(self.workspace)
-        self.context.update(
-            {
-                "workspace": str(self.workspace),
-                "run_number": int(self.workspace.name.split("_run_")[-1]),
-                "timestamp": datetime.now().isoformat(),
-                "workflow_name": workflow_name,
-                "workflow_file": str(
-                    self.workflow_file.absolute() if self.workflow_file else ""
-                ),
-            }
-        )
-
-        self.logger.info(f"Created workspace: {self.workspace}")
-        return self.workspace
-
-    def resolve_template(self, template_str: str) -> str:
-        """
-        Resolve template with both direct and namespaced variables.
+        Execute a single workflow step.
 
         Args:
-            template_str: Template string to resolve
-
-        Returns:
-            str: Resolved template string
+            step: Step definition dictionary
+            global_max_retries: Global default for maximum retries
 
         Raises:
-            TemplateError: If template resolution fails
+            TaskExecutionError: If step execution ultimately fails after retries.
+            StepExecutionError: For issues preparing the step itself.
+            RetryStepException: If step should be retried.
         """
-        return self.template_engine.process_template(template_str, self.context)
+        step_name = step.get("name")
+        if not step_name:
+            raise StepExecutionError(
+                "Unnamed Step",
+                Exception("Step definition missing required 'name' field"),
+            )
 
-    def resolve_value(self, value: Any) -> Any:
-        """
-        Resolve a single value that might contain templates.
+        self.current_step = step_name
+        self.logger.info(f"Executing step: {step_name}")
+        self.state.set_current_step(step_name)
 
-        Args:
-            value: Value to resolve, can be any type
+        # Prepare task config
+        task_config = TaskConfig(
+            step=step,
+            context=self.context,
+            workspace=self.workspace,
+        )
 
-        Returns:
-            Resolved value with templates replaced
-        """
-        if isinstance(value, str):
-            return self.template_engine.process_template(value, self.context)
-        elif isinstance(value, dict):
-            return {k: self.resolve_value(v) for k, v in value.items()}
-        elif isinstance(value, (list, tuple)):
-            return [self.resolve_value(v) for v in value]
-        return value
+        # Find the task handler
+        task_type = step.get("task")
+        if not task_type:
+            # Raise StepExecutionError for config issues before task execution attempt
+            raise StepExecutionError(
+                step_name, Exception("Step definition missing 'task' definition")
+            )
 
-    def resolve_inputs(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Resolve all inputs using Jinja2 template resolution.
+        handler = get_task_handler(task_type)
+        if not handler:
+            # Raise StepExecutionError for config issues before task execution attempt
+            raise StepExecutionError(
+                step_name, Exception(f"Unknown task type: '{task_type}'")
+            )
 
-        Args:
-            inputs: Input dictionary
+        # --- Condition Check ---
+        condition = step.get("condition")
+        should_execute = True
+        if condition:
+            try:
+                # Resolve the template; boolean True becomes string "True"
+                resolved_condition_str = str(self.resolve_template(condition)).strip()
 
-        Returns:
-            Dict[str, Any]: Resolved inputs
-        """
-        return self.template_engine.process_value(inputs, self.context)
+                # Check if the resolved string is exactly "True"
+                if resolved_condition_str != "True":
+                    should_execute = False
 
-    def _call_task_handler(self, handler: Any, step: Dict[str, Any]) -> Any:
-        """
-        Call a task handler with TaskConfig.
+                self.logger.debug(
+                    f"Step '{step_name}' condition '{condition}' resolved to string '{resolved_condition_str}'. Should execute: {should_execute}"
+                )
+            except Exception as e:
+                # Treat condition resolution errors as skip, but log a warning
+                self.logger.warning(
+                    f"Could not resolve condition '{condition}' for step '{step_name}': {e}. Skipping step."
+                )
+                should_execute = False
 
-        Args:
-            handler: The task handler function
-            step: The step configuration
+        if not should_execute:
+            self.logger.info(
+                f"Skipping step '{step_name}' due to condition: {condition}"
+            )
+            # Mark step as skipped in state
+            self.state.mark_step_skipped(
+                step_name, reason=f"Condition '{condition}' not met"
+            )
+            self.state.save()  # Save state after marking skipped
+            return
 
-        Returns:
-            Any: The result from the task handler
-        """
-        # Create TaskConfig and call handler
-        config = TaskConfig(step, self.context, self.workspace)
-        return handler(config)
-
-    def execute_step(self, step: Dict[str, Any]) -> None:
-        """Execute a single workflow step."""
-        name = step.get("name")
-        if not name:
-            raise WorkflowError("Step missing required 'name' field")
-
-        self.current_step = name
-        self.logger.info(f"Executing step: {name}")
+        # --- Refactored Execution and Error Handling ---
+        step_failed = False
+        step_error: Optional[Exception] = None
+        result: Any = None
 
         try:
-            task_type = step.get("task")
-            if not task_type:
-                raise WorkflowError(f"No task type specified for step: {name}")
-
-            # Get task handler
-            handler = get_task_handler(task_type)
-            if not handler:
-                raise WorkflowError(f"Unknown task type: {task_type}")
-
-            # Run task with appropriate signature
-            self.logger.info(f"Running step {name}")
-            try:
-                # Call on_step_start callback if defined
-                if hasattr(self, "on_step_start") and self.on_step_start:
-                    try:
-                        self.on_step_start(name)
-                    except Exception as e:
-                        self.state.mark_step_failed(name, str(e))
-                        raise WorkflowError(f"Error in step {name}: {str(e)}") from e
-
-                result = self._call_task_handler(handler, step)
-                self.logger.debug(
-                    f"Task returned result of type {type(result)}: {result}"
-                )
-                # Update context with step result
-                self.context[name] = result
-                # Update workflow state
-                self.state.mark_step_complete(name, {name: result})
-            except Exception as e:
-                # Handle error according to on_error configuration
-                result = self._handle_step_error(step, e)
-                if result is None:
-                    # Error handling indicated workflow should fail
-                    raise WorkflowError(f"Error in step {name}: {str(e)}") from e
-                # Error was handled, store result and continue
-                self.context[name] = result
-
-            # Store outputs in context
-            outputs: Union[List[str], str, None] = step.get("outputs")
-            if outputs is not None:
-                self.logger.debug(
-                    f"Storing outputs in context. Current context before: {self.context}"
-                )
-                self.logger.debug(f"Task result type: {type(result)}, value: {result}")
-                if isinstance(outputs, str):
-                    # Ensure we store raw strings for template variables
-                    if isinstance(result, dict) and "content" in result:
-                        self.logger.warning(
-                            f"Task '{name}' returned a dict with 'content' property - using raw content value"
-                        )
-                        self.context[outputs] = result["content"]
-                    else:
-                        self.context[outputs] = result
-                    self.logger.debug(
-                        f"Stored single output '{outputs}' = {self.context[outputs]}"
-                    )
-                elif isinstance(outputs, list):
-                    if len(outputs) == 1:
-                        if isinstance(result, dict) and "content" in result:
-                            self.logger.warning(
-                                f"Task '{name}' returned a dict with 'content' property - using raw content value"
-                            )
-                            self.context[outputs[0]] = result["content"]
-                        else:
-                            self.context[outputs[0]] = result
-                        self.logger.debug(
-                            f"Stored single output from list '{outputs[0]}' = {self.context[outputs[0]]}"
-                        )
-                    elif len(outputs) > 1 and isinstance(result, (list, tuple)):
-                        for output, value in zip(outputs, result):
-                            if isinstance(value, dict) and "content" in value:
-                                self.logger.warning(
-                                    f"Task '{name}' returned a dict with 'content' property - using raw content value"
-                                )
-                                self.context[output] = value["content"]
-                            else:
-                                self.context[output] = value
-                            self.logger.debug(
-                                f"Stored multiple output '{output}' = {self.context[output]}"
-                            )
-
-            self.logger.debug(f"Final context after step '{name}': {self.context}")
-            self.logger.info(f"Step '{name}' completed. Outputs: {self.context}")
-
-            # Mark step as completed
-            self.state.mark_step_complete(name, {name: result})
+            # --- Execute Task Handler ---
+            result = handler(task_config)
+            self.logger.debug(f"Step '{step_name}' completed successfully in handler.")
 
         except Exception as e:
-            # Handle step error
-            result = self._handle_step_error(step, e)
-            if result is None:
-                raise
-        finally:
-            self.current_step = None  # Clear current step
-
-    def _handle_step_error(
-        self, step: Dict[str, Any], error: Exception
-    ) -> Optional[Any]:
-        """Handle step execution error based on error handling configuration."""
-        name = step.get("name", "unnamed_step")
-        error_message = str(error)
-
-        # Get error handling configuration
-        error_config = step.get("on_error", {})
-        action = error_config.get("action", "fail")
-        next_step = error_config.get("next")
-
-        # Add error info to context for template resolution
-        self.context["error"] = error_message
-
-        # Process custom error message if provided
-        if "message" in error_config:
-            try:
-                error_message = self.resolve_template(error_config["message"])
-            except Exception as e:
-                self.logger.warning(f"Failed to resolve error message template: {e}")
-
-        if action == "retry":
-            # Get retry configuration
-            max_attempts = int(error_config.get("max_attempts", 3))
-            delay = float(error_config.get("delay", 1.0))
-            backoff = float(error_config.get("backoff", 2.0))
-
-            # Get current retry state
-            retry_state = self.state.get_retry_state(name)
-            attempt = retry_state.get("attempt", 0) + 1
-
-            # Update retry state
-            self.state.update_retry_state(name, {"attempt": attempt})
-
-            if attempt >= max_attempts:
-                # Max retries exceeded
-                error_message = f"Failed after {attempt} attempts: {error_message}"
-                self.state.mark_step_failed(name, error_message)
-                self.state.clear_retry_state(name)
-                return None
-
-            # Calculate wait time with exponential backoff
-            wait_time = delay * (backoff ** (attempt - 1))
-            self.logger.info(
-                f"Retrying step '{name}' in {wait_time} seconds (attempt {attempt}/{max_attempts})"
+            # --- Catch ANY exception from the handler ---
+            self.logger.warning(
+                f"Step '{step_name}' caught exception during execution: {e}"
             )
-            time.sleep(wait_time)
+            step_failed = True
+            step_error = e  # Store the caught error
 
-            # Try running the step again
-            try:
-                handler = get_task_handler(step["task"])
-                if handler is None:
-                    raise WorkflowError(f"Unknown task type: {step['task']}")
-                result = self._call_task_handler(handler, step)
-                # Clear retry state on success
-                self.state.clear_retry_state(name)
-                # Mark step as completed
-                self.state.mark_step_complete(name, {name: result})
-                return result
-            except Exception as retry_error:
-                # Get updated retry state to check attempt count
-                retry_state = self.state.get_retry_state(name)
-                attempt = retry_state.get("attempt", 0)
+            # Ensure it's a TaskExecutionError, wrapping if necessary
+            if not isinstance(step_error, TaskExecutionError):
+                self.logger.debug(
+                    f"Wrapping non-TaskExecutionError: {type(step_error).__name__}"
+                )
+                step_error = TaskExecutionError(
+                    step_name=step_name,
+                    original_error=step_error,
+                    # Pass the raw step dict as task_config for context
+                    task_config=task_config.step,
+                )
+            else:
+                self.logger.debug(f"Caught existing TaskExecutionError: {step_error}")
 
-                if attempt >= max_attempts:
-                    # If this was the last retry, mark as failed and clear retry state
-                    error_message = (
-                        f"Failed after {attempt} attempts: {str(retry_error)}"
-                    )
-                    self.state.mark_step_failed(name, error_message)
-                    self.state.clear_retry_state(name)
-                    raise WorkflowError(error_message)
+        # --- Handle Successful Execution (if not failed) ---
+        if not step_failed:
+            self.logger.debug(f"Processing successful result for step '{step_name}'.")
+            # Store the raw task result under the 'result' key in the steps namespace
+            self.context["steps"][step_name] = {"result": result}
 
-                # Otherwise, handle retry failure recursively
-                return self._handle_step_error(step, retry_error)
-        elif action == "continue":
-            # Mark as failed but continue workflow
-            self.state.mark_step_failed(name, error_message)
-            return {"error": error_message}
-        elif action == "notify":
-            # Mark as failed but try to execute notification task if specified
-            self.state.mark_step_failed(name, error_message)
-            if next_step:
-                try:
-                    notify_step = next(
-                        s
-                        for s in self.workflow.get("steps", [])
-                        if s.get("name") == next_step
-                    )
-                    handler = get_task_handler(notify_step["task"])
-                    if handler is None:
-                        raise WorkflowError(f"Unknown task type: {notify_step['task']}")
-                    # Add error info to context for notification
-                    self.context["error"] = {
-                        "step": name,
-                        "message": error_message,
-                        "error": str(error),
-                    }
-                    # Execute notification task but still fail the workflow
-                    result = self._call_task_handler(handler, notify_step)
-                    self.context[name] = result
-                    self.state.mark_step_complete(name, {name: result})
-                except Exception as notify_error:
-                    self.logger.error(
-                        f"Failed to execute notification task: {notify_error}"
-                    )
-            # Always raise WorkflowError after notification
-            raise WorkflowError(error_message)
-        elif action == "fail":
-            # Mark as failed and raise error
-            self.state.mark_step_failed(name, error_message)
-            raise WorkflowError(error_message)
+            # Mark step as executed successfully in state
+            self.state.mark_step_success(step_name, self.context["steps"][step_name])
+            self.state.reset_step_retries(step_name)
+            self.current_step = None
+            self.logger.info(f"Step '{step_name}' executed successfully.")
+            # Save state and exit method on success
+            self.state.save()
+            return
+
+        # --- Handle Failure (if caught) ---
+        # This block only runs if step_failed is True
+        # We also assert step_error is a TaskExecutionError due to wrapping above
+        assert isinstance(
+            step_error, TaskExecutionError
+        ), "Internal error: step_error should be TaskExecutionError here"
+
+        self.logger.debug(f"Processing failure for step '{step_name}'.")
+        # --- Retry and Error Flow Logic ---
+        on_error_config_raw = step.get("on_error", {})
+
+        # Normalize on_error shorthand (e.g., "continue")
+        if isinstance(on_error_config_raw, str):
+            if on_error_config_raw == "continue":
+                on_error_config = {"action": "continue"}
+            else:
+                # If it's a string but not "continue", treat as invalid config
+                # (Could also default to action: fail, but explicit error is safer)
+                self.logger.warning(
+                    f"Invalid shorthand '{on_error_config_raw}' for on_error in step '{step_name}'. Defaulting to fail."
+                )
+                on_error_config = {"action": "fail"}
+        elif isinstance(on_error_config_raw, dict):
+            on_error_config = on_error_config_raw
         else:
-            self.logger.error(f"Unknown error action: {action}")
-            self.state.mark_step_failed(name, error_message)
-            raise WorkflowError(
-                f"Unknown error action '{action}' for step {name}: {error_message}"
+            # Handle unexpected type for on_error
+            self.logger.warning(
+                f"Invalid type '{type(on_error_config_raw).__name__}' for on_error in step '{step_name}'. Defaulting to fail."
             )
+            on_error_config = {"action": "fail"}
+
+        # Ensure max_retries is an integer, falling back to global default
+        try:
+            max_retries_for_step = int(on_error_config.get("retry", global_max_retries))
+        except (ValueError, TypeError):
+            self.logger.warning(
+                f"Invalid value for on_error.retry in step '{step_name}'. Using global default: {global_max_retries}"
+            )
+            max_retries_for_step = global_max_retries
+
+        # Ensure max_retries is non-negative
+        if max_retries_for_step < 0:
+            self.logger.warning(
+                f"Negative value for on_error.retry ({max_retries_for_step}) in step '{step_name}'. Using 0 retries."
+            )
+            max_retries_for_step = 0
+
+        retry_count = self.state.get_step_retry_count(step_name)
+
+        error_to_propagate = step_error.original_error or step_error
+        error_str_for_message = str(error_to_propagate)
+
+        if retry_count < max_retries_for_step:
+            # --- Handle Retry ---
+            self.state.increment_step_retry(step_name)
+            self.logger.info(
+                f"Retrying step '{step_name}' (Attempt {retry_count + 1}/{max_retries_for_step})"
+            )
+            delay = float(on_error_config.get("delay", 0))
+            if delay > 0:
+                self.logger.info(f"Waiting {delay} seconds before retry...")
+                time.sleep(delay)
+            # Save state before raising retry exception
+            self.state.save()
+            raise RetryStepException(step_name, original_error=error_to_propagate)
+        else:
+            # --- Handle Final Failure (No More Retries) ---
+            self.logger.error(f"Step '{step_name}' failed after {retry_count} retries.")
+            # Populate the 'error' context variable for templates
+            error_info = {"step": step_name, "message": error_str_for_message}
+            self.context["error"] = error_info
+            # Store the raw exception object separately if needed (e.g., for programmatic access)
+            # self.context["error"]["raw_error"] = error_to_propagate # Keeping this commented for now
+
+            error_message_template = on_error_config.get("message")
+            final_error_message_for_state = str(
+                step_error
+            )  # Use TaskExecutionError message by default
+            if error_message_template:
+                try:
+                    formatted_message = self.resolve_template(error_message_template)
+                    self.logger.error(f"Formatted error message: {formatted_message}")
+                    final_error_message_for_state = formatted_message
+                except Exception as template_err:
+                    self.logger.warning(
+                        f"Failed to resolve on_error.message template: {template_err}"
+                    )
+                    final_error_message_for_state = (
+                        f"{error_str_for_message} (failed to format custom message)"
+                    )
+
+            action = on_error_config.get("action", "fail")
+
+            if action == "continue":
+                self.logger.warning(
+                    f"Step '{step_name}' failed, but workflow continues due to on_error.action='continue'"
+                )
+                self.state.mark_step_failed(step_name, final_error_message_for_state)
+                self.state.clear_error_flow_target()
+                # Save state and return, allowing run loop to continue
+                self.state.save()
+                return  # NOTE: Execution stops here for 'continue'
+
+            error_next_step = on_error_config.get("next")
+            if error_next_step:
+                self.logger.info(
+                    f"Proceeding to error handling step: {error_next_step}"
+                )
+                # Mark the step as failed before setting the jump target
+                self.state.mark_step_failed(step_name, final_error_message_for_state)
+                self.state.set_error_flow_target(error_next_step)
+                # Save state before raising exception for jump
+                self.state.save()
+                raise TaskExecutionError(
+                    step_name, original_error=error_to_propagate
+                )  # Re-raise TaskExecutionError for jump
+            else:
+                self.logger.error(
+                    f"No error handling ('on_error.next' or 'continue') defined for step '{step_name}'. Halting workflow."
+                )
+                self.state.mark_step_failed(step_name, final_error_message_for_state)
+                # Save state before raising exception for halt
+                self.state.save()
+                raise TaskExecutionError(
+                    step_name, original_error=error_to_propagate
+                )  # Re-raise TaskExecutionError for halt
+
+        # Note: The finally block is removed as state saving is handled explicitly
+        # in success, continue, retry, jump, and halt paths.
+
+
+# Custom exception for signaling retry
+class RetryStepException(TaskExecutionError):
+    """Indicates a step should be retried."""
+
+    pass

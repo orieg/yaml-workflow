@@ -1,0 +1,64 @@
+# Resume Functionality Example
+#
+# This example demonstrates workflow resumption and state management:
+# - Input validation with strict variable checking
+# - State persistence and restoration
+# - Error handling with detailed messages
+# - Progress tracking and reporting
+# - File-based state management
+#
+# Usage Examples:
+# 1. Initial run (will fail without required_param):
+#    yaml-workflow run test_resume.yaml
+#
+# 2. Resume after failure:
+#    yaml-workflow run test_resume.yaml --resume required_param=test
+#
+# 3. Start from specific step:
+#    yaml-workflow run test_resume.yaml --start-from process_data required_param=test
+
+name: Test Resume
+description: Demonstrates workflow resumption and state management
+
+settings:
+  error_handling:
+    undefined_variables: strict  # Enable strict variable checking
+    show_available: true        # Show available variables in errors
+
+params:
+  required_param:
+    description: Required parameter for testing
+    type: string
+    minLength: 1
+    required: true
+
+steps:
+  # Step 1: Validate required parameter
+  - name: check_required_param
+    task: shell
+    inputs:
+      command: |
+        # The workflow should fail before reaching this point due to required_param validation
+        echo "{{ args.required_param }}" > "output/check_result.txt"
+    outputs:
+      check_result: "{{ args.required_param }}"
+
+  # Step 2: Process the data
+  - name: process_data
+    task: shell
+    inputs:
+      command: |
+        echo "Processing data with {{ args.required_param }}"
+        echo "{{ args.required_param }}" > "output/result.txt"
+    outputs:
+      process_result: "{{ args.required_param }}"
+
+  # Step 3: Final verification
+  - name: final_step
+    task: shell
+    inputs:
+      command: |
+        echo "Final step - reading result"
+        cat "output/result.txt"
+    outputs:
+      final_result: "$(cat output/result.txt)" 

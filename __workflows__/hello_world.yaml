@@ -1,0 +1,56 @@
+# Basic Hello World Example
+#
+# This example demonstrates core workflow features:
+# - Template task with strict variable handling
+# - Shell task for command execution
+# - Built-in variables (run_number, workflow_name, timestamp, workspace)
+# - Error handling with detailed messages
+# - File operations with validation
+# - Namespaced variable access (args.VAR)
+#
+# Usage:
+# yaml-workflow run hello_world.yaml --name="World"
+
+name: Hello World
+description: A simple workflow demonstrating core features and best practices
+
+settings:
+  error_handling:
+    undefined_variables: strict  # Enable strict variable checking
+    show_available: true        # Show available variables in errors
+
+params:
+  name:
+    description: Name to include in the greeting
+    type: string
+    minLength: 2
+    maxLength: 50
+    default: World
+
+steps:
+  # Step 1: Create greeting
+  - name: create_greeting
+    task: template
+    inputs:
+      template: |
+        Hello, {{ args.name }}!
+        
+        This is run #{{ run_number }} of the {{ workflow_name }} workflow.
+        Created at: {{ timestamp }}
+        Workspace: {{ workspace }}
+      output: greeting.txt
+
+  # Step 2: Display workflow information and greeting
+  - name: show_info
+    task: shell
+    inputs:
+      command: |
+        echo "Workflow run information:"
+        echo "------------------------"
+        echo "Run number: {{ run_number }}"
+        echo "Workflow: {{ workflow_name }}"
+        echo "Created: {{ timestamp }}"
+        echo "Workspace: {{ workspace }}"
+        echo "------------------------"
+        echo "Current directory: $(pwd)"
+        cat greeting.txt 

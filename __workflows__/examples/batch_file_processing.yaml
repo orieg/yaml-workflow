@@ -1,0 +1,147 @@
+# Example workflow demonstrating batch processing with resume capability
+# This workflow can process any type of items (files, URLs, etc.) in parallel
+
+name: Batch Processing Example
+description: Process multiple items in parallel with resume capability
+version: "1.0"
+
+# Global settings for parallel processing
+parallel_settings:
+  max_workers: 4  # Number of parallel processes
+  timeout: 3600   # Maximum time in seconds for each item
+  chunk_size: 10  # Number of items to process in each batch
+
+# Parameters for the workflow
+params:
+  input_directory:
+    description: Directory containing files to process
+    type: string
+    required: true
+  file_pattern:
+    description: Glob pattern to match files
+    type: string
+    default: "*.txt"
+  output_directory:
+    description: Directory to store processed files
+    type: string
+    required: true
+
+steps:
+  # Step 1: List and validate input files
+  - name: discover_files
+    task: file_utils
+    function: list_files
+    inputs:
+      directory: ${input_directory}
+      pattern: ${file_pattern}
+      recursive: true
+    outputs:
+      - file_list
+      - total_files
+
+  # Step 2: Process files in parallel with resume capability
+  - name: process_files
+    task: batch_processor
+    function: process_batch
+    parallel: true  # Enable parallel processing
+    iterate_over: ${file_list}  # List to iterate over
+    resume_state: true  # Enable resume capability
+    # Specify the task to use for processing each item
+    processing_task:
+      task: file_processor  # The task type to use
+      function: transform_file  # The function to call
+      inputs:
+        output_dir: ${output_directory}
+        options:
+          validate: true
+          transform: true
+          compress: false
+    outputs:
+      - processed_items  # List of successfully processed items
+      - failed_items    # List of files that failed processing
+      - skipped_items   # List of files skipped (already processed)
+      - results        # List of results from each processed item
+
+  # Example of processing URLs instead of files
+  - name: process_urls
+    task: batch_processor
+    function: process_batch
+    parallel: true
+    iterate_over: 
+      - "https://api.example.com/data/1"
+      - "https://api.example.com/data/2"
+      - "https://api.example.com/data/3"
+    resume_state: true
+    processing_task:
+      task: api_client
+      function: fetch_data
+      inputs:
+        headers:
+          Authorization: "Bearer ${env:API_TOKEN}"
+        timeout: 30
+    outputs:
+      - processed_urls
+      - failed_urls
+      - skipped_urls
+      - api_results
+
+  # Example of processing arbitrary items
+  - name: process_tasks
+    task: batch_processor
+    function: process_batch
+    parallel: true
+    iterate_over: ${task_list}  # List of task definitions
+    resume_state: true
+    processing_task:
+      task: task_runner
+      function: execute_task
+      inputs:
+        workspace: ${workspace}
+        env:
+          PYTHONPATH: ${env:PYTHONPATH}
+    outputs:
+      - processed_tasks
+      - failed_tasks
+      - skipped_tasks
+      - task_results
+
+  # Generate processing report
+  - name: generate_report
+    task: reporting
+    function: create_batch_report
+    inputs:
+      summary:
+        files:
+          total: ${total_files}
+          processed: ${processed_items}
+          failed: ${failed_items}
+          skipped: ${skipped_items}
+        urls:
+          processed: ${processed_urls}
+          failed: ${failed_urls}
+          skipped: ${skipped_urls}
+        tasks:
+          processed: ${processed_tasks}
+          failed: ${failed_tasks}
+          skipped: ${skipped_tasks}
+      results:
+        file_results: ${results}
+        api_results: ${api_results}
+        task_results: ${task_results}
+      output_file: "processing_report.json"
+    outputs:
+      - report_path
+
+  # Handle any failures
+  - name: handle_failures
+    task: error_handler
+    function: process_failures
+    condition: ${len(failed_items) > 0 or len(failed_urls) > 0 or len(failed_tasks) > 0}
+    inputs:
+      failures:
+        files: ${failed_items}
+        urls: ${failed_urls}
+        tasks: ${failed_tasks}
+      error_log: "error_report.txt"
+    outputs:
+      - error_report 
