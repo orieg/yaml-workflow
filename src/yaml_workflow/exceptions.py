@@ -8,7 +8,9 @@ from typing import Optional
 class WorkflowError(Exception):
     """Base exception class for all workflow-related errors."""
 
-    pass
+    def __init__(self, message: str, original_error: Optional[Exception] = None):
+        super().__init__(message)
+        self.original_error = original_error
 
 
 class WorkflowValidationError(WorkflowError):
@@ -106,10 +108,19 @@ class ModuleImportError(WorkflowRuntimeError):
 class TaskExecutionError(WorkflowRuntimeError):
     """Raised when a task fails during execution."""
 
-    def __init__(self, step_name: str, original_error: Exception):
+    def __init__(
+        self,
+        step_name: str,
+        original_error: Exception,
+        task_config: Optional[dict] = None,
+    ):
         self.step_name = step_name
         self.original_error = original_error
-        super().__init__(f"Task '{step_name}' failed: {str(original_error)}")
+        self.task_config = task_config
+        super().__init__(
+            message=f"Task '{step_name}' failed: {str(original_error)}",
+            original_error=original_error,
+        )
 
 
 class InputResolutionError(WorkflowRuntimeError):
@@ -192,5 +203,11 @@ class StepNotInFlowError(FlowError):
 class TemplateError(WorkflowError):
     """Raised when template resolution fails."""
 
-    def __init__(self, message: str):
-        super().__init__(f"Template error: {message}")
+    def __init__(self, message: str, original_error: Optional[Exception] = None):
+        super().__init__(f"Template error: {message}", original_error=original_error)
+
+
+class ConfigurationError(WorkflowError):
+    """Raised when workflow configuration is invalid or inconsistent."""
+
+    pass  # Simple inheritance is often sufficient

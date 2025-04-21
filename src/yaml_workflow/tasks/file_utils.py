@@ -38,22 +38,36 @@ def list_files(config: TaskConfig) -> Dict[str, Any]:
     if not directory:
         raise ValueError("directory parameter is required")
 
-    # Resolve directory path
-    if not os.path.isabs(directory):
-        directory = os.path.join(str(config.workspace), directory)
+    # Resolve directory path relative to the workspace root
+    input_path = Path(directory)
+    if input_path.is_absolute():
+        resolved_dir = input_path
+    else:
+        # config.workspace is the Workspace object OR the Path obj in tests
+        # Access the path correctly depending on type (safer check)
+        workspace_path = getattr(config.workspace, "path", config.workspace)
+        resolved_dir = workspace_path / input_path
 
-    # Build glob pattern
+    # Build glob pattern using resolved_dir
+    search_path_base = str(resolved_dir)
     if recursive:
         if not pattern.startswith("**/"):
             pattern = f"**/{pattern}"
-    search_pattern = os.path.join(directory, pattern)
+    search_pattern = os.path.join(search_path_base, pattern)
 
     # Find files
     logger.info(f"Searching for files: {search_pattern}")
-    files = [f for f in glob(search_pattern, recursive=recursive) if os.path.isfile(f)]
-    total = len(files)
+    # Use Path objects for manipulation and resolve to absolute paths
+    file_paths = [
+        Path(f).resolve()
+        for f in glob(search_pattern, recursive=recursive)
+        if Path(f).is_file()
+    ]
+    # Convert back to strings for the output dictionary
+    files_str = [str(p) for p in file_paths]
+    total = len(files_str)
 
     logger.info(f"Found {total} files matching pattern")
 
     # Return results
-    return {"file_list": files, "total_files": total}
+    return {"file_list": files_str, "total_files": total}

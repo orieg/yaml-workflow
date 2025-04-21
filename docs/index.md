@@ -35,10 +35,9 @@ yaml-workflow init --example hello_world
 yaml-workflow run workflows/hello_world.yaml name=World
 ```
 
-## Documentation Sections
+## Documentation Structure
 
-- [Getting Started](guide/getting-started.md) - Quick start guide and basic concepts
-- [User Guide](guide/index.md) - Detailed usage instructions and examples
-- [API Reference](api/index.md) - Complete API documentation
-- [Examples](examples/index.md) - Real-world workflow examples
-- [Contributing](contributing/index.md) - Guidelines for contributors 
+- **[Guide](guide/getting-started.md):** Tutorials, core concepts, features, and usage guides.
+- **[Examples](examples/basic-workflow.md):** Practical workflow examples.
+- **[API Reference](reference/SUMMARY.md):** Detailed API documentation for modules and classes.
+- **[Contributing](development.md):** Guidelines for contributing to the project. 

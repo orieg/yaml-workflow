@@ -7,8 +7,9 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from ..exceptions import TaskExecutionError
-from . import TaskConfig, register_task
+# Remove unused imports causing circular dependency
+# from ..exceptions import TaskExecutionError
+# from . import TaskConfig, register_task
 
 
 def get_task_logger(workspace: Union[str, Path], task_name: str) -> logging.Logger:

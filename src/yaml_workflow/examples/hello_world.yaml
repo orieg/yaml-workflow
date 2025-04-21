@@ -38,7 +38,7 @@ steps:
         This is run #{{ run_number }} of the {{ workflow_name }} workflow.
         Created at: {{ timestamp }}
         Workspace: {{ workspace }}
-      output: greeting.txt
+      output_file: greeting.txt
 
   # Step 2: Display workflow information and greeting
   - name: show_info

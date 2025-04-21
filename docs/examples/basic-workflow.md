@@ -141,6 +141,4 @@ The workflow includes several error handling features:
 
 ## Next Steps
 
-- Learn about [more complex workflows](data-pipeline.md)
-- Explore [HTTP integration examples](api-integration.md)
 - See [task reference](../guide/tasks/index.md) for all available tasks 
