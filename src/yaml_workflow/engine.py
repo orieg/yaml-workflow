@@ -968,10 +968,10 @@ class WorkflowEngine:
 
         # Ensure max_retries is non-negative
         if max_retries_for_step < 0:
-             self.logger.warning(
+            self.logger.warning(
                 f"Negative value for on_error.retry ({max_retries_for_step}) in step '{step_name}'. Using 0 retries."
             )
-             max_retries_for_step = 0
+            max_retries_for_step = 0
 
         retry_count = self.state.get_step_retry_count(step_name)
 
