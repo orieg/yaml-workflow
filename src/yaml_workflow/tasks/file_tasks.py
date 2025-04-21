@@ -75,6 +75,7 @@ def read_file_direct(
     workspace: Path,
     encoding: str = "utf-8",
     step_name: str = "read_file",
+    logger = None,
 ) -> str:
     """Read content from a file.
 
@@ -83,6 +84,7 @@ def read_file_direct(
         workspace: Workspace directory
         encoding: File encoding (default: utf-8)
         step_name: Name of the step for error reporting
+        logger: Optional logger for debug output
 
     Returns:
         str: File content
@@ -91,10 +93,30 @@ def read_file_direct(
         TaskExecutionError: If file cannot be read or decoded
     """
     try:
+        if logger:
+            logger.debug(f"Original file_path={file_path}")
+            logger.debug(f"Workspace={workspace}, exists={workspace.exists()}")
+        
         resolved_path = resolve_path(workspace, file_path)
+        
+        if logger:
+            logger.debug(f"Resolved path={resolved_path}, exists={resolved_path.exists()}")
+            if not resolved_path.exists():
+                parent_dir = resolved_path.parent
+                logger.debug(f"Parent directory={parent_dir}, exists={parent_dir.exists()}")
+                if parent_dir.exists():
+                    logger.debug(f"Directory contents: {list(parent_dir.glob('*'))}")
+                    
         with open(resolved_path, "rb") as f:
-            return f.read().decode(encoding)
+            content = f.read().decode(encoding)
+            if logger:
+                logger.debug(f"Successfully read {len(content)} bytes from file")
+            return content
     except (IOError, UnicodeDecodeError) as e:
+        if logger:
+            logger.error(f"ERROR: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"TRACEBACK:\n{traceback.format_exc()}")
         raise TaskExecutionError(step_name=step_name, original_error=e)
 
 
@@ -258,18 +280,44 @@ def read_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     try:
         processed = config.process_inputs()
         file_path_input = processed.get("file")
+        
+        # Debug logging
+        logger.debug(f"Workspace={config.workspace}, exists={config.workspace.exists()}")
+        logger.debug(f"file_path param={file_path_input}")
+        logger.debug(f"All inputs={processed}")
+        
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path_input:
-            raise ValueError("No file path provided")
+            error_msg = "No file path provided (param 'file' is missing)"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+            
+        # Debug: Print resolved path
+        resolved_path = str(resolve_path(config.workspace, file_path_input))
+        logger.debug(f"Resolved path={resolved_path}")
+        
+        # Check if file exists before trying to read it
+        resolved_file = Path(resolved_path)
+        logger.debug(f"File exists={resolved_file.exists()}")
+        if not resolved_file.exists():
+            parent_dir = resolved_file.parent
+            logger.debug(f"Parent directory={parent_dir}, exists={parent_dir.exists()}")
+            if parent_dir.exists():
+                logger.debug(f"Directory contents: {list(parent_dir.glob('*'))}")
 
         content = read_file_direct(
-            file_path_input, config.workspace, encoding, task_name
+            file_path_input, config.workspace, encoding, task_name, logger=logger
         )
         output = {"path": file_path_input, "content": content}
         log_task_result(logger, output)
         return output
     except Exception as e:
+        # Debug: Print detailed exception info
+        logger.error(f"EXCEPTION: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(f"TRACEBACK:\n{traceback.format_exc()}")
+        
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -455,14 +503,34 @@ def write_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     try:
         processed = config.process_inputs()
         file_path = processed.get("file")
+        
+        # Debug: Print workspace and file path info
+        logger.debug(f"Workspace={config.workspace}, exists={config.workspace.exists()}")
+        logger.debug(f"file_path param={file_path}")
+        logger.debug(f"All inputs={processed}")
+        
         data = processed.get("data")
         indent = int(processed.get("indent", 2))
         encoding = processed.get("encoding", "utf-8")
 
         if not file_path:
-            raise ValueError("No file path provided")
+            error_msg = "No file path provided (param 'file' is missing)"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
         if data is None:
-            raise ValueError("No data provided")
+            error_msg = "No data provided"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+            
+        # Ensure output directory exists
+        if "output/" in file_path:
+            output_dir = config.workspace / "output"
+            logger.debug(f"Creating output dir {output_dir}, exists={output_dir.exists()}")
+            output_dir.mkdir(exist_ok=True, parents=True)
+
+        # Debug: Print resolved path
+        resolved_path = str(resolve_path(config.workspace, file_path))
+        logger.debug(f"Resolved path={resolved_path}")
 
         result_path = write_json_direct(
             file_path,
@@ -471,11 +539,22 @@ def write_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             workspace=config.workspace,
             encoding=encoding,
             step_name=task_name,
+            logger=logger,
         )
+        
+        # Debug: Check if file was created
+        result_file = Path(result_path)
+        logger.debug(f"Result path={result_path}, exists={result_file.exists()}")
+        
         output = {"path": result_path}
         log_task_result(logger, output)
         return output
     except Exception as e:
+        # Debug: Print detailed exception info
+        logger.error(f"EXCEPTION: {type(e).__name__}: {str(e)}")
+        import traceback
+        logger.error(f"TRACEBACK:\n{traceback.format_exc()}")
+        
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -623,6 +702,7 @@ def write_json_direct(
     workspace: Path = Path("."),
     encoding: str = "utf-8",
     step_name: str = "write_json",
+    logger = None,
 ) -> str:
     """Write JSON data to a file.
 
@@ -633,6 +713,7 @@ def write_json_direct(
         workspace: Optional workspace directory
         encoding: File encoding (default: utf-8)
         step_name: Name of the step for error reporting
+        logger: Optional logger for debug output
 
     Returns:
         str: Path to written file
@@ -641,14 +722,37 @@ def write_json_direct(
         TemplateError: If file cannot be written
     """
     try:
+        if logger:
+            logger.debug(f"Original file_path={file_path}")
+            logger.debug(f"Workspace={workspace}, exists={workspace.exists()}")
+        
         if workspace:
             file_path = str(resolve_path(workspace, file_path))
+            if logger:
+                logger.debug(f"Resolved file_path={file_path}")
+                dir_path = Path(file_path).parent
+                logger.debug(f"Directory path={dir_path}, exists={dir_path.exists()}")
             ensure_directory(Path(file_path), step_name)
+            if logger:
+                dir_path = Path(file_path).parent
+                logger.debug(f"After ensure_directory, dir exists={dir_path.exists()}")
 
+        if logger:
+            logger.debug(f"Writing JSON to {file_path}")
         with open(file_path, "w") as f:
             json.dump(data, f, indent=indent)
+        
+        # Verify file was created
+        if logger:
+            created_file = Path(file_path)
+            logger.debug(f"File created, exists={created_file.exists()}, size={created_file.stat().st_size if created_file.exists() else 'N/A'}")
+        
         return file_path
     except (IOError, TypeError) as e:
+        if logger:
+            logger.error(f"ERROR: {type(e).__name__}: {str(e)}")
+            import traceback
+            logger.error(f"TRACEBACK:\n{traceback.format_exc()}")
         raise TemplateError(f"Failed to write JSON file '{file_path}': {str(e)}")
 
 
