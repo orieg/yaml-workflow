@@ -127,16 +127,55 @@ def test_advanced_hello_world_success(run_cli, example_workflows_dir, workspace_
         ]
     )
 
+    # Debug output for GitHub Actions
+    print("\n=== DEBUG OUTPUT FOR GITHUB ACTIONS ===")
+    print(f"Workspace directory: {workspace_dir}")
+    print(f"Exit code: {exit_code}")
+    print(f"STDOUT:\n{out}")
+    if err:
+        print(f"STDERR:\n{err}")
+    
+    # Check output directory exists and list contents
+    output_dir = workspace_dir / "output"
+    print(f"Output directory exists: {output_dir.exists()}")
+    if output_dir.exists():
+        print(f"Output directory contents: {list(output_dir.glob('*'))}")
+    
     assert exit_code == 0, f"Workflow failed with error: {err}"
 
     # Check validation result
     validation_file = workspace_dir / "output" / "validation_result.txt"
-    assert validation_file.exists()
-    assert "Valid: Alice" in validation_file.read_text()
+    validation_exists = validation_file.exists()
+    print(f"Validation file exists: {validation_exists}")
+    
+    assert validation_exists
+    validation_content = validation_file.read_text()
+    print(f"Validation file content: {validation_content}")
+    assert "Valid: Alice" in validation_content
+    
+    # Check if processed_validation.txt exists and what it contains
+    processed_file = workspace_dir / "output" / "processed_validation.txt"
+    if processed_file.exists():
+        processed_content = processed_file.read_text()
+        print(f"Processed validation file content: {processed_content}")
+    else:
+        print("Processed validation file does not exist")
 
+    # Debug: Check all files in output directory
+    print("All files in output directory before checking greeting.json:")
+    all_files = list(output_dir.glob("**/*"))
+    for file in all_files:
+        if file.is_file():
+            print(f"  - {file.relative_to(workspace_dir)}: {file.stat().st_size} bytes")
+    
     # Check JSON greeting
     greeting_json = workspace_dir / "output" / "greeting.json"
-    assert greeting_json.exists()
+    exists = greeting_json.exists()
+    print(f"Greeting JSON exists: {exists}")
+    
+    assert exists, f"greeting.json missing from output dir. Directory contents: {all_files}"
+    
+    # Continue with the rest of the test...
     with open(greeting_json) as f:
         greeting_data = json.load(f)
         assert greeting_data["name"] == "Alice"
