@@ -3,7 +3,7 @@
 import pytest
 
 from yaml_workflow.exceptions import TemplateError
-from yaml_workflow.template import TemplateEngine
+from yaml_workflow.template import AttrDict, TemplateEngine
 
 
 @pytest.fixture
@@ -135,3 +135,87 @@ def test_process_value_non_template(template_engine, variables):
     value = 42
     result = template_engine.process_value(value, variables)
     assert result == 42
+
+
+def test_attrdict_method_access(template_engine):
+    """Test accessing dictionary methods via attribute access."""
+    data = {"a": 1, "b": 2}
+    context = AttrDict(data)
+    assert list(context.items()) == [("a", 1), ("b", 2)]
+    assert list(context.keys()) == ["a", "b"]
+    assert list(context.values()) == [1, 2]
+
+
+def test_attrdict_attribute_error(template_engine):
+    """Test accessing a non-existent attribute raises AttributeError."""
+    data = {"a": 1}
+    context = AttrDict(data)
+    with pytest.raises(AttributeError) as exc:
+        _ = context.non_existent
+    assert "non_existent" in str(exc.value)
+
+
+def test_attrdict_set_attribute(template_engine):
+    """Test setting an attribute directly on AttrDict."""
+    data = {"a": 1}
+    context = AttrDict(data)
+    context.b = 2
+    assert context["b"] == 2
+    assert context.b == 2
+
+
+def test_process_template_with_none_variables(template_engine):
+    """Test processing template when variables is None."""
+    template = "Test"
+    result = template_engine.process_template(template, None)
+    assert result == "Test"
+    # Test with undefined variable when context is None
+    template_undef = "{{ undefined_var }}"
+    with pytest.raises(TemplateError) as exc:
+        template_engine.process_template(template_undef, None)
+    error_msg = str(exc.value)
+    assert "Template error: Invalid namespace 'undefined_var'" in error_msg
+    assert "Available namespaces:" in error_msg
+
+
+def test_process_template_error_invalid_namespace(template_engine):
+    """Test detailed error message for invalid namespace."""
+    template = "{{ invalid.foo }}"
+    variables = {"valid": {"bar": 1}}
+    with pytest.raises(TemplateError) as exc:
+        template_engine.process_template(template, variables)
+    error_msg = str(exc.value)
+    assert "Template error: Invalid namespace 'invalid'" in error_msg
+    assert "Available namespaces:" in error_msg
+    assert "- valid" in error_msg
+
+
+def test_process_template_error_invalid_attribute_access_missing(template_engine):
+    """Test error message when accessing missing attribute in dict."""
+    template = "{{ steps.foo.missing }}"
+    variables = {"steps": {"foo": {"bar": 1}}}
+    with pytest.raises(TemplateError) as exc:
+        template_engine.process_template(template, variables)
+    error_msg = str(exc.value)
+    assert "Template error: Invalid attribute 'missing' on dict" in error_msg
+    assert "Type of 'steps.foo' is 'dict'" in error_msg
+
+
+def test_process_template_error_undefined_root_variable(template_engine):
+    """Test error message for undefined root variable."""
+    template = "{{ undefined_root }}"
+    variables = {"root_var": 1}
+    with pytest.raises(TemplateError) as exc:
+        template_engine.process_template(template, variables)
+    error_msg = str(exc.value)
+    assert "Template error: Invalid namespace 'undefined_root'" in error_msg
+    assert "Available namespaces:" in error_msg
+
+
+def test_process_template_syntax_error_explicit(template_engine):
+    """Test explicitly catching TemplateSyntaxError."""
+    template = "{% bad tag %}"
+    with pytest.raises(TemplateError) as exc:
+        template_engine.process_template(template, {})
+    assert "Template syntax error:" in str(exc.value)
+    assert "Encountered unknown tag 'bad'." in str(exc.value)  # Check Jinja's message

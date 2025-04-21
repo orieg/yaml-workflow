@@ -76,27 +76,31 @@ nav:
   - Home: index.md
   - Guide:
       - Getting Started: guide/getting-started.md
+      - Features: features.md
       - Core Concepts: guide/concepts.md
       - Workflow Structure: workflow-structure.md
       - Configuration: guide/configuration.md
+      - CLI Usage: cli.md
+      - Templating: guide/templating.md
+      - State Management: state.md
+      - Flow Control: guide/flows.md
+      - Error Handling: guide/error-handling.md
       - Tasks:
-          - Overview: guide/tasks/index.md
+          - Overview: tasks.md
           - Basic Tasks: guide/tasks/basic-tasks.md
           - File Operations: guide/tasks/file-operations.md
           - Shell Tasks: guide/tasks/shell-tasks.md
           - Python Tasks: guide/tasks/python-tasks.md
           - Batch Tasks: guide/tasks/batch-tasks.md
           - Template Tasks: guide/tasks/template-tasks.md
+      - Task Development: guide/task-development.md
+      - Dependencies: dependencies.md
   - Examples:
       - Basic Workflow: examples/basic-workflow.md
       - Hello World: examples/hello-world.md
       - Advanced Hello World: examples/advanced-hello-world.md
       - Resume Testing: examples/test-resume.md
-  - API Reference:
-      - Overview: api/index.md
-      - Core API: api/core.md
-      - Engine: api/engine.md
-      - CLI: api/cli.md
+  - API Reference: reference/SUMMARY.md
   - Contributing:
       - Development Guide: development.md
       - Testing Guide: testing.md

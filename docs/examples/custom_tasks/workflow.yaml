@@ -1,0 +1,60 @@
+# docs/examples/custom_tasks/workflow.yaml
+
+name: Custom Task Example Workflow
+description: Demonstrates using custom tasks defined in my_tasks.py
+
+# Define some arguments for the workflow
+params:
+  initial_value:
+    type: integer
+    default: 10
+    description: The starting value for multiplication.
+  user_name:
+    type: string
+    default: "Example User"
+    description: The name to use in the custom greeting.
+  config_data_label:
+    type: string
+    default: "workflow_data"
+    description: The key to look up in the context for the config task.
+
+# Provide some top-level context (optional)
+context:
+  workflow_data: "This is data from the top-level context."
+
+steps:
+  - name: multiply_step
+    task: multiply_by # Task name matches the function name
+    inputs:
+      value: "{{ args.initial_value }}"
+      multiplier: 5 # Override the default multiplier
+
+  - name: show_multiply_result
+    task: echo # Use a built-in task to show the result
+    inputs:
+      message: "Multiplication Result: {{ steps.multiply_step.result }}"
+
+  - name: greeting_step
+    task: custom_greeting # Task name specified in the decorator
+    inputs:
+      name: "{{ args.user_name }}"
+
+  - name: show_greeting
+    task: echo
+    inputs:
+      message: "Greeting: {{ steps.greeting_step.result }}"
+
+  - name: process_context_step
+    task: process_with_config # Task takes config object implicitly
+    inputs:
+      # This input is passed to the task function's 'data_key' parameter
+      data_key: "{{ args.config_data_label }}"
+
+  - name: show_processed_data
+    task: echo
+    inputs:
+      message: "Config Task Result: {{ steps.process_context_step.result }}"
+
+# Note: To run this workflow, the custom tasks in my_tasks.py must be
+# discoverable by the Python environment executing the workflow engine.
+# See the notes in my_tasks.py. 

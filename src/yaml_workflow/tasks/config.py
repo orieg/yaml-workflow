@@ -8,8 +8,9 @@ from typing import Any, Dict, List, Optional
 
 from jinja2 import UndefinedError
 
-from ..exceptions import TemplateError
+from ..exceptions import TaskExecutionError, TemplateError
 from ..template import TemplateEngine
+from .error_handling import ErrorContext, handle_task_error
 
 
 class TaskConfig:
@@ -100,6 +101,9 @@ class TaskConfig:
 
         Returns:
             Any: Processed value with resolved templates
+
+        Raises:
+            TaskExecutionError: If template processing fails due to undefined variables.
         """
         if isinstance(value, str):
             try:
@@ -123,13 +127,15 @@ class TaskConfig:
                 except (ValueError, TypeError, SyntaxError):
                     return result
             except UndefinedError as e:
-                error_msg = str(e)
-                namespace = self._get_undefined_namespace(error_msg)
-                available = self.get_available_variables()
-                raise TemplateError(
-                    f"Template error: Undefined variable in namespace '{namespace}'. "
-                    f"Error: {error_msg}. Available variables in '{namespace}' namespace: {available[namespace]}"
+                # Use the new centralized error handler
+                context = ErrorContext(
+                    step_name=str(self.name),
+                    task_type=str(self.type),
+                    error=e,
+                    task_config=self.step,
+                    template_context=template_context,
                 )
+                handle_task_error(context)
         elif isinstance(value, dict):
             return {
                 k: self._process_value(v, template_context) for k, v in value.items()

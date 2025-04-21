@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Tuple, cast
 
 from ..exceptions import TaskExecutionError
 from . import TaskConfig, get_task_handler, register_task
+from .error_handling import ErrorContext, handle_task_error
 
 
 def process_item(
@@ -44,18 +45,25 @@ def process_item(
         TaskExecutionError: If item processing fails
         ValueError: If task type is invalid
     """
-    task_type = task_config.get("task")
-    if not task_type:
-        raise ValueError("Task type is required")
-
-    handler = get_task_handler(task_type)
-    if not handler:
-        raise ValueError(f"Unknown task type: {task_type}")
-
     try:
+        task_type = task_config.get("task")
+        if not task_type:
+            # Raise ValueError for config issue before task execution attempt
+            raise ValueError(
+                "Task type is required within the batch task configuration"
+            )
+
+        handler = get_task_handler(task_type)
+        if not handler:
+            # Raise ValueError for config issue before task execution attempt
+            raise ValueError(
+                f"Unknown task type specified in batch task config: {task_type}"
+            )
+
         # Create task config with item in inputs using specified arg name
         step = {
-            "name": f"batch_item_{item}",
+            # Use a more informative name including original step name if available
+            "name": f"batch_item_{item}_in_{task_config.get('name', 'batch')}",
             "task": task_type,
             "inputs": {**task_config.get("inputs", {}), arg_name: item},
         }
@@ -76,12 +84,25 @@ def process_item(
 
         config = TaskConfig(step, item_context, workspace)
         result = handler(config)
-        # If result is a dict with a single 'result' key, unwrap it
-        if isinstance(result, dict) and len(result) == 1 and "result" in result:
-            return result["result"]
+        # Remove unwrapping logic - return the full result dict from the handler
+        # if isinstance(result, dict) and len(result) == 1 and "result" in result:
+        #     return result["result"]
         return result
     except Exception as e:
-        raise TaskExecutionError(step_name=f"batch_item_{item}", original_error=e)
+        # Centralized error handling for exceptions during item processing
+        err_context = ErrorContext(
+            # Use the specific item step name generated above
+            step_name=step["name"],
+            task_type=str(task_type),  # Ensure type is str
+            error=e,
+            # Pass the sub-task config, not the main batch config
+            task_config=step,
+            # Include the item context used for this specific item
+            template_context=item_context,
+        )
+        handle_task_error(err_context)
+        # handle_task_error always raises, so return is unreachable but satisfies type checker
+        return None
 
 
 @register_task("batch")
@@ -124,113 +145,146 @@ def batch_task(config: TaskConfig) -> Dict[str, Any]:
                   factor: 2
         ```
     """
-    # Process inputs with template resolution
-    processed = config.process_inputs()
+    task_name = config.name or "batch_task"
+    task_type = config.type or "batch"
 
-    # Get required parameters
-    items = processed.get("items")
-    if items is None:
-        raise ValueError("items parameter is required")
+    try:
+        # Process inputs with template resolution
+        processed = config.process_inputs()
 
-    # Ensure items is a list
-    if not isinstance(items, list):
-        raise ValueError("items must be a list after template resolution")
+        # Get required parameters
+        items = processed.get("items")
+        if items is None:
+            raise ValueError("'items' parameter is required for batch task")
 
-    if not items:
-        return {
+        # Ensure items is a list
+        if not isinstance(items, list):
+            raise ValueError("'items' must resolve to a list after template processing")
+
+        task_config = processed.get("task")
+        if not task_config:
+            raise ValueError(
+                "'task' configuration is required within batch task inputs"
+            )
+
+        # Get optional parameters with defaults
+        chunk_size = int(processed.get("chunk_size", 10))
+        if chunk_size <= 0:
+            raise ValueError("'chunk_size' must be greater than 0")
+
+        max_workers = int(
+            processed.get("max_workers", min(chunk_size, os.cpu_count() or 1))
+        )
+        if max_workers <= 0:
+            raise ValueError("'max_workers' must be greater than 0")
+
+        # Handle case where items list is empty after processing
+        if not items:
+            return {
+                "processed": [],
+                "failed": [],
+                "results": [],
+                "stats": {
+                    "total": 0,
+                    "processed": 0,
+                    "failed": 0,
+                    "start_time": datetime.now().isoformat(),
+                    "end_time": datetime.now().isoformat(),
+                    "success_rate": 100.0,
+                },
+            }
+
+        # Get argument name to use for items, defaulting to "item"
+        arg_name = processed.get("arg_name", "item")
+
+        # Initialize state
+        state: Dict[str, Any] = {
             "processed": [],
             "failed": [],
             "results": [],
             "stats": {
-                "total": 0,
+                "total": len(items),
                 "processed": 0,
                 "failed": 0,
                 "start_time": datetime.now().isoformat(),
-                "end_time": datetime.now().isoformat(),
-                "success_rate": 100.0,
             },
         }
 
-    task_config = processed.get("task")
-    if not task_config:
-        raise ValueError("task configuration is required")
+        # Store results with their indices for ordering
+        ordered_results: List[Tuple[int, Any]] = []
+        ordered_processed: List[Tuple[int, Any]] = []
+        ordered_failed: List[Tuple[int, Dict[str, Any]]] = []
 
-    # Get optional parameters with defaults
-    chunk_size = int(processed.get("chunk_size", 10))
-    if chunk_size <= 0:
-        raise ValueError("chunk_size must be greater than 0")
+        # Process items in chunks
+        for chunk_index, chunk_start in enumerate(range(0, len(items), chunk_size)):
+            chunk = cast(List[Any], items[chunk_start : chunk_start + chunk_size])
 
-    max_workers = int(
-        processed.get("max_workers", min(chunk_size, os.cpu_count() or 1))
-    )
-    if max_workers <= 0:
-        raise ValueError("max_workers must be greater than 0")
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {}
 
-    # Get argument name to use for items, defaulting to "item"
-    arg_name = processed.get("arg_name", "item")
+                # Submit tasks for chunk
+                for item_index, item in enumerate(chunk):
+                    # Pass the sub-task config, not the main batch config inputs
+                    sub_task_config_for_item = task_config
+                    future = executor.submit(
+                        process_item,
+                        item,  # item: Any
+                        sub_task_config_for_item,  # task_config: Dict[str, Any]
+                        config._context,  # context: Dict[str, Any]
+                        config.workspace,  # workspace: Path
+                        arg_name,  # arg_name: str
+                        chunk_index,  # chunk_index: int
+                        chunk_start + item_index,  # item_index: int
+                        len(items),  # total: int
+                        chunk_size,  # chunk_size: int
+                    )
+                    futures[future] = (item, chunk_start + item_index)
 
-    # Initialize state
-    state: Dict[str, Any] = {
-        "processed": [],
-        "failed": [],
-        "results": [],
-        "stats": {
-            "total": len(items),
-            "processed": 0,
-            "failed": 0,
-            "start_time": datetime.now().isoformat(),
-        },
-    }
+                # Process completed futures
+                for future in as_completed(futures):
+                    item, index = futures[future]
+                    try:
+                        result = future.result()
+                        ordered_processed.append((index, item))
+                        ordered_results.append((index, result))
+                        state["stats"]["processed"] += 1
+                    except Exception as e:
+                        # Capture the error from process_item (already wrapped if needed)
+                        error_info = {"item": item, "error": str(e)}
+                        # If it's a TaskExecutionError, add more details if possible
+                        if isinstance(e, TaskExecutionError):
+                            error_info["step_name"] = e.step_name
+                            if e.task_config:
+                                error_info["task_config"] = e.task_config
+                        ordered_failed.append((index, error_info))
+                        state["stats"]["failed"] += 1
 
-    # Store results with their indices for ordering
-    ordered_results: List[Tuple[int, Any]] = []
-    ordered_processed: List[Tuple[int, Any]] = []
-    ordered_failed: List[Tuple[int, Dict[str, Any]]] = []
+        # Sort results by index and extract values
+        state["processed"] = [item for _, item in sorted(ordered_processed)]
+        state["results"] = [result for _, result in sorted(ordered_results)]
+        state["failed"] = [error for _, error in sorted(ordered_failed)]
 
-    # Process items in chunks
-    for chunk_index, chunk_start in enumerate(range(0, len(items), chunk_size)):
-        chunk = cast(List[Any], items[chunk_start : chunk_start + chunk_size])
+        # Add completion statistics
+        state["stats"]["end_time"] = datetime.now().isoformat()
+        total_items = state["stats"]["total"]
+        processed_items = state["stats"]["processed"]
+        state["stats"]["success_rate"] = (
+            (processed_items / total_items) * 100.0
+            if total_items > 0
+            else 100.0  # Avoid division by zero if total is 0
+        )
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {}
+        return state
 
-            # Submit tasks for chunk
-            for item_index, item in enumerate(chunk):
-                future = executor.submit(
-                    process_item,
-                    item,
-                    task_config,
-                    config._context,
-                    config.workspace,
-                    arg_name,
-                    chunk_index,
-                    chunk_start + item_index,
-                    len(items),  # total
-                    chunk_size,  # chunk_size
-                )
-                futures[future] = (item, chunk_start + item_index)
-
-            # Process completed futures
-            for future in as_completed(futures):
-                item, index = futures[future]
-                try:
-                    result = future.result()
-                    ordered_processed.append((index, item))
-                    ordered_results.append((index, result))
-                    state["stats"]["processed"] += 1
-                except Exception as e:
-                    ordered_failed.append((index, {"item": item, "error": str(e)}))
-                    state["stats"]["failed"] += 1
-
-    # Sort results by index and extract values
-    state["processed"] = [item for _, item in sorted(ordered_processed)]
-    state["results"] = [result for _, result in sorted(ordered_results)]
-    state["failed"] = [error for _, error in sorted(ordered_failed)]
-
-    # Add completion statistics
-    state["stats"]["end_time"] = datetime.now().isoformat()
-    state["stats"]["success_rate"] = (
-        state["stats"]["processed"] / state["stats"]["total"]
-    ) * 100.0
-
-    return state
+    except Exception as e:
+        # Centralized error handling for exceptions during batch setup/config
+        err_context = ErrorContext(
+            step_name=str(task_name),
+            task_type=str(task_type),
+            error=e,
+            task_config=config.step,
+            template_context=config._context,
+        )
+        handle_task_error(err_context)
+        # handle_task_error always raises, so return is unreachable but satisfies type checker
+        return {}

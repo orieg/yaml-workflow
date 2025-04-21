@@ -1,17 +1,15 @@
 # Python Tasks Example
 #
 # This example demonstrates Python task features:
-# - Result handling and variable access
+# - Result handling and variable access (using specific tasks and steps.NAME.result access)
 # - Error handling and validation
-# - Multiple return values
-# - Module imports and dependencies
-# - Conditional execution
+# - Using python_code for inline logic
 #
 # Usage:
 # yaml-workflow run python_tasks.yaml --numbers=[1,2,3,4,5]
 
-name: Python Tasks
-description: Demonstrates Python task features and best practices
+name: Python Tasks Example (Updated)
+description: Demonstrates current Python task features and best practices
 
 settings:
   error_handling:
@@ -33,139 +31,188 @@ params:
     default: "stats"
 
 steps:
-  # Step 1: Validate input parameters
+  # Step 1: Validate input parameters using python_code
   - name: validate_input
-    task: python
-    params:
+    task: python_code # Use specific task
+    inputs:
       code: |
         import json
-        
-        # Get and validate numbers
-        numbers = args.numbers
-        if not isinstance(numbers, list):
-          if isinstance(numbers, str):
+
+        # Get args from context
+        workflow_args = context.get('args', {})
+        numbers_in = workflow_args.get('numbers')
+        operation_in = workflow_args.get('operation')
+
+        # Validate numbers
+        if not isinstance(numbers_in, list):
+          if isinstance(numbers_in, str):
             try:
-              numbers = json.loads(numbers)
+              numbers = json.loads(numbers_in)
             except json.JSONDecodeError:
-              raise ValueError("Invalid JSON format for numbers")
+              raise ValueError(f"Invalid JSON format for numbers: {numbers_in!r}")
           else:
-            raise ValueError("numbers must be a list")
-            
+            raise ValueError(f"Input 'numbers' must be a list, got {type(numbers_in)}")
+        else:
+            numbers = numbers_in # Already a list
+
         if not numbers:
-          raise ValueError("numbers list cannot be empty")
-          
+          raise ValueError("Input 'numbers' list cannot be empty")
+
         if not all(isinstance(n, (int, float)) for n in numbers):
-          raise ValueError("all items must be numbers")
-          
-        # Get and validate operation
-        operation = args.operation
-        if operation not in ["sum", "average", "stats"]:
-          raise ValueError("invalid operation")
-          
-        # Return validated input
+          raise ValueError(f"All items in 'numbers' must be numbers. Found: {[type(n) for n in numbers if not isinstance(n, (int, float))]}")
+
+        # Validate operation
+        operation = operation_in
+        valid_ops = ["sum", "average", "stats"]
+        if operation not in valid_ops:
+          raise ValueError(f"Invalid operation '{operation}'. Must be one of {valid_ops}")
+
+        # Assign validated inputs to 'result' for output
         result = {
           "numbers": numbers,
           "operation": operation
         }
+    # Implicitly returns the 'result' dictionary
 
-  # Step 2: Perform calculations
+  # Step 2: Perform calculations using python_code
   - name: calculate
-    task: python
-    params:
+    task: python_code # Use specific task
+    inputs:
+      # Get validated input using standardized access
+      validated_numbers: "{{ steps.validate_input.result.numbers }}"
+      validated_operation: "{{ steps.validate_input.result.operation }}"
       code: |
         import statistics
         from typing import Dict, List, Union
-        
-        def calculate_stats(numbers: List[Union[int, float]]) -> Dict[str, float]:
-            return {
-                "sum": sum(numbers),
-                "average": statistics.mean(numbers),
-                "median": statistics.median(numbers),
-                "std_dev": statistics.stdev(numbers) if len(numbers) > 1 else 0,
-                "min": min(numbers),
-                "max": max(numbers)
+
+        # Get inputs passed directly into the execution context
+        numbers = validated_numbers
+        operation = validated_operation
+
+        def calculate_stats(nums: List[Union[int, float]]) -> Dict[str, float]:
+            # Calculate stats, handle potential edge case for stdev
+            stats_dict = {
+                "sum": float(sum(nums)),
+                "average": float(statistics.mean(nums)),
+                "median": float(statistics.median(nums)),
+                "min": float(min(nums)),
+                "max": float(max(nums))
             }
-        
-        # Get validated input
-        data = steps.validate_input.output
-        numbers = data["numbers"]
-        operation = data["operation"]
-        
+            if len(nums) > 1:
+                stats_dict["std_dev"] = float(statistics.stdev(nums))
+            else:
+                stats_dict["std_dev"] = 0.0 # Define stdev as 0 for single element list
+            return stats_dict
+
         # Perform requested operation
         if operation == "sum":
-            result = sum(numbers)
+            calculated_result = float(sum(numbers))
         elif operation == "average":
-            result = statistics.mean(numbers)
+            calculated_result = float(statistics.mean(numbers))
         else:  # stats
-            result = calculate_stats(numbers)
-    condition: "steps.validate_input.status == 'completed'"
+            calculated_result = calculate_stats(numbers)
 
-  # Step 3: Format results
+        # Assign final calculation to 'result' for output
+        result = calculated_result
+    # Implicitly returns the 'calculated_result' assigned to 'result'
+    condition: "steps.validate_input.status == 'completed'" # Check step state
+
+  # Step 3: Format results using python_code
   - name: format_results
-    task: python
-    params:
+    task: python_code # Use specific task
+    inputs:
+      # Get data using standardized access
+      input_data: "{{ steps.validate_input.result }}"
+      calculated_data: "{{ steps.calculate.result }}"
+      timestamp: "{{ timestamp }}" # Access global context
+      run_number: "{{ run_number }}" # Access global context
       code: |
         import json
         from pathlib import Path
         from typing import Any, Dict
-        
+
+        # Get inputs passed directly into the execution context
+        validation_result = input_data
+        calculation_result = calculated_data
+        ts = timestamp
+        run_num = run_number
+
         def format_value(value: Any) -> str:
-            if isinstance(value, (int, float)):
+            # Helper to format numbers nicely
+            if isinstance(value, float):
+                # Avoid unnecessary .00 for integers represented as floats
+                if value.is_integer():
+                    return f"{int(value):,}"
                 return f"{value:,.2f}"
+            elif isinstance(value, int):
+                 return f"{value:,}"
             elif isinstance(value, dict):
-                return "\n".join(f"  {k}: {format_value(v)}" for k, v in value.items())
+                # Recursively format dictionary values
+                return "\\n".join(f"  {k}: {format_value(v)}" for k, v in value.items())
+            elif isinstance(value, list):
+                 # Format list elements
+                 return ', '.join(map(format_value, value))
             return str(value)
-        
-        # Get calculation results
-        data = steps.validate_input.output
-        result = steps.calculate.output
-        
-        # Create output directory
-        Path("output").mkdir(exist_ok=True)
-        
-        # Save raw results as JSON
+
+        # Create output directory relative to workspace root
+        output_dir = Path("output")
+        output_dir.mkdir(exist_ok=True)
+
+        # Prepare raw results dictionary
         raw_output = {
-            "input": data,
-            "result": result,
-            "timestamp": timestamp,
-            "run_number": run_number
+            "input": validation_result,
+            "result": calculation_result,
+            "timestamp": ts,
+            "run_number": run_num
         }
-        Path("output/results.json").write_text(json.dumps(raw_output, indent=2))
-        
-        # Format human-readable output
-        formatted = f"""
+
+        # Save raw results to JSON
+        json_path = output_dir / "results.json"
+        json_path.write_text(json.dumps(raw_output, indent=2))
+
+        # Prepare formatted text output
+        formatted_text = f\"\"\"
         Python Task Results
         ==================
-        Run #{run_number} at {timestamp}
-        
+        Run #{run_num} at {ts}
+
         Input
         -----
-        Numbers: {data['numbers']}
-        Operation: {data['operation']}
-        
+        Numbers: {format_value(validation_result['numbers'])}
+        Operation: {validation_result['operation']}
+
         Result
         ------
-        {format_value(result)}
-        """
-        
-        Path("output/results.txt").write_text(formatted)
-        
-        # Return both formats
-        result = {
-            "json": raw_output,
-            "text": formatted
-        }
-    condition: "steps.calculate.status == 'completed'"
-    outputs: [json_result, text_result]
+        {format_value(calculation_result)}
+        \"\"\"
 
-  # Step 4: Display results
+        # Save formatted text to file
+        text_path = output_dir / "results.txt"
+        text_path.write_text(formatted_text)
+
+        # Assign dict containing paths and content to 'result' for output
+        result = {
+            "json_file": str(json_path),
+            "text_file": str(text_path),
+            "json_content": raw_output, # Include content directly if needed
+            "text_content": formatted_text # Include content directly if needed
+        }
+    # Implicitly returns the 'result' dictionary
+    condition: "steps.calculate.status == 'completed'"
+    # 'outputs' field is deprecated and removed. Access via steps.format_results.result.*
+
+  # Step 4: Display results using shell task
   - name: show_results
     task: shell
     command: |
-      if [ -f "output/results.txt" ]; then
-        cat output/results.txt
+      echo "--- Formatted Results ---"
+      if [ -f "{{ steps.format_results.result.text_file }}" ]; then
+        cat "{{ steps.format_results.result.text_file }}"
       else
-        echo "Error: Results file not found"
+        echo "Error: Results text file not found at {{ steps.format_results.result.text_file }}"
         exit 1
       fi
+      echo ""
+      echo "--- JSON Results File ---"
+      echo "{{ steps.format_results.result.json_file }}"
     condition: "steps.format_results.status == 'completed'" 
