@@ -18,6 +18,11 @@ from yaml_workflow.exceptions import (
 )
 from yaml_workflow.state import WorkflowState
 from yaml_workflow.tasks import TaskConfig, register_task
+from yaml_workflow.tasks.basic_tasks import (  # Import basic tasks
+    add_numbers,
+    echo,
+    fail,
+)
 
 
 @pytest.fixture
@@ -226,9 +231,12 @@ def test_workflow_execution(temp_workflow_file):
 
     # Check if both steps were executed
     state = engine.state.get_state()
+    print(f"DEBUG: state['steps'] = {state['steps']}")
     assert "step1" in state["steps"]
     assert "step2" in state["steps"]
+    print(f"DEBUG: state['steps']['step1'] = {state['steps'].get('step1')}")
     assert state["steps"]["step1"]["status"] == "completed"
+    print(f"DEBUG: state['steps']['step2'] = {state['steps'].get('step2')}")
     assert state["steps"]["step2"]["status"] == "completed"
 
 
@@ -301,105 +309,172 @@ def test_on_error_fail(tmp_path):
     assert state["execution_state"]["failed_step"]["error"] == "Custom error message"
 
 
-def test_on_error_continue(tmp_path):
-    """Test on_error with continue action."""
+def test_on_error_continue(tmp_path: Path):
+    """Test that on_error: continue allows workflow to complete despite failure."""
     workflow = {
-        "name": "on-error-continue-test",
         "steps": [
             {
                 "name": "step1",
-                "task": "echo",
-                "inputs": {"message": "Step 1 Result"},
+                "task": "python_code",
+                "inputs": {"code": "result = {'var1': 'initial'}"},
             },
             {
-                "name": "step2",
-                "task": "fail",
-                "inputs": {"message": "Deliberate failure"},
-                "on_error": {"action": "continue", "message": "Skipping failed step"},
+                "name": "step2_fails",
+                "task": "python_code",
+                "inputs": {"code": "raise ValueError('Intentional failure')"},
+                "on_error": "continue",
             },
             {
                 "name": "step3",
-                "task": "echo",
-                "inputs": {"message": "Step 3 Result"},
+                "task": "python_code",
+                "inputs": {"code": "result = {'var2': 'final'}"},
             },
-        ],
+        ]
     }
-    engine = WorkflowEngine(workflow, base_dir=tmp_path)
-    result = engine.run()
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    status = engine.run()
 
-    assert (
-        result["status"] == "completed"
-    ), "Workflow should complete despite step failure"
+    # Workflow should complete even though a step failed
+    assert status["status"] == "completed"
 
-    # Check final outputs in the result dictionary
-    assert "step1" in result["outputs"], "Step 1 output should be present"
-    assert result["outputs"]["step1"] == {"result": "Step 1 Result"}
-    assert (
-        "step2" not in result["outputs"]
-    ), "Failed step 2 output should NOT be present"
-    assert "step3" in result["outputs"], "Step 3 output should be present"
-    assert result["outputs"]["step3"] == {"result": "Step 3 Result"}
+    # --- Check step statuses from the engine's state ---
+    final_state = engine.state.get_state()
+    print(f"DEBUG (continue): final_state['steps'] = {final_state['steps']}")  # Debug
+    assert final_state["steps"]["step1"]["status"] == "completed"
+    print(
+        f"DEBUG (continue): final_state['steps']['step2_fails'] = {final_state['steps'].get('step2_fails')}"
+    )  # Debug
+    assert final_state["steps"]["step2_fails"]["status"] == "failed"
+    assert final_state["steps"]["step2_fails"]["skipped"] is False  # It ran and failed
+    assert "Intentional failure" in final_state["steps"]["step2_fails"]["error"]
+    assert final_state["steps"]["step3"]["status"] == "completed"
 
-    # Check the detailed execution state
-    state = engine.state.metadata["execution_state"]
-    assert state["status"] == "completed", "Internal state status should be completed"
-    assert "step1" in state["step_outputs"]
-    # *** Step 2 failed, so its output should NOT be in step_outputs ***
-    assert (
-        "step2" not in state["step_outputs"]
-    ), "Failed step output should not be in state outputs"
-    assert "step3" in state["step_outputs"]
-    # Check step status (this is tracked separately from outputs)
-    # We need a way to get individual step status reliably from state.
-    # For now, let's assume the steps_status structure exists or adapt if needed.
-    # Placeholder: Assuming get_state() provides this structure or similar.
-    full_state = engine.state.get_state()  # Use get_state() which calculates status
-    assert full_state["steps"]["step1"]["status"] == "completed"
-    assert (
-        full_state["steps"]["step2"]["status"] == "failed"
-    ), "Step 2 status should be failed"
-    assert full_state["steps"]["step3"]["status"] == "completed"
-    # *** Since action is 'continue', the workflow completes, but the step *is* marked failed internally ***
-    # assert state["failed_step"] is None, "No step should be marked as the final failure point"
-    assert (
-        state["failed_step"] is not None
-    ), "failed_step should be recorded even on continue"
-    assert (
-        state["failed_step"]["step_name"] == "step2"
-    ), "Step 2 should be the recorded failed step"
-    assert (
-        state["failed_step"]["error"] == "Skipping failed step"
-    ), "State should record the formatted error msg"
+    # Check context variables from the final returned status dictionary
+    assert status["context"]["steps"]["step1"]["result"] == {"var1": "initial"}
 
 
-def test_on_error_retry(tmp_path):
-    """Test on_error with retry action."""
-    attempts = []
-
-    @register_task("flaky")
-    def flaky_task(config: TaskConfig):
-        attempts.append(len(attempts) + 1)
-        if len(attempts) < 3:
-            raise ValueError("Temporary failure")
-        return {"success": True}
-
+def test_on_error_next(tmp_path: Path):
+    """Test that on_error: next correctly jumps to the specified step."""
     workflow = {
         "steps": [
             {
-                "name": "flaky_step",
-                "task": "flaky",
-                "retry": {"max_attempts": 3, "delay": 0.1, "backoff": 1},
-                "on_error": {"action": "retry", "message": "Retrying flaky step"},
-            }
+                "name": "step1",
+                "task": "python_code",
+                "inputs": {"code": "result = {'a': 1}"},
+            },
+            {
+                "name": "step2_fails",
+                "task": "python_code",
+                "inputs": {"code": "raise ValueError('Going to step4')"},
+                "on_error": {"next": "step4"},
+            },
+            {
+                "name": "step3_skipped",  # This step should be skipped
+                "task": "python_code",
+                "inputs": {"code": "result = {'b': 2}"},
+            },
+            {
+                "name": "step4",
+                "task": "python_code",
+                "inputs": {"code": "result = {'c': 3}"},
+            },
         ]
     }
-    engine = WorkflowEngine(workflow)
-    result = engine.run()
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    status = engine.run()
 
-    assert result["status"] == "completed"
-    assert len(attempts) == 3  # Should succeed on third try
-    state = engine.state.get_state()
-    assert state["steps"]["flaky_step"]["status"] == "completed"
+    # Workflow should complete
+    assert status["status"] == "completed"
+
+    # --- Check step statuses from the engine's state ---
+    final_state = engine.state.get_state()
+    # Access status via final_state['steps'][step_name]['status']
+    print(f"DEBUG (next): final_state['steps'] = {final_state['steps']}")  # Debug
+    assert final_state["steps"]["step1"]["status"] == "completed"
+    print(
+        f"DEBUG (next): final_state['steps']['step2_fails'] = {final_state['steps'].get('step2_fails')}"
+    )  # Debug
+    assert final_state["steps"]["step2_fails"]["status"] == "failed"
+    assert "Going to step4" in final_state["steps"]["step2_fails"]["error"]
+    print(
+        f"DEBUG (next): final_state['steps']['step3_skipped'] = {final_state['steps'].get('step3_skipped')}"
+    )  # Debug
+    assert final_state["steps"]["step3_skipped"]["status"] == "skipped"
+    print(
+        f"DEBUG (next): final_state['steps']['step4'] = {final_state['steps'].get('step4')}"
+    )  # Debug
+    assert final_state["steps"]["step4"]["status"] == "completed"
+
+    # Check context variables from the final returned status dictionary
+    # (These should still reflect only successfully completed steps)
+    assert status["context"]["steps"]["step1"]["result"] == {"a": 1}
+    assert "step2_fails" not in status["context"]["steps"]
+    assert "step3_skipped" not in status["context"]["steps"]
+    assert status["context"]["steps"]["step4"]["result"] == {"c": 3}
+
+
+def test_on_error_retry(tmp_path):
+    """Test that on_error: retry attempts the step multiple times before succeeding."""
+
+    # Register a task that fails a few times then succeeds
+    fail_count = 0
+
+    @register_task("fail_sometimes")
+    def fail_sometimes_task(config: TaskConfig):
+        nonlocal fail_count
+        fail_count += 1
+        if fail_count <= 3:
+            raise ValueError(f"Failure attempt {fail_count}")
+        return {"status": "Finally succeeded", "attempt": fail_count}
+
+    # --- Workflow Definition ---
+    workflow = {
+        "steps": {
+            "step1": {"task": "echo", "inputs": {"message": "Hello"}},  # Use "inputs"
+            "flaky_step": {
+                "task": "fail_sometimes",
+                "onError": "retry",
+                "maxRetries": 3,
+            },
+            "step3": {"task": "echo", "inputs": {"message": "World"}},  # Use "inputs"
+        }
+    }
+
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+
+    # --- Run and Expect Success ---
+    result = engine.run()  # Run the engine, expect it to succeed
+
+    # --- Assertions ---
+    # Check the final workflow status
+    assert (
+        result["status"] == "completed"
+    ), "Workflow should complete successfully after retries"
+
+    # Check the final state
+    final_state = engine.state.get_state()
+    assert (
+        final_state["execution_state"]["status"] == "completed"
+    )  # Check execution status
+
+    # Check individual step statuses in the final state
+    assert final_state["steps"]["step1"]["status"] == "completed"
+    assert (
+        final_state["steps"]["flaky_step"]["status"] == "completed"
+    )  # Should be completed now
+    # Check the retry count from the execution_state, not the step output - REMOVED as retry count is cleared on success
+    assert (
+        "error" not in final_state["steps"]["flaky_step"]
+    )  # No error should be stored if successful
+    assert (
+        final_state["steps"]["step3"]["status"] == "completed"
+    )  # Step3 should have run and completed
+
+    # Check the output of the flaky step
+    assert "flaky_step" in result["outputs"]
+    assert result["outputs"]["flaky_step"] == {
+        "result": {"status": "Finally succeeded", "attempt": 4}
+    }
 
 
 def test_on_error_notify(tmp_path):

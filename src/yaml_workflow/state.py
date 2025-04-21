@@ -132,27 +132,9 @@ class WorkflowState:
             "execution_state": exec_state,
             "namespaces": self.metadata["namespaces"],
             "steps": {
-                step: {
-                    "status": (
-                        "completed"
-                        if step in exec_state["completed_steps"]
-                        else (
-                            "failed"
-                            if exec_state["failed_step"]
-                            and exec_state["failed_step"]["step_name"] == step
-                            else "not_started"
-                        )
-                    ),
-                    "outputs": exec_state["step_outputs"].get(step, {}),
-                }
-                for step in set(
-                    exec_state["completed_steps"]
-                    + (
-                        [exec_state["failed_step"]["step_name"]]
-                        if exec_state["failed_step"]
-                        else []
-                    )
-                )
+                # Iterate over all steps recorded in step_outputs
+                step_name: step_data.copy()  # Return a copy of the recorded data
+                for step_name, step_data in exec_state["step_outputs"].items()
             },
         }
 
@@ -210,8 +192,9 @@ class WorkflowState:
         state = cast(ExecutionState, self.metadata["execution_state"])
         if step_name not in state["completed_steps"]:
             state["completed_steps"].append(step_name)
-        state["step_outputs"][step_name] = outputs
-        state["status"] = "in_progress"
+        # Store status along with the outputs for consistency
+        state["step_outputs"][step_name] = {"status": "completed", **outputs}
+        state["status"] = "in_progress"  # Workflow status
         if state["failed_step"] and state["failed_step"]["step_name"] == step_name:
             state["failed_step"] = None
         self.reset_step_retries(step_name)
@@ -226,7 +209,36 @@ class WorkflowState:
             "error": error,
             "failed_at": datetime.now().isoformat(),
         }
+        # Also record the failure status in step_outputs for get_state() consistency
+        failed_step_info = state["failed_step"]
+        assert failed_step_info is not None
+        state["step_outputs"][step_name] = {
+            "status": "failed",
+            "error": error,
+            "skipped": False,
+            "failed_at": failed_step_info["failed_at"],
+        }
         state["status"] = "failed"
+        self.save()
+
+    def mark_step_skipped(
+        self, step_name: str, reason: str = "Condition not met"
+    ) -> None:
+        """Mark a step as skipped."""
+        state = cast(ExecutionState, self.metadata["execution_state"])
+        # Ensure skipped steps are not in completed list
+        if step_name in state["completed_steps"]:
+            state["completed_steps"].remove(step_name)
+        # Add entry to step_outputs
+        state["step_outputs"][step_name] = {
+            "status": "skipped",
+            "reason": reason,
+            "skipped_at": datetime.now().isoformat(),
+        }
+        # Ensure it's not marked as failed if previously failed
+        failed_step_info = state.get("failed_step")
+        if failed_step_info and failed_step_info.get("step_name") == step_name:
+            state["failed_step"] = None
         self.save()
 
     def mark_workflow_completed(self) -> None:
@@ -252,10 +264,11 @@ class WorkflowState:
         """Check if workflow can be resumed from a specific step."""
         state = cast(ExecutionState, self.metadata["execution_state"])
         # Check if workflow is in failed state and has a failed step
-        if state["status"] != "failed" or not state["failed_step"]:
+        failed_step_info = state.get("failed_step")
+        if state["status"] != "failed" or not failed_step_info:
             return False
         # Check if the failed step matches the requested step
-        if state["failed_step"]["step_name"] != step_name:
+        if failed_step_info.get("step_name") != step_name:
             return False
         # Ensure there's no active retry state for this step
         if "retry_counts" in state and step_name in state["retry_counts"]:

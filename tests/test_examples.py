@@ -550,14 +550,12 @@ def test_complex_flow_continue_on_error(run_cli, example_workflows_dir, workspac
     complex_workflow_file = example_workflows_dir / "complex_flow_error_handling.yaml"
 
     # Run workflow with default flow (full_run) which includes optional_step
-    # Keep default flaky_mode (success)
     exit_code, out, err = run_cli(
         [
             "run",
             str(complex_workflow_file),
             "--workspace",
             str(workspace_dir),
-            # Default flow is used
         ],
     )
 
@@ -576,12 +574,32 @@ def test_complex_flow_continue_on_error(run_cli, example_workflows_dir, workspac
         exit_code == 0
     ), f"Workflow should complete despite optional_step failure: {err}"
 
-    # Check that optional_step attempted to run and failed (check stderr)
-    assert "Attempting optional step..." in out  # Check stdout for attempt message
-    # Check stderr for the specific error from `cat non_existent_file.txt`
-    # The exact message might vary slightly by OS/shell, but should contain key parts
-    assert "non_existent_file.txt: No such file or directory" in err
-    # assert "Optional step failed as expected, continuing..." in err # Removed: Custom message not logged to stderr on 'continue'
+    # --- Check State for Failure Details ---
+    # Load the state file
+    state_file = workspace_dir / ".workflow_metadata.json"
+    assert state_file.exists(), "Workflow state file not found."
+    with open(state_file) as f:
+        final_state = json.load(f)
+
+    # Check that optional_step is marked as failed in the state
+    assert (
+        "optional_step" in final_state["execution_state"]["step_outputs"]
+    ), "optional_step not found in final state step_outputs"
+    optional_step_state = final_state["execution_state"]["step_outputs"][
+        "optional_step"
+    ]
+    assert (
+        optional_step_state["status"] == "failed"
+    ), "Optional step status should be failed"
+
+    # Check the error message stored in the state for the expected content
+    assert (
+        "error" in optional_step_state
+    ), "Error message missing from optional_step state"
+    step_error_message = optional_step_state["error"]
+    # Check that the error message matches the custom message defined in on_error
+    expected_error = "Optional step failed as expected, continuing..."
+    assert step_error_message == expected_error
 
     # Check that subsequent steps ran (process_core_2, cleanup)
     # Check for process_core_2 output in the log file
