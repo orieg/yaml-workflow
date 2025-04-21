@@ -381,7 +381,8 @@ def test_python_code_success(tmp_path: Path):
     engine = WorkflowEngine(workflow, workspace=str(tmp_path))
     status = engine.run()
     assert status["status"] == "completed"
-    assert status["outputs"]["run_code"]["result"]["result"] == 50
+    # Access the direct result value
+    assert status["outputs"]["run_code"]["result"] == 50
 
 
 def test_python_code_exec_error(tmp_path: Path):
@@ -421,19 +422,21 @@ def test_python_code_result_var_error(tmp_path: Path):
 
 def test_python_code_no_result_var(tmp_path: Path):
     # Test that it returns None when result_variable is omitted
+    # or when 'result' is not explicitly assigned.
     workflow = {
         "steps": [
             {
                 "name": "run_code_no_res",
                 "task": "python_code",
-                "inputs": {"code": "x = 100"},
+                "inputs": {"code": "x = 100"},  # No 'result' variable assigned
             }
         ]
     }
     engine = WorkflowEngine(workflow, workspace=str(tmp_path))
     status = engine.run()
     assert status["status"] == "completed"
-    assert status["outputs"]["run_code_no_res"]["result"]["result"] is None
+    # Access the direct result value, which should be None
+    assert status["outputs"]["run_code_no_res"]["result"] is None
 
 
 # Assuming the test definition starts around line 500
@@ -465,3 +468,79 @@ def test_python_function_too_many_pos_args_no_varargs(tmp_path: Path, test_modul
     with pytest.raises(WorkflowError) as e:
         engine.run()
     assert isinstance(e.value.original_error, TypeError)
+
+
+# === Tests for print_vars_task and print_message_task ===
+
+
+def test_print_message_task(tmp_path: Path, capsys):
+    workflow = {
+        "params": {"user_name": "WorkflowUser"},
+        "steps": [
+            {
+                "name": "print_greeting",
+                "task": "print_message",
+                "inputs": {"message": "Hello, {{ args.user_name }}!"},
+            }
+        ],
+    }
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    status = engine.run()
+    assert status["status"] == "completed"
+    captured = capsys.readouterr()
+    assert "Hello, WorkflowUser!" in captured.out
+    assert status["outputs"]["print_greeting"]["result"]["success"] is True
+    assert status["outputs"]["print_greeting"]["result"]["printed_length"] == len(
+        "Hello, WorkflowUser!"
+    )
+
+
+def test_print_message_task_empty(tmp_path: Path, capsys):
+    workflow = {
+        "steps": [
+            {
+                "name": "print_empty",
+                "task": "print_message",
+                "inputs": {"message": ""},  # Empty message
+            }
+        ]
+    }
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    status = engine.run()
+    assert status["status"] == "completed"
+    captured = capsys.readouterr()
+    assert captured.out == "\n"
+    assert status["outputs"]["print_empty"]["result"]["success"] is True
+    assert status["outputs"]["print_empty"]["result"]["printed_length"] == 0
+
+
+def test_print_vars_task(tmp_path: Path, capsys):
+    workflow = {
+        "params": {"input_arg": "test_value"},
+        "steps": [
+            {
+                "name": "setup_step",
+                "task": "python_code",
+                "inputs": {"code": "result = {'data': 123}"},
+            },
+            {
+                "name": "print_context",
+                "task": "print_vars",
+                "inputs": {"message": "Debug Context"},
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    status = engine.run()
+    assert status["status"] == "completed"
+    captured = capsys.readouterr()
+    assert "--- Debug Context ---" in captured.out
+    assert "Workflow Variables:" in captured.out
+    assert "args: {'input_arg': 'test_value'}" in captured.out
+    assert "Step Results:" in captured.out
+    # Check key components of the step result representation
+    # More robust to formatting changes from pprint
+    assert "'setup_step':" in captured.out
+    assert "'result':" in captured.out
+    assert "'data': 123" in captured.out
+    assert status["outputs"]["print_context"]["result"]["success"] is True
