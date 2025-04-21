@@ -69,13 +69,16 @@ steps:
         mkdir -p output # Ensure output directory exists
         # Read from the correct location (output/)
         validation_result=$(cat output/validation_result.txt) 
-        # Check if the result STARTS WITH "Valid"
-        if [[ "$validation_result" == Valid* ]]; then
-          echo "PASSED" > output/processed_validation.txt
-        else
-          # Use printf to avoid extra newline in error case if needed, echo is likely fine
-          echo "FAILED: $validation_result" > output/processed_validation.txt
-        fi
+        # Check if the result STARTS WITH "Valid" - POSIX compliant version
+        case "$validation_result" in
+          Valid*)
+            echo "PASSED" > output/processed_validation.txt
+            ;;
+          *)
+            # Use printf to avoid extra newline in error case if needed, echo is likely fine
+            echo "FAILED: $validation_result" > output/processed_validation.txt
+            ;;
+        esac
     on_error:
       action: fail
       message: "Failed to process validation result: {{ error }}"
