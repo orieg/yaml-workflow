@@ -16,12 +16,19 @@ from yaml_workflow.tasks import python_tasks
 def test_module_file(tmp_path: Path):
     """Create a dummy module file for python_function tests."""
     module_content = """
+import asyncio
+import logging
+# from yaml_workflow.tasks.config import TaskConfig # No longer needed
+
+logger = logging.getLogger(__name__)
+
 def my_func(a, b=2):
     return a * b
 
-def func_with_config(x, config):
-    # Access config details if needed (config is injected)
-    return x + config.context.get('offset', 0)
+# Renamed and simplified: no longer takes TaskConfig
+def func_with_offset(x, offset_val):
+    logger.info(f"[func_with_offset] Received x={x}, offset_val={offset_val}")
+    return x + offset_val
 
 def func_raises_error(y):
     raise ValueError(\"Intentional function error\")
@@ -102,7 +109,9 @@ def test_python_function_success(tmp_path: Path, test_module_file):
     engine = WorkflowEngine(workflow, workspace=str(tmp_path))
     status = engine.run()
     assert status["status"] == "completed"
-    assert status["outputs"]["run_func"]["result"]["result"] == 15
+    # Check the output of the run_func step
+    assert "result" in status["outputs"]["run_func"]
+    assert status["outputs"]["run_func"]["result"] == 15
 
 
 def test_python_function_missing_function(tmp_path: Path, test_module_file):
@@ -158,12 +167,12 @@ def test_python_function_bad_args(tmp_path: Path, test_module_file):
         ]
     }
     engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    # Expect WorkflowError as the engine wraps TaskExecutionError on final halt
     with pytest.raises(WorkflowError) as e:
         engine.run()
-    # Error message depends on Python version, check for core issue
-    # assert "got an unexpected keyword argument 'c'" in str(e.value.original_error)
-    # With the current inputs, the missing required argument 'a' should be raised first.
-    assert "Missing required argument(s): a" in str(e.value.original_error)
+    # Assert on the message within the WorkflowError (should contain original reason)
+    assert "Error binding arguments for my_func" in str(e.value)
+    assert "missing a required argument: 'a'" in str(e.value)
 
 
 def test_python_function_internal_error(tmp_path: Path, test_module_file):
@@ -184,6 +193,29 @@ def test_python_function_internal_error(tmp_path: Path, test_module_file):
     with pytest.raises(WorkflowError) as e:
         engine.run()
     assert "Intentional function error" in str(e.value.original_error)
+
+
+def test_python_function_with_taskconfig(tmp_path: Path, test_module_file):
+    """Test passing context via explicit inputs."""
+    workflow = {
+        "params": {"offset": {"default": 5}},
+        "steps": [
+            {
+                "name": "run_func_config",
+                "task": "python_function",
+                "inputs": {
+                    "module": "test_module",
+                    "function": "func_with_offset",
+                    "args": [10],
+                    "kwargs": {"offset_val": "{{ args.offset }}"},
+                },
+            }
+        ],
+    }
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    status = engine.run()
+    assert status["status"] == "completed"
+    assert status["outputs"]["run_func_config"]["result"] == 15
 
 
 # === python_script Tests ===
@@ -402,3 +434,34 @@ def test_python_code_no_result_var(tmp_path: Path):
     status = engine.run()
     assert status["status"] == "completed"
     assert status["outputs"]["run_code_no_res"]["result"]["result"] is None
+
+
+# Assuming the test definition starts around line 500
+# def test_python_function_too_many_pos_args_no_varargs(...):
+#    ...
+#    with pytest.raises(WorkflowError) as e:
+#        engine.run()
+#    # Change the type expected for the original error
+#    assert isinstance(e.value.original_error, TaskExecutionError) # <<< Line 516 (approx)
+
+# Corrected version:
+
+
+def test_python_function_too_many_pos_args_no_varargs(tmp_path: Path, test_module_file):
+    workflow = {
+        "steps": [
+            {
+                "name": "run_func_fail",
+                "task": "python_function",
+                "inputs": {
+                    "module": "test_module",
+                    "function": "my_func",
+                    "args": [1, 2, 3],  # Too many positional arguments
+                },
+            }
+        ]
+    }
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    with pytest.raises(WorkflowError) as e:
+        engine.run()
+    assert isinstance(e.value.original_error, TypeError)

@@ -128,6 +128,26 @@ class WorkflowEngine:
         if not isinstance(self.workflow, dict):
             raise WorkflowError("Invalid workflow format: root must be a mapping")
 
+        # Validate top-level keys
+        allowed_keys = {
+            "name",
+            "description",
+            "params",
+            "steps",
+            "flows",
+            "settings",
+        }
+        for key in self.workflow:
+            if key not in allowed_keys:
+                # Import ConfigurationError locally to avoid circular dependency
+                from .exceptions import ConfigurationError
+
+                raise ConfigurationError(
+                    f"Unexpected top-level key '{key}' found in workflow definition. "
+                    f"Allowed keys are: {', '.join(sorted(allowed_keys))}. "
+                    f"Use the 'params' section for workflow inputs."
+                )
+
         # Validate required sections
         if not self.workflow.get("steps") and not self.workflow.get("flows"):
             raise WorkflowError(
@@ -183,19 +203,20 @@ class WorkflowEngine:
         params = self.workflow.get("params", {})
         for param_name, param_config in params.items():
             if isinstance(param_config, dict) and "default" in param_config:
-                # Store in both root (backward compatibility) and args namespace
+                # Store ONLY in args namespace
                 default_value = param_config["default"]
-                self.context[param_name] = default_value
+                # self.context[param_name] = default_value  # REMOVED for consistency
                 self.context["args"][param_name] = default_value
             elif isinstance(param_config, dict):
                 # Handle case where param is defined but no default
                 self.context["args"][param_name] = None
             else:
                 # Handle simple parameter definition
-                self.context[param_name] = param_config
+                # self.context[param_name] = param_config # REMOVED for consistency
                 self.context["args"][param_name] = param_config
 
         # If there's existing state, restore step outputs to context
+        # NOTE: This section might need review if old state files relied on root context params
         if self.state.metadata.get("execution_state", {}).get("step_outputs"):
             step_outputs = self.state.metadata["execution_state"]["step_outputs"]
             for step_name, outputs in step_outputs.items():

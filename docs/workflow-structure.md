@@ -93,14 +93,38 @@ stateDiagram-v2
 
 ## Variable Access
 
-The workflow engine uses a namespaced approach for variable access:
+The workflow engine uses a namespaced approach for variable access. It's important to distinguish between the definition of parameters and their runtime access:
 
+- **`params:` Block (YAML Definition):**
+  - Located at the top level of your workflow YAML.
+  - Used to *define* the parameters your workflow expects, including their type, description, default values, and whether they are required.
+  - Example:
+    ```yaml
+    params:
+      input_file:
+        description: Input file path
+        type: string
+        required: true
+      batch_size:
+        description: Number of items to process at once
+        type: integer
+        default: 10
+    ```
+
+- **Runtime Namespaces (Template Access):**
+  - **`args`**: Provides the *resolved runtime values* of parameters defined in the `params:` block, after merging with any overrides provided via the command line (using `name=value` format). Use `{{ args.PARAM_NAME }}` to access these values in templates.
+  - **`env`**: Accesses environment variables (`{{ env.VAR_NAME }}`).
+  - **`steps`**: Accesses outputs from previous steps (`{{ steps.STEP_NAME.result }}` or `{{ steps.STEP_NAME.result.KEY }}`).
+  - **`workflow`**: Provides workflow-level information (`{{ workflow.workspace }}`, `{{ workflow.run_id }}`).
+  - (Other namespaces like `batch`, `current` exist for specific contexts).
+
+Example Template Access:
 ```yaml
 steps:
   - name: process
     task: python
-    params:
-      # Access workflow parameters
+    params: # Note: 'params' under a step are task-specific inputs, not the workflow params
+      # Access workflow parameters' runtime values via args namespace
       input_file: "{{ args.input_file }}"
       batch_size: "{{ args.batch_size }}"
       
@@ -108,7 +132,7 @@ steps:
       api_url: "{{ env.API_URL }}"
       debug: "{{ env.DEBUG }}"
       
-      # Access step outputs
+      # Access step outputs (standardized)
       data: "{{ steps.transform.result }}"
       metadata: "{{ steps.transform.result.metadata }}"
       

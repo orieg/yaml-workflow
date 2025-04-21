@@ -49,12 +49,14 @@ params:
 steps:
   - name: step1
     task: template
-    template: "Value is {{ input_value }}"
-    output: output.txt
+    inputs:
+      template: "Value is {{ args.input_value }}"
+      output_file: output.txt
 
   - name: step2
     task: shell
-    command: "echo 'Processing {{ input_value }}'"
+    inputs:
+      command: "echo 'Processing {{ args.input_value }}' > shell_output.txt"
 """
     workflow_file = temp_workspace / "workflow.yaml"
     workflow_file.write_text(content)

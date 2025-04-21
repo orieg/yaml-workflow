@@ -5,11 +5,18 @@ import pytest
 
 from yaml_workflow.engine import WorkflowEngine
 from yaml_workflow.exceptions import (
+    ConfigurationError,
+    FlowError,
     FlowNotFoundError,
+    FunctionNotFoundError,
     InvalidFlowDefinitionError,
+    StepExecutionError,
     StepNotInFlowError,
+    TaskExecutionError,
+    TemplateError,
     WorkflowError,
 )
+from yaml_workflow.state import WorkflowState
 from yaml_workflow.tasks import TaskConfig, register_task
 
 
@@ -27,12 +34,12 @@ steps:
   - name: step1
     task: echo
     inputs:
-      message: "Hello {{ param1 }}"
+      message: "Hello {{ args.param1 }}"
   
   - name: step2
     task: echo
     inputs:
-      message: "Hello {{ param2 }}"
+      message: "Hello {{ args.param2 }}"
 
 flows:
   definitions:
@@ -60,7 +67,7 @@ steps:
   - name: step1
     task: echo
     inputs:
-      message: "Hello {{ param1 }}"
+      message: "Hello {{ args.param1 }}"
   
   - name: step2
     task: fail
@@ -82,10 +89,10 @@ flows:
 def test_workflow_initialization(temp_workflow_file):
     engine = WorkflowEngine(str(temp_workflow_file))
     assert engine.name == "test_workflow"
-    assert "param1" in engine.context
-    assert engine.context["param1"] == "value1"
-    assert "param2" in engine.context
-    assert engine.context["param2"] == "value2"
+    assert "param1" in engine.context["args"]
+    assert engine.context["args"]["param1"] == "value1"
+    assert "param2" in engine.context["args"]
+    assert engine.context["args"]["param2"] == "value2"
 
 
 def test_workflow_invalid_file():
@@ -578,9 +585,10 @@ def test_basic_task_create_greeting(tmp_path):
     # create_greeting(name: str, context: Dict[str, Any]) -> str
     # The TaskConfig provides the context implicitly based on the second param name.
     workflow = {
-        "params": {"user": "Alice"},
-        "context": {  # Top-level context for the task to access
-            "system_message": "Welcome to the system."
+        "params": {
+            "user": "Alice",
+            # Define other initial values here if needed
+            "system_message": "Welcome to the system.",
         },
         "steps": [
             {
@@ -605,3 +613,21 @@ def test_basic_task_create_greeting(tmp_path):
     assert result["outputs"]["step_greet"]["result"] == "Hello Alice!"
 
     # Check context propagation (Optional - depends on task needs)
+
+
+def test_execute_workflow_step_failure(temp_workspace, failed_workflow_file):
+    """Test executing a workflow where a step fails using the 'fail' task."""
+    engine = WorkflowEngine(failed_workflow_file)
+    with pytest.raises(WorkflowError) as excinfo:
+        engine.run()
+    # Check that the error message indicates halting at step2 due to the fail task
+    assert "Workflow halted at step 'step2'" in str(excinfo.value)
+    assert "This step always fails" in str(excinfo.value)
+
+
+def test_get_task_func_invalid_module():
+    pass
+
+
+def test_get_task_func_invalid_function():
+    pass

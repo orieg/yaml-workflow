@@ -140,13 +140,13 @@
     - Remove the previous logic that stored dictionaries directly.
 
 2. **[x] Task Review & Update (`tasks/`)**: 
-    - Review built-in tasks to confirm their return values (single values or dictionaries) are appropriate for being stored under the `result` key. (Implicitly done for echo/shell via examples/tests, file tasks refactored).
+    - Review built-in tasks to confirm their return values (single values or dictionaries) are appropriate for being stored under the `result` key. (Implicitly done for echo/shell via examples/tests, file tasks refactored, python tasks updated).
 
 3. **[x] Update Examples (`src/yaml_workflow/examples/`)**: 
-    - Modify all example YAML files to access previous step outputs *exclusively* using the `{{ steps.STEP_NAME.result }}` or `{{ steps.STEP_NAME.result.KEY }}` pattern. (Done for complex_flow_error_handling, advanced_hello_world).
+    - Modify all example YAML files to access previous step outputs *exclusively* using the `{{ steps.STEP_NAME.result }}` or `{{ steps.STEP_NAME.result.KEY }}` pattern. (Done for complex_flow_error_handling, advanced_hello_world, python_tasks.yaml. Other examples might need review if they use deprecated patterns).
 
 4. **[x] Add/Update Tests (`tests/`)**: 
-    - Add/Update tests verifying that results are correctly stored and accessible via `steps.STEP_NAME.result` or `steps.STEP_NAME.result.KEY`. (Done for complex_flow_error_handling, advanced_hello_world, file_tasks tests).
+    - Add/Update tests verifying that results are correctly stored and accessible via `steps.STEP_NAME.result` or `steps.STEP_NAME.result.KEY`. (Done for complex_flow_error_handling, advanced_hello_world, file_tasks tests, new_python_tasks tests).
     - Ensure no tests rely on direct access like `steps.STEP_NAME.KEY`.
 
 ### Phase 3: Documentation Enhancement (Renumbered)
@@ -189,24 +189,22 @@
 
 4. **[~] Improve overall test coverage and fix existing issues**
     - Run `pytest --cov=src/yaml_workflow --cov-report term-missing` to check coverage.
-    - Current overall coverage **88%** (up from 79%). `batch_context.py` at 100%. `step.py` at 100%. `exceptions.py` at 98%.
-    - *(Progress: Added tests for `runner.py`, significantly improving its coverage. Fixed existing issue in `test_exceptions.py` contributing to 98% coverage for `exceptions.py`).*
-    - Identify and test uncovered code paths. Key areas still needing significant improvement:
-        - `src/yaml_workflow/template.py` (73%)
-        - `src/yaml_workflow/tasks/basic_tasks.py` (76%)
-        - `src/yaml_workflow/workspace.py` (80%)
+    - Current overall coverage **88%** (as of 2025-04-21 after namespace/engine fixes).
+    - *(Progress: Added tests for `runner.py`, fixed `test_exceptions.py`, added tests for `template.py`. Fixed specific Python tasks & tests (`test_new_python_tasks.py`), resolved template task input issues (`test_template_tasks.py`), fixed engine tests (`test_engine.py`) and invalid flow tests (`test_workflow_invalid_flow.py`) related to namespace changes and error handling. `workspace.py` improved. Added missing import in `python_tasks.py` based on mypy.)*
+    - Identify and test uncovered code paths. Key areas still needing significant improvement based on last coverage report:
+        - `src/yaml_workflow/engine.py` (84%)
         - `src/yaml_workflow/tasks/python_tasks.py` (81%)
         - `src/yaml_workflow/tasks/file_tasks.py` (83%)
-        - `src/yaml_workflow/engine.py` (84%)
+        - `src/yaml_workflow/template.py` (83%)
         - `src/yaml_workflow/state.py` (87%)
         - `src/yaml_workflow/utils/yaml_utils.py` (88%)
         - `src/yaml_workflow/tasks/__init__.py` (91%)
-        - `src/yaml_workflow/tasks/template_tasks.py` (91%)
         - `src/yaml_workflow/tasks/shell_tasks.py` (91%)
         - `src/yaml_workflow/tasks/noop.py` (92%)
         - `src/yaml_workflow/cli.py` (92%)
         - `src/yaml_workflow/tasks/batch.py` (94%)
         - `src/yaml_workflow/tasks/config.py` (94%)
+        - `src/yaml_workflow/tasks/template_tasks.py` (94% - improved)
     - Aim for a target coverage percentage (e.g., 90%).
     - *(Note: Performance testing moved to `.github/PERFORMANCE_TESTING_PLAN.md`)*
 
@@ -354,8 +352,8 @@ pytest
 
 - [~] 5. **Testing Enhancement Phase** (Renumbered - excluding work already done in examples)
    Implementation Order:
-   - [~] 1. Review and improve overall test coverage. (Progress: Coverage increased to 87%. `shell_tasks.py` at 91%, `python_tasks.py` at 81%. Key modules identified.)
-   - [ ] 2. Run coverage checks (`pytest --cov`). (Done, see results above)
+   - [~] 1. Review and improve overall test coverage. (Progress: Overall 87%. Key modules identified: python_tasks 77%, file_tasks 83%, template 83%, engine 84%, state 87%.)
+   - [x] 2. Run coverage checks (`pytest --cov`). (Done, results recorded above).
    Success Criteria:
    - Added tests cover remaining gaps. Target 90% overall.
 

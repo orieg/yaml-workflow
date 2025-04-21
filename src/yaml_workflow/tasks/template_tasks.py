@@ -12,7 +12,7 @@ from jinja2 import (
     UndefinedError,
 )
 
-from ..exceptions import TemplateError
+from ..exceptions import TaskExecutionError, TemplateError
 from . import TaskConfig, register_task
 from .base import get_task_logger, log_task_execution, log_task_result
 from .error_handling import ErrorContext, handle_task_error
@@ -47,38 +47,38 @@ def render_template(config: TaskConfig) -> Dict[str, Any]:
         if not template_str or not isinstance(template_str, str):
             raise ValueError("Input 'template' must be a non-empty string")
 
-        output_file = raw_inputs.get("output")
-        if not output_file or not isinstance(output_file, str):
-            raise ValueError("Input 'output' must be a non-empty string")
+        # Correctly get the output file path using 'output_file' key
+        output_file_rel_path = raw_inputs.get("output_file")
+        if not output_file_rel_path or not isinstance(output_file_rel_path, str):
+            raise ValueError("Input 'output_file' must be a non-empty string")
 
-        # Get the shared template engine from config
-        template_engine = config._template_engine
+        # Resolve the full output path relative to the workspace
+        output_path = config.workspace / output_file_rel_path
 
-        # Render template using the engine, providing the workspace as searchpath
-        # Pass the full context for rendering
-        rendered = template_engine.process_template(
+        # Ensure parent directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Resolve the template content using the engine
+        # Pass workspace as searchpath to allow includes
+        resolved_content = config._template_engine.process_template(
             template_str,
-            variables=config._context,  # Pass the full context
-            searchpath=str(config.workspace),  # Enable includes relative to workspace
+            config._context,
+            searchpath=str(config.workspace),  # Pass workspace for includes
         )
 
-        # Save to file (use the raw output_file path)
-        output_path = config.workspace / output_file
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(rendered)
+        # Write the resolved content to the output file
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(resolved_content)
 
-        result = {"output_path": str(output_path)}
-        log_task_result(logger, result)
-        return result
+        log_task_result(logger, str(output_path))
+        return {"path": str(output_path)}
 
     except Exception as e:
-        # Centralized error handling
-        context = ErrorContext(
-            step_name=task_name,
-            task_type=task_type,
-            error=e,
-            task_config=config.step,
-            template_context=config._context,
+        # Use a centralized error handler if available, otherwise raise TaskExecutionError
+        # Assuming handle_task_error exists (replace if necessary)
+        # handle_task_error(task_name, e, config)
+        # Fallback if no central handler:
+        logger.error(f"Task '{task_name}' failed: {str(e)}", exc_info=True)
+        raise TaskExecutionError(
+            step_name=task_name, original_error=e, task_config=config.step
         )
-        handle_task_error(context)
-        return {}  # Unreachable

@@ -1698,7 +1698,15 @@
 <span class="normal"><a href="#__codelineno-0-222">222</a></span>
 <span class="normal"><a href="#__codelineno-0-223">223</a></span>
 <span class="normal"><a href="#__codelineno-0-224">224</a></span>
-<span class="normal"><a href="#__codelineno-0-225">225</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="k">def</span><span class="w"> </span><span class="nf">run_workflow</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-225">225</a></span>
+<span class="normal"><a href="#__codelineno-0-226">226</a></span>
+<span class="normal"><a href="#__codelineno-0-227">227</a></span>
+<span class="normal"><a href="#__codelineno-0-228">228</a></span>
+<span class="normal"><a href="#__codelineno-0-229">229</a></span>
+<span class="normal"><a href="#__codelineno-0-230">230</a></span>
+<span class="normal"><a href="#__codelineno-0-231">231</a></span>
+<span class="normal"><a href="#__codelineno-0-232">232</a></span>
+<span class="normal"><a href="#__codelineno-0-233">233</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-20" name="__codelineno-0-20"></a><span class="k">def</span><span class="w"> </span><span class="nf">run_workflow</span><span class="p">(</span>
 <a id="__codelineno-0-21" name="__codelineno-0-21"></a>    <span class="n">workflow_file</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span><span class="p">,</span>
 <a id="__codelineno-0-22" name="__codelineno-0-22"></a>    <span class="n">args</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <a id="__codelineno-0-23" name="__codelineno-0-23"></a>    <span class="n">workspace_dir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -1849,61 +1857,69 @@
 <a id="__codelineno-0-168" name="__codelineno-0-168"></a>                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
 <a id="__codelineno-0-169" name="__codelineno-0-169"></a>                    <span class="sa">f</span><span class="s2">&quot;Template error in step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span>
 <a id="__codelineno-0-170" name="__codelineno-0-170"></a>                <span class="p">)</span>
-<a id="__codelineno-0-171" name="__codelineno-0-171"></a>                <span class="n">final_status</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
-<a id="__codelineno-0-172" name="__codelineno-0-172"></a>                <span class="k">if</span> <span class="n">final_status</span><span class="p">[</span><span class="s2">&quot;success&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
-<a id="__codelineno-0-173" name="__codelineno-0-173"></a>                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-<a id="__codelineno-0-174" name="__codelineno-0-174"></a>                        <span class="sa">f</span><span class="s2">&quot;Workflow aborted due to error in step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
-<a id="__codelineno-0-175" name="__codelineno-0-175"></a>                    <span class="p">)</span>
-<a id="__codelineno-0-176" name="__codelineno-0-176"></a>                    <span class="k">break</span>  <span class="c1"># Stop workflow execution</span>
-<a id="__codelineno-0-177" name="__codelineno-0-177"></a>                <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-178" name="__codelineno-0-178"></a>                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-<a id="__codelineno-0-179" name="__codelineno-0-179"></a>                        <span class="sa">f</span><span class="s2">&quot;Error handled in step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39;, continuing workflow...&quot;</span>
-<a id="__codelineno-0-180" name="__codelineno-0-180"></a>                    <span class="p">)</span>
-<a id="__codelineno-0-181" name="__codelineno-0-181"></a>                    <span class="n">context</span><span class="p">[</span><span class="s2">&quot;steps&quot;</span><span class="p">][</span><span class="n">step_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-182" name="__codelineno-0-182"></a>                        <span class="s2">&quot;skipped&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-<a id="__codelineno-0-183" name="__codelineno-0-183"></a>                        <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span>
-<a id="__codelineno-0-184" name="__codelineno-0-184"></a>                        <span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-185" name="__codelineno-0-185"></a>                    <span class="p">}</span>  <span class="c1"># Mark error but continue</span>
-<a id="__codelineno-0-186" name="__codelineno-0-186"></a>
-<a id="__codelineno-0-187" name="__codelineno-0-187"></a>            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-0-188" name="__codelineno-0-188"></a>                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error executing step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-0-189" name="__codelineno-0-189"></a>                <span class="n">final_status</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
-<a id="__codelineno-0-190" name="__codelineno-0-190"></a>                <span class="k">if</span> <span class="n">final_status</span><span class="p">[</span><span class="s2">&quot;success&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
-<a id="__codelineno-0-191" name="__codelineno-0-191"></a>                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
-<a id="__codelineno-0-192" name="__codelineno-0-192"></a>                        <span class="sa">f</span><span class="s2">&quot;Workflow aborted due to error in step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
-<a id="__codelineno-0-193" name="__codelineno-0-193"></a>                    <span class="p">)</span>
-<a id="__codelineno-0-194" name="__codelineno-0-194"></a>                    <span class="k">break</span>  <span class="c1"># Stop workflow execution</span>
-<a id="__codelineno-0-195" name="__codelineno-0-195"></a>                <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-196" name="__codelineno-0-196"></a>                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-<a id="__codelineno-0-197" name="__codelineno-0-197"></a>                        <span class="sa">f</span><span class="s2">&quot;Error handled in step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39;, continuing workflow...&quot;</span>
-<a id="__codelineno-0-198" name="__codelineno-0-198"></a>                    <span class="p">)</span>
-<a id="__codelineno-0-199" name="__codelineno-0-199"></a>                    <span class="n">context</span><span class="p">[</span><span class="s2">&quot;steps&quot;</span><span class="p">][</span><span class="n">step_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-200" name="__codelineno-0-200"></a>                        <span class="s2">&quot;skipped&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
-<a id="__codelineno-0-201" name="__codelineno-0-201"></a>                        <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span>
-<a id="__codelineno-0-202" name="__codelineno-0-202"></a>                        <span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-203" name="__codelineno-0-203"></a>                    <span class="p">}</span>  <span class="c1"># Mark error but continue</span>
-<a id="__codelineno-0-204" name="__codelineno-0-204"></a>
-<a id="__codelineno-0-205" name="__codelineno-0-205"></a>            <span class="k">finally</span><span class="p">:</span>
-<a id="__codelineno-0-206" name="__codelineno-0-206"></a>                <span class="k">del</span> <span class="n">context</span><span class="p">[</span><span class="s2">&quot;current_step&quot;</span><span class="p">]</span>  <span class="c1"># Clean up current step context</span>
-<a id="__codelineno-0-207" name="__codelineno-0-207"></a>
-<a id="__codelineno-0-208" name="__codelineno-0-208"></a>        <span class="k">if</span> <span class="n">final_status</span><span class="p">[</span><span class="s2">&quot;success&quot;</span><span class="p">]:</span>
-<a id="__codelineno-0-209" name="__codelineno-0-209"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Workflow finished successfully.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-210" name="__codelineno-0-210"></a>        <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-211" name="__codelineno-0-211"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Workflow finished with errors: </span><span class="si">{</span><span class="n">final_status</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-171" name="__codelineno-0-171"></a>                <span class="n">step_error_status</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+<a id="__codelineno-0-172" name="__codelineno-0-172"></a>                <span class="k">if</span> <span class="n">step_error_status</span><span class="p">[</span><span class="s2">&quot;success&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+<a id="__codelineno-0-173" name="__codelineno-0-173"></a>                    <span class="c1"># Only update final_status and break if action was &#39;fail&#39;</span>
+<a id="__codelineno-0-174" name="__codelineno-0-174"></a>                    <span class="n">final_status</span> <span class="o">=</span> <span class="n">step_error_status</span>
+<a id="__codelineno-0-175" name="__codelineno-0-175"></a>                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+<a id="__codelineno-0-176" name="__codelineno-0-176"></a>                        <span class="sa">f</span><span class="s2">&quot;Workflow aborted due to error in step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+<a id="__codelineno-0-177" name="__codelineno-0-177"></a>                    <span class="p">)</span>
+<a id="__codelineno-0-178" name="__codelineno-0-178"></a>                    <span class="k">break</span>
+<a id="__codelineno-0-179" name="__codelineno-0-179"></a>                <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-180" name="__codelineno-0-180"></a>                    <span class="c1"># Action was &#39;continue&#39;, log warning but don&#39;t change final_status message</span>
+<a id="__codelineno-0-181" name="__codelineno-0-181"></a>                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+<a id="__codelineno-0-182" name="__codelineno-0-182"></a>                        <span class="sa">f</span><span class="s2">&quot;Step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39; failed but workflow continues: </span><span class="si">{</span><span class="n">step_error_status</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-0-183" name="__codelineno-0-183"></a>                    <span class="p">)</span>
+<a id="__codelineno-0-184" name="__codelineno-0-184"></a>                    <span class="n">context</span><span class="p">[</span><span class="s2">&quot;steps&quot;</span><span class="p">][</span><span class="n">step_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-185" name="__codelineno-0-185"></a>                        <span class="s2">&quot;skipped&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-0-186" name="__codelineno-0-186"></a>                        <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span>  <span class="c1"># Log the original error for the step</span>
+<a id="__codelineno-0-187" name="__codelineno-0-187"></a>                        <span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-188" name="__codelineno-0-188"></a>                    <span class="p">}</span>
+<a id="__codelineno-0-189" name="__codelineno-0-189"></a>                    <span class="c1"># Keep final_status[&#39;success&#39;] = True and original message</span>
+<a id="__codelineno-0-190" name="__codelineno-0-190"></a>
+<a id="__codelineno-0-191" name="__codelineno-0-191"></a>            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-0-192" name="__codelineno-0-192"></a>                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error executing step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-0-193" name="__codelineno-0-193"></a>                <span class="n">step_error_status</span> <span class="o">=</span> <span class="n">step</span><span class="o">.</span><span class="n">handle_error</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+<a id="__codelineno-0-194" name="__codelineno-0-194"></a>                <span class="k">if</span> <span class="n">step_error_status</span><span class="p">[</span><span class="s2">&quot;success&quot;</span><span class="p">]</span> <span class="ow">is</span> <span class="kc">False</span><span class="p">:</span>
+<a id="__codelineno-0-195" name="__codelineno-0-195"></a>                    <span class="c1"># Only update final_status and break if action was &#39;fail&#39;</span>
+<a id="__codelineno-0-196" name="__codelineno-0-196"></a>                    <span class="n">final_status</span> <span class="o">=</span> <span class="n">step_error_status</span>
+<a id="__codelineno-0-197" name="__codelineno-0-197"></a>                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span>
+<a id="__codelineno-0-198" name="__codelineno-0-198"></a>                        <span class="sa">f</span><span class="s2">&quot;Workflow aborted due to error in step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39;.&quot;</span>
+<a id="__codelineno-0-199" name="__codelineno-0-199"></a>                    <span class="p">)</span>
+<a id="__codelineno-0-200" name="__codelineno-0-200"></a>                    <span class="k">break</span>
+<a id="__codelineno-0-201" name="__codelineno-0-201"></a>                <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-202" name="__codelineno-0-202"></a>                    <span class="c1"># Action was &#39;continue&#39;, log warning but don&#39;t change final_status message</span>
+<a id="__codelineno-0-203" name="__codelineno-0-203"></a>                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+<a id="__codelineno-0-204" name="__codelineno-0-204"></a>                        <span class="sa">f</span><span class="s2">&quot;Step &#39;</span><span class="si">{</span><span class="n">step_name</span><span class="si">}</span><span class="s2">&#39; failed but workflow continues: </span><span class="si">{</span><span class="n">step_error_status</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-0-205" name="__codelineno-0-205"></a>                    <span class="p">)</span>
+<a id="__codelineno-0-206" name="__codelineno-0-206"></a>                    <span class="n">context</span><span class="p">[</span><span class="s2">&quot;steps&quot;</span><span class="p">][</span><span class="n">step_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-207" name="__codelineno-0-207"></a>                        <span class="s2">&quot;skipped&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-0-208" name="__codelineno-0-208"></a>                        <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">),</span>  <span class="c1"># Log the original error for the step</span>
+<a id="__codelineno-0-209" name="__codelineno-0-209"></a>                        <span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-210" name="__codelineno-0-210"></a>                    <span class="p">}</span>
+<a id="__codelineno-0-211" name="__codelineno-0-211"></a>                    <span class="c1"># Keep final_status[&#39;success&#39;] = True and original message</span>
 <a id="__codelineno-0-212" name="__codelineno-0-212"></a>
-<a id="__codelineno-0-213" name="__codelineno-0-213"></a>    <span class="c1"># Capture stdout/stderr after the context manager exits</span>
-<a id="__codelineno-0-214" name="__codelineno-0-214"></a>    <span class="n">final_status</span><span class="p">[</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stdout_capture</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
-<a id="__codelineno-0-215" name="__codelineno-0-215"></a>    <span class="n">final_status</span><span class="p">[</span><span class="s2">&quot;stderr&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stderr_capture</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
-<a id="__codelineno-0-216" name="__codelineno-0-216"></a>
-<a id="__codelineno-0-217" name="__codelineno-0-217"></a>    <span class="c1"># --- Cleanup Logging ---</span>
-<a id="__codelineno-0-218" name="__codelineno-0-218"></a>    <span class="c1"># It might be better to close/remove handlers if the runner is long-lived</span>
-<a id="__codelineno-0-219" name="__codelineno-0-219"></a>    <span class="c1"># For simple script execution, this might not be strictly necessary</span>
-<a id="__codelineno-0-220" name="__codelineno-0-220"></a>    <span class="c1"># root_logger.removeHandler(file_handler)</span>
-<a id="__codelineno-0-221" name="__codelineno-0-221"></a>    <span class="c1"># root_logger.removeHandler(console_handler)</span>
-<a id="__codelineno-0-222" name="__codelineno-0-222"></a>    <span class="c1"># file_handler.close()</span>
-<a id="__codelineno-0-223" name="__codelineno-0-223"></a>    <span class="c1"># --- End Cleanup Logging ---</span>
+<a id="__codelineno-0-213" name="__codelineno-0-213"></a>            <span class="k">finally</span><span class="p">:</span>
+<a id="__codelineno-0-214" name="__codelineno-0-214"></a>                <span class="k">del</span> <span class="n">context</span><span class="p">[</span><span class="s2">&quot;current_step&quot;</span><span class="p">]</span>  <span class="c1"># Clean up current step context</span>
+<a id="__codelineno-0-215" name="__codelineno-0-215"></a>
+<a id="__codelineno-0-216" name="__codelineno-0-216"></a>        <span class="k">if</span> <span class="n">final_status</span><span class="p">[</span><span class="s2">&quot;success&quot;</span><span class="p">]:</span>
+<a id="__codelineno-0-217" name="__codelineno-0-217"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Workflow finished successfully.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-218" name="__codelineno-0-218"></a>        <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-0-219" name="__codelineno-0-219"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Workflow finished with errors: </span><span class="si">{</span><span class="n">final_status</span><span class="p">[</span><span class="s1">&#39;message&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-220" name="__codelineno-0-220"></a>
+<a id="__codelineno-0-221" name="__codelineno-0-221"></a>    <span class="c1"># Capture stdout/stderr after the context manager exits</span>
+<a id="__codelineno-0-222" name="__codelineno-0-222"></a>    <span class="n">final_status</span><span class="p">[</span><span class="s2">&quot;stdout&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stdout_capture</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
+<a id="__codelineno-0-223" name="__codelineno-0-223"></a>    <span class="n">final_status</span><span class="p">[</span><span class="s2">&quot;stderr&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">stderr_capture</span><span class="o">.</span><span class="n">getvalue</span><span class="p">()</span>
 <a id="__codelineno-0-224" name="__codelineno-0-224"></a>
-<a id="__codelineno-0-225" name="__codelineno-0-225"></a>    <span class="k">return</span> <span class="n">final_status</span>
+<a id="__codelineno-0-225" name="__codelineno-0-225"></a>    <span class="c1"># --- Cleanup Logging ---</span>
+<a id="__codelineno-0-226" name="__codelineno-0-226"></a>    <span class="c1"># It might be better to close/remove handlers if the runner is long-lived</span>
+<a id="__codelineno-0-227" name="__codelineno-0-227"></a>    <span class="c1"># For simple script execution, this might not be strictly necessary</span>
+<a id="__codelineno-0-228" name="__codelineno-0-228"></a>    <span class="c1"># root_logger.removeHandler(file_handler)</span>
+<a id="__codelineno-0-229" name="__codelineno-0-229"></a>    <span class="c1"># root_logger.removeHandler(console_handler)</span>
+<a id="__codelineno-0-230" name="__codelineno-0-230"></a>    <span class="c1"># file_handler.close()</span>
+<a id="__codelineno-0-231" name="__codelineno-0-231"></a>    <span class="c1"># --- End Cleanup Logging ---</span>
+<a id="__codelineno-0-232" name="__codelineno-0-232"></a>
+<a id="__codelineno-0-233" name="__codelineno-0-233"></a>    <span class="k">return</span> <span class="n">final_status</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

@@ -205,3 +205,9 @@ class TemplateError(WorkflowError):
 
     def __init__(self, message: str, original_error: Optional[Exception] = None):
         super().__init__(f"Template error: {message}", original_error=original_error)
+
+
+class ConfigurationError(WorkflowError):
+    """Raised when workflow configuration is invalid or inconsistent."""
+
+    pass  # Simple inheritance is often sufficient

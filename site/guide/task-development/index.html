@@ -1429,6 +1429,7 @@
 <li><strong>Task Registration</strong>: Use the <code>@register_task("your_task_name")</code> decorator to make your task available in workflow YAML files.</li>
 <li><strong>Type Safety</strong>: Utilize Python type hints for function arguments and return values to improve clarity and enable static analysis.</li>
 <li><strong>Logging</strong>: Use <code>get_task_logger</code> from <code>yaml_workflow.tasks.base</code> to get a logger specific to the task instance.</li>
+<li><strong>Path Handling</strong>: If your task deals with file paths provided in <code>inputs</code>, use the <code>config.workspace</code> attribute and standard <code>pathlib</code> operations (<code>config.workspace / relative_path</code>) to resolve paths. Assume relative paths are relative to the workspace root. Avoid hardcoding subdirectories like <code>output/</code> unless intrinsic to the task's core function.</li>
 </ul>
 <h2 id="returning-results">Returning Results<a class="headerlink" href="#returning-results" title="Permanent link">&para;</a></h2>
 <p>Tasks should return the primary output they generate. This could be a single value (like a string, number, boolean) or a dictionary containing multiple related output values.</p>
