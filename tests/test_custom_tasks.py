@@ -109,10 +109,10 @@ def test_custom_task_in_workflow(custom_task_module, temp_workspace):
     result = engine.run()
 
     assert result["status"] == "completed"
-    assert result["outputs"]["custom_step"]["success"]
+    assert result["outputs"]["custom_step"]["result"]["success"]
     assert (
         "Custom task executed: Workflow message"
-        in result["outputs"]["custom_step"]["output"]
+        in result["outputs"]["custom_step"]["result"]["output"]
     )
 
 

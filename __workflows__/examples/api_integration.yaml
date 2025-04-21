@@ -1,0 +1,94 @@
+# Example workflow demonstrating API integration with rate limiting and retries
+# This workflow fetches data from multiple APIs, processes it, and updates a system
+
+name: API Integration Example
+description: Integrate with external APIs with proper rate limiting and retries
+version: "1.0"
+
+# Global API settings
+api_settings:
+  rate_limit:
+    requests_per_minute: 60
+    burst_size: 10
+  timeout: 30  # seconds
+  
+# Define environment variables needed
+environment:
+  required:
+    - API_KEY
+    - API_SECRET
+    - WEBHOOK_URL
+
+steps:
+  # Fetch data from first API with custom rate limiting
+  - name: fetch_github_data
+    task: api_clients
+    function: github_api_call
+    rate_limit:
+      requests_per_minute: 30
+    retry:
+      max_attempts: 3
+      backoff_factor: 2
+    inputs:
+      endpoint: "/repos/${org_name}/${repo_name}/issues"
+      params:
+        state: "all"
+        per_page: 100
+    outputs:
+      - github_issues
+  
+  # Fetch data from second API
+  - name: fetch_jira_data
+    task: api_clients
+    function: jira_api_call
+    rate_limit:
+      requests_per_minute: 100
+    inputs:
+      jql_query: ${jira_query}
+      fields:
+        - "summary"
+        - "status"
+        - "assignee"
+    outputs:
+      - jira_tickets
+  
+  # Process and match data from both sources
+  - name: match_issues
+    task: data_processors
+    function: match_tickets
+    inputs:
+      github_data: ${github_issues}
+      jira_data: ${jira_tickets}
+      matching_rules:
+        - "title_similarity"
+        - "reference_numbers"
+    outputs:
+      - matched_issues
+  
+  # Update third-party system via webhook
+  - name: update_dashboard
+    task: api_clients
+    function: send_webhook
+    retry:
+      max_attempts: 5
+      backoff_factor: 2
+      retry_on:
+        - 429  # Too Many Requests
+        - 503  # Service Unavailable
+    inputs:
+      url: ${WEBHOOK_URL}
+      payload: ${matched_issues}
+      method: "POST"
+    outputs:
+      - webhook_response
+  
+  # Handle any errors in the webhook call
+  - name: handle_webhook_errors
+    task: error_handlers
+    function: process_api_errors
+    condition: "${webhook_response.status_code} != 200"
+    inputs:
+      response: ${webhook_response}
+      alert_channel: "slack"
+    outputs:
+      - error_report 

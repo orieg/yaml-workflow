@@ -68,6 +68,7 @@ dependencies = [
 test = [
     "pytest>=7.0,<9.0",
     "pytest-cov>=4.0,<7.0",
+    "pytest-ordering",
     "mypy>=1.0,<2.0",
     "types-PyYAML>=6.0,<7.0",
 ]
@@ -112,4 +113,14 @@ include = '\.pyi?$'
 extend-exclude = '''
 # A regex preceded with ^/ will apply only to files and directories
 # in the root of the project.
-''' 
+'''
+
+[tool.mypy]
+exclude = ["build/", ".venv/", "site/"] # Exclude build, venv, and site directories
+mypy_path = "src"
+namespace_packages = true
+
+[tool.pytest.ini_options]
+markers = [
+    "last: mark test to run last",
+] 

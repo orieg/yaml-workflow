@@ -56,3 +56,6 @@ Thumbs.db
 runs/
 .coverage
 /workflows/
+
+# Workflow logs
+logs/

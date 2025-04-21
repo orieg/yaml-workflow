@@ -5,6 +5,7 @@ from typing import Any, Dict, Iterator, Optional, Tuple
 
 from jinja2 import Environment, StrictUndefined, Template
 from jinja2.exceptions import TemplateSyntaxError, UndefinedError
+from jinja2.loaders import FileSystemLoader
 
 from .exceptions import TemplateError
 
@@ -50,7 +51,9 @@ class TemplateEngine:
 
     def __init__(self):
         """Initialize the template engine with strict undefined behavior."""
+        # Default environment without a loader
         self.env = Environment(
+            # loader=None, # Explicitly no loader by default
             undefined=StrictUndefined,
             autoescape=False,
             trim_blocks=True,
@@ -87,7 +90,10 @@ class TemplateEngine:
         return var_name
 
     def process_template(
-        self, template_str: str, variables: Optional[Dict[str, Any]] = None
+        self,
+        template_str: str,
+        variables: Optional[Dict[str, Any]] = None,
+        searchpath: Optional[str] = None,
     ) -> Any:
         """Process a template string with the given variables.
 
@@ -95,6 +101,7 @@ class TemplateEngine:
             template_str (str): The template string to process.
             variables (Optional[Dict[str, Any]], optional): Variables to use in template processing.
                 Defaults to None.
+            searchpath (Optional[str], optional): Filesystem path for includes/extends. Defaults to None.
 
         Returns:
             Any: The processed template value, preserving the original type.
@@ -105,6 +112,18 @@ class TemplateEngine:
         try:
             # Initialize variables to empty dict if None
             vars_dict: Dict[str, Any] = variables if variables is not None else {}
+
+            # Choose environment: Create a new one if searchpath is provided
+            if searchpath:
+                env = Environment(
+                    loader=FileSystemLoader(searchpath=searchpath),
+                    undefined=StrictUndefined,
+                    autoescape=False,
+                    trim_blocks=True,
+                    lstrip_blocks=True,
+                )
+            else:
+                env = self.env  # Use default env if no searchpath
 
             # If the template is just a variable reference, try to return the raw value
             if template_str.strip().startswith("{{") and template_str.strip().endswith(
@@ -121,8 +140,8 @@ class TemplateEngine:
                     if current is not None:
                         return current
 
-            # Create a new template with the configured environment
-            template = self.env.from_string(template_str)
+            # Create a template using the chosen environment
+            template = env.from_string(template_str)
 
             # Convert variables to AttrDict for proper attribute access
             context = AttrDict(vars_dict)

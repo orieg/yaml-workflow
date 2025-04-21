@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 
+from yaml_workflow.engine import WorkflowEngine
 from yaml_workflow.exceptions import TemplateError
-from yaml_workflow.tasks import TaskConfig
+from yaml_workflow.tasks import TaskConfig, get_task_handler, register_task
 
 
 @pytest.fixture
@@ -33,6 +34,27 @@ def context_with_namespaces():
         "steps": {"previous": {"output": "success"}},
         "root_var": "root_value",
     }
+
+
+@register_task()
+def my_simple_task(value: int) -> int:
+    """A simple task for testing registration."""
+    return value * 2
+
+
+@register_task("custom_name_task")
+def another_simple_task(text: str) -> str:
+    """A task registered with a custom name."""
+    return f"Processed: {text}"
+
+
+@register_task()
+def task_with_args_and_config(message: str, config: TaskConfig) -> str:
+    """A task that takes both specific args and the config object."""
+    # The config argument is present but might not be used directly
+    # Accessing config.workspace.path as an example if needed
+    # print(f"Workspace path from config: {config.workspace.path}")
+    return f"Processed: {message}"
 
 
 def test_task_config_initialization(basic_step, context_with_namespaces, workspace):
@@ -298,3 +320,45 @@ def test_numeric_type_conversion(basic_step, context_with_namespaces, workspace)
 
     assert isinstance(numbers["negative"], int)
     assert numbers["negative"] == -1
+
+
+def test_task_registration_and_retrieval():
+    """Test that tasks are registered and can be retrieved."""
+    # Test retrieving task registered with default name
+    default_task_handler = get_task_handler("my_simple_task")
+    assert default_task_handler is not None
+    assert callable(default_task_handler)
+
+    # Test retrieving task registered with custom name
+    custom_task_handler = get_task_handler("custom_name_task")
+    assert custom_task_handler is not None
+    assert callable(custom_task_handler)
+
+    # Test retrieving a non-existent task
+    non_existent_handler = get_task_handler("non_existent_task_123")
+    assert non_existent_handler is None
+
+    # Optional: Add direct call checks if mocking TaskConfig is feasible/desired
+    # mock_config_simple = ...
+    # assert default_task_handler(mock_config_simple) == ...
+    # mock_config_custom = ...
+    # assert custom_task_handler(mock_config_custom) == ...
+
+
+def test_task_with_args_and_config_param(tmp_path):
+    """Test wrapper correctly handles tasks with both specific args and config param."""
+    workflow = {
+        "steps": [
+            {
+                "name": "step1",
+                "task": "task_with_args_and_config",
+                "inputs": {"message": "Test Message"},
+            }
+        ]
+    }
+    # Need WorkflowEngine to run the task via the wrapper
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run()
+    assert result["status"] == "completed"
+    assert "step1" in result["outputs"]
+    assert result["outputs"]["step1"]["result"] == "Processed: Test Message"

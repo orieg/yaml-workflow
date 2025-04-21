@@ -1,0 +1,130 @@
+# Complex Workflow Example: Flows and Error Handling
+name: Complex Flow and Error Handling Demo
+description: >
+  Demonstrates multiple execution flows and various error handling strategies
+  (retry, continue, next/jump) within a single workflow.
+
+params:
+  # Set to "fail" to trigger error handling in the 'flaky_step'
+  flaky_mode:
+    description: Controls the behavior of flaky_step. Set to 'fail' to force failure.
+    default: success
+  user_name:
+    description: User name for processing.
+    default: DemoUser
+
+steps:
+  # 1. Setup
+  - name: setup_workspace
+    task: shell
+    inputs:
+      command: |
+        echo "Setting up workspace..."
+        mkdir -p "output/"
+        echo "Initial data for {{ args.user_name }}" > "output/input_data.txt"
+
+  # 2. Core Step 1 - Changed to echo task to output structured data
+  - name: process_core_1
+    task: echo
+    inputs:
+      message:
+        result: "Core 1 OK"
+
+  # 3. Flaky Step - Demonstrates Retry and Error Flow Jump (next)
+  - name: flaky_step
+    task: shell
+    inputs:
+      command: |
+        echo "Attempting flaky step..."
+        if [ "{{ args.flaky_mode }}" = "fail" ]; then
+          echo "Flaky step is configured to fail!" >&2
+          # Simulate failure by exiting with non-zero code
+          exit 1
+        else
+          echo "Flaky step succeeded." >> "output/processing_log.txt"
+          echo "Flaky Success" # Output result on success
+        fi
+    outputs: flaky_result # Map stdout to this variable on success
+    on_error:
+      action: retry # Explicitly state retry action
+      retry:
+        max_attempts: 3
+        delay: 1 # Wait 1 second between retries
+      # If all retries fail, jump to the error_handler step
+      next: handle_flaky_error
+      message: "Flaky step failed after {{ retry_count }} retries: {{ error.error }}"
+
+  # 4. Optional Step - Demonstrates Continue on Error
+  - name: optional_step
+    task: shell
+    inputs:
+      command: |
+        echo "Attempting optional step..."
+        # Simulate a failure (e.g., trying to access a non-existent file)
+        cat "non_existent_file.txt"
+        echo "Optional step output (should not be reached on failure)"
+
+  # 5. Core Step 2 - Depends on Core Step 1 implicitly via log file
+  - name: process_core_2
+    task: shell
+    inputs:
+      command: |
+        echo "Processing core step 2..."
+        # process_core_1 (echo) returns {'result': 'Core 1 OK'}, stored directly
+        echo "Status from Core 1: {{ steps.process_core_1.result }}" >> "output/processing_log.txt"
+        # flaky_step (shell) returns {'stdout': ...}, stored directly
+        echo "Flaky step result (if successful): {{ steps.flaky_step.stdout | trim | default('N/A') }}" >> "output/processing_log.txt"
+        echo "Core 2 processed" >> "output/processing_log.txt"
+
+  # 6. Error Handler Step - Target for 'next' from flaky_step
+  - name: handle_flaky_error
+    task: echo # Could be a notification task, write_file, etc.
+    inputs:
+      message: |
+        --------------------------------------------------
+        ERROR HANDLED: Flaky step failed permanently.
+        Step: {{ error.step }}
+        Error: {{ error.error }}
+        Run Number: {{ run_number }}
+        User: {{ args.user_name }}
+        See logs in workspace: {{ workspace }}
+        --------------------------------------------------
+    outputs: error_handled_message
+
+  # 7. Cleanup Step - Should run in most flows
+  - name: cleanup
+    task: shell
+    inputs:
+      command: |
+        echo "Performing cleanup..."
+        # Example: list final output files
+        ls -l output/
+        echo "Cleanup finished."
+
+# Define Execution Flows
+flows:
+  default: full_run # Default flow if none specified
+
+  definitions:
+    # Flow 1: Runs all steps including optional ones
+    - full_run:
+        - setup_workspace
+        - process_core_1
+        - flaky_step # Will retry/jump on failure
+        - optional_step # Will continue on failure
+        - process_core_2
+        - cleanup
+
+    # Flow 2: Skips the optional step
+    - core_only:
+        - setup_workspace
+        - process_core_1
+        - flaky_step # Will retry/jump on failure
+        - process_core_2
+        - cleanup
+
+    # Flow 3: Explicit error handling path (also reachable via on_error.next)
+    # This flow might be run manually for diagnostics or if the main flows fail early
+    - error_path:
+        - handle_flaky_error # Directly run the handler
+        - cleanup 

@@ -1,0 +1,94 @@
+# Example workflow demonstrating data processing and transformation
+# This workflow loads data from various sources, processes it, and generates reports
+
+name: Data Processing Example
+description: Load, transform, and analyze data from multiple sources
+version: "1.0"
+
+# Global settings for data processing
+settings:
+  batch_size: 1000
+  max_memory: "2GB"
+  temp_directory: "/tmp/data_processing"
+
+# Environment variables needed for the workflow
+env:
+  DATABASE_URL: ${env:DATABASE_URL}
+  API_KEY: ${env:API_KEY}
+
+steps:
+  # Load data from multiple sources
+  - name: load_csv_data
+    task: data_loader
+    function: load_csv
+    inputs:
+      file_path: ${input_csv}
+      delimiter: ","
+      encoding: "utf-8"
+    outputs:
+      - csv_data
+
+  - name: fetch_api_data
+    task: data_loader
+    function: fetch_api
+    inputs:
+      url: ${api_endpoint}
+      headers:
+        Authorization: "Bearer ${env:API_KEY}"
+    outputs:
+      - api_data
+
+  # Clean and transform data
+  - name: clean_data
+    task: data_processor
+    function: clean_dataset
+    inputs:
+      data: 
+        - ${csv_data}
+        - ${api_data}
+      operations:
+        - remove_duplicates
+        - fill_missing_values
+        - normalize_dates
+    outputs:
+      - cleaned_data
+
+  # Perform analysis
+  - name: analyze_data
+    task: data_analyzer
+    function: run_analysis
+    inputs:
+      dataset: ${cleaned_data}
+      metrics:
+        - "mean"
+        - "median"
+        - "correlation"
+    outputs:
+      - analysis_results
+
+  # Generate visualizations
+  - name: create_visualizations
+    task: visualizer
+    function: plot_data
+    inputs:
+      data: ${cleaned_data}
+      analysis: ${analysis_results}
+      plot_types:
+        - "histogram"
+        - "scatter"
+        - "boxplot"
+    outputs:
+      - plots
+
+  # Export results
+  - name: export_results
+    task: exporter
+    function: save_results
+    inputs:
+      data: ${cleaned_data}
+      analysis: ${analysis_results}
+      plots: ${plots}
+      format: "pdf"
+      output_path: ${output_directory}
+    outputs:
+      - report_path 

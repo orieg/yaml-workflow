@@ -10,6 +10,7 @@ from ..exceptions import TemplateError
 from . import register_task
 
 
+@register_task()
 def echo(message: str) -> str:
     """
     Echo back the input message.
@@ -23,6 +24,7 @@ def echo(message: str) -> str:
     return message
 
 
+@register_task()
 def fail(message: str = "Task failed") -> None:
     """
     A task that always fails.
@@ -36,6 +38,7 @@ def fail(message: str = "Task failed") -> None:
     raise RuntimeError(message)
 
 
+@register_task()
 def hello_world(name: str = "World") -> str:
     """
     A simple hello world function.
@@ -49,6 +52,7 @@ def hello_world(name: str = "World") -> str:
     return f"Hello, {name}!"
 
 
+@register_task()
 def add_numbers(a: float, b: float) -> float:
     """
     Add two numbers together.
@@ -63,6 +67,7 @@ def add_numbers(a: float, b: float) -> float:
     return a + b
 
 
+@register_task()
 def join_strings(*strings: str, separator: str = " ") -> str:
     """
     Join multiple strings together.
@@ -77,6 +82,7 @@ def join_strings(*strings: str, separator: str = " ") -> str:
     return separator.join(strings)
 
 
+@register_task()
 def create_greeting(name: str, context: Dict[str, Any]) -> str:
     """
     Create a greeting message.
@@ -94,13 +100,5 @@ def create_greeting(name: str, context: Dict[str, Any]) -> str:
     try:
         template = Template("Hello {{ name }}!", undefined=StrictUndefined)
         return template.render(name=name, **context)
-    except UndefinedError as e:
-        available = {
-            "name": name,
-            "args": list(context["args"].keys()) if "args" in context else [],
-            "env": list(context["env"].keys()) if "env" in context else [],
-            "steps": list(context["steps"].keys()) if "steps" in context else [],
-        }
-        raise TemplateError(f"{str(e)}. Available variables: {available}")
     except Exception as e:
         raise TemplateError(f"Failed to create greeting: {str(e)}")
