@@ -131,27 +131,35 @@ def test_workflow_invalid_top_level_key():
         # does not explicitly check for these and raises different errors (or no error) later.
         # Add them back if the validation logic is enhanced.
         (
-            {"definitions": [{"flow1": "not_a_list"}]},  # flow steps value is not a list
-            "steps must be a list", # Updated message and flow name is added in error
+            {
+                "definitions": [{"flow1": "not_a_list"}]
+            },  # flow steps value is not a list
+            "steps must be a list",  # Updated message and flow name is added in error
         ),
         (
             {
                 "definitions": [{"flow1": ["non_existent_step"]}],
                 "default": "flow1",
             },  # flow step name is not in workflow steps
-            "Flow error: Step 'non_existent_step' not found in flow 'flow1'", # Updated prefix and wording
+            "Flow error: Step 'non_existent_step' not found in flow 'flow1'",  # Updated prefix and wording
         ),
         (
-            {"default": "non_existent_flow", "definitions": [{"real_flow": []}]}, # default flow not in definitions
-            "Flow error: Flow 'non_existent_flow' not found", # Updated prefix and wording
+            {
+                "default": "non_existent_flow",
+                "definitions": [{"real_flow": []}],
+            },  # default flow not in definitions
+            "Flow error: Flow 'non_existent_flow' not found",  # Updated prefix and wording
         ),
         (
-            {"default": 123, "definitions": []},  # default flow name is not a string - Added empty definitions
-            "Flow error: Flow '123' not found", # Updated: Checks existence before type
+            {
+                "default": 123,
+                "definitions": [],
+            },  # default flow name is not a string - Added empty definitions
+            "Flow error: Flow '123' not found",  # Updated: Checks existence before type
         ),
         (
-            {"definitions": [{"flow1": []}, {"flow1": []}]}, # duplicate flow name
-            "Flow error: Invalid flow 'flow1': duplicate flow name", # Updated: Includes flow name
+            {"definitions": [{"flow1": []}, {"flow1": []}]},  # duplicate flow name
+            "Flow error: Invalid flow 'flow1': duplicate flow name",  # Updated: Includes flow name
         ),
     ],
 )
@@ -172,7 +180,7 @@ def test_workflow_invalid_flow_definitions(
     with pytest.raises(WorkflowError) as exc_info:
         WorkflowEngine(workflow_dict, base_dir=tmp_path)
 
-    print(f"Actual error: {exc_info.value}") # Debug print
+    print(f"Actual error: {exc_info.value}")  # Debug print
     # Check if the expected message is part of the actual error message
     # Using 'in' for more flexible matching
     assert expected_error_msg in str(exc_info.value)
@@ -185,15 +193,15 @@ def test_workflow_invalid_flow_step_not_string(tmp_path):
     workflow_dict = {
         "name": "test-invalid-flow-step-type",
         "steps": [{"name": "step1", "task": "echo"}],
-        "flows": {
-            "definitions": [{"flow1": [123]}] # Step name is not a string
-        }
+        "flows": {"definitions": [{"flow1": [123]}]},  # Step name is not a string
     }
     with pytest.raises(StepNotInFlowError) as exc_info:
         engine = WorkflowEngine(workflow_dict, base_dir=tmp_path)
         # engine._validate_flows() # Validation happens during init
 
-    assert "Flow error: Step '123' not found in flow 'flow1'" == str(exc_info.value) # Updated prefix and wording
+    assert "Flow error: Step '123' not found in flow 'flow1'" == str(
+        exc_info.value
+    )  # Updated prefix and wording
 
 
 def test_workflow_invalid_flow(tmp_path):
@@ -763,11 +771,13 @@ def test_setup_workspace_specific_workspace_dir(tmp_path):
     # The directory might be created by the engine or expected to exist
     # Assuming create_workspace handles its creation if needed
     workflow_dict = {"name": "workspace_test_specific", "steps": []}
-    engine = WorkflowEngine(workflow_dict, workspace=str(specific_dir), base_dir=str(tmp_path))
+    engine = WorkflowEngine(
+        workflow_dict, workspace=str(specific_dir), base_dir=str(tmp_path)
+    )
     workspace_path = engine.workspace
 
     assert workspace_path.exists()
-    assert workspace_path == specific_dir # Should use the exact dir provided
+    assert workspace_path == specific_dir  # Should use the exact dir provided
     # Run number might not be inferred if a specific dir is given, check context
     # create_workspace seems to always assign a run number
     assert engine.context["run_number"] == 1
@@ -776,7 +786,7 @@ def test_setup_workspace_specific_workspace_dir(tmp_path):
 def test_setup_workspace_workflow_name_from_file(tmp_path):
     """Test workspace name inference from the workflow file name."""
     workflow_file = tmp_path / "my_workflow_file.yaml"
-    workflow_file.write_text("steps: []") # Minimal valid workflow
+    workflow_file.write_text("steps: []")  # Minimal valid workflow
     engine = WorkflowEngine(str(workflow_file), base_dir=str(tmp_path))
     workspace_path = engine.workspace
 
@@ -808,7 +818,7 @@ def test_setup_workspace_workflow_name_from_file(tmp_path):
 #         engine.run(params={"choice": "C"})
 #     assert "Invalid value 'C' for parameter 'choice'" in str(exc_info.value)
 #     assert "Allowed values: ['A', 'B']" in str(exc_info.value)
-# 
+#
 # def test_run_param_validation_min_length(tmp_path):
 #     """Test run fails if a string param is shorter than minLength."""
 #     workflow_dict = {
