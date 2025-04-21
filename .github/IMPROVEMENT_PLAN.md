@@ -189,23 +189,18 @@
 
 4. **[~] Improve overall test coverage and fix existing issues**
     - Run `pytest --cov=src/yaml_workflow --cov-report term-missing` to check coverage.
-    - Current overall coverage **88%** (as of 2025-04-21 after namespace/engine fixes).
-    - *(Progress: Added tests for `runner.py`, fixed `test_exceptions.py`, added tests for `template.py`. Fixed specific Python tasks & tests (`test_new_python_tasks.py`), resolved template task input issues (`test_template_tasks.py`), fixed engine tests (`test_engine.py`) and invalid flow tests (`test_workflow_invalid_flow.py`) related to namespace changes and error handling. `workspace.py` improved. Added missing import in `python_tasks.py` based on mypy.)*
-    - Identify and test uncovered code paths. Key areas still needing significant improvement based on last coverage report:
-        - `src/yaml_workflow/engine.py` (84%)
-        - `src/yaml_workflow/tasks/python_tasks.py` (81%)
-        - `src/yaml_workflow/tasks/file_tasks.py` (83%)
-        - `src/yaml_workflow/template.py` (83%)
-        - `src/yaml_workflow/state.py` (87%)
-        - `src/yaml_workflow/utils/yaml_utils.py` (88%)
-        - `src/yaml_workflow/tasks/__init__.py` (91%)
-        - `src/yaml_workflow/tasks/shell_tasks.py` (91%)
-        - `src/yaml_workflow/tasks/noop.py` (92%)
-        - `src/yaml_workflow/cli.py` (92%)
-        - `src/yaml_workflow/tasks/batch.py` (94%)
-        - `src/yaml_workflow/tasks/config.py` (94%)
-        - `src/yaml_workflow/tasks/template_tasks.py` (94% - improved)
-    - Aim for a target coverage percentage (e.g., 90%).
+    - Current overall coverage **89%** (as of 2025-04-21 after python_code/batch fixes).
+    - *(Progress: Added tests for `runner.py`, fixed `test_exceptions.py`, added tests for `template.py`. Fixed specific Python tasks & tests (`test_python_tasks.py`), resolved template task input issues (`test_template_tasks.py`), fixed engine tests (`test_engine.py`) and invalid flow tests (`test_workflow_invalid_flow.py`) related to namespace changes and error handling. `workspace.py` improved. Added missing import in `python_tasks.py` based on mypy. Fixed `python_code` result handling and `batch` task tests.)*
+    - Identify and test uncovered code paths. Key areas still needing attention based on last coverage report (aiming for >90%):
+        - `src/yaml_workflow/engine.py` (87%, 53 missed)
+        - `src/yaml_workflow/tasks/file_tasks.py` (83%, 56 missed)
+        - `src/yaml_workflow/tasks/python_tasks.py` (83%, 47 missed)
+        - `src/yaml_workflow/template.py` (83%, 19 missed)
+        - `src/yaml_workflow/state.py` (87%, 21 missed)
+        - `src/yaml_workflow/tasks/basic_tasks.py` (85%, 4 missed)
+        - `src/yaml_workflow/utils/yaml_utils.py` (88%, 1 missed)
+        - *(Other modules are >= 90%)*
+    - Aim for a target coverage percentage (e.g., 90-95%).
     - *(Note: Performance testing moved to `.github/PERFORMANCE_TESTING_PLAN.md`)*
 
 ### Implementation Strategy
