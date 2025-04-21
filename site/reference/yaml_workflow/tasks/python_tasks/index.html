@@ -1395,15 +1395,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#yaml_workflow.tasks.python_tasks.python_task" class="md-nav__link">
-    <span class="md-ellipsis">
-      python_task
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -2896,77 +2887,77 @@
 
             <details class="quote">
               <summary>Source code in <code>src/yaml_workflow/tasks/python_tasks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-934">934</a></span>
-<span class="normal"><a href="#__codelineno-0-935">935</a></span>
-<span class="normal"><a href="#__codelineno-0-936">936</a></span>
-<span class="normal"><a href="#__codelineno-0-937">937</a></span>
-<span class="normal"><a href="#__codelineno-0-938">938</a></span>
-<span class="normal"><a href="#__codelineno-0-939">939</a></span>
-<span class="normal"><a href="#__codelineno-0-940">940</a></span>
-<span class="normal"><a href="#__codelineno-0-941">941</a></span>
-<span class="normal"><a href="#__codelineno-0-942">942</a></span>
-<span class="normal"><a href="#__codelineno-0-943">943</a></span>
-<span class="normal"><a href="#__codelineno-0-944">944</a></span>
-<span class="normal"><a href="#__codelineno-0-945">945</a></span>
-<span class="normal"><a href="#__codelineno-0-946">946</a></span>
-<span class="normal"><a href="#__codelineno-0-947">947</a></span>
-<span class="normal"><a href="#__codelineno-0-948">948</a></span>
-<span class="normal"><a href="#__codelineno-0-949">949</a></span>
-<span class="normal"><a href="#__codelineno-0-950">950</a></span>
-<span class="normal"><a href="#__codelineno-0-951">951</a></span>
-<span class="normal"><a href="#__codelineno-0-952">952</a></span>
-<span class="normal"><a href="#__codelineno-0-953">953</a></span>
-<span class="normal"><a href="#__codelineno-0-954">954</a></span>
-<span class="normal"><a href="#__codelineno-0-955">955</a></span>
-<span class="normal"><a href="#__codelineno-0-956">956</a></span>
-<span class="normal"><a href="#__codelineno-0-957">957</a></span>
-<span class="normal"><a href="#__codelineno-0-958">958</a></span>
-<span class="normal"><a href="#__codelineno-0-959">959</a></span>
-<span class="normal"><a href="#__codelineno-0-960">960</a></span>
-<span class="normal"><a href="#__codelineno-0-961">961</a></span>
-<span class="normal"><a href="#__codelineno-0-962">962</a></span>
-<span class="normal"><a href="#__codelineno-0-963">963</a></span>
-<span class="normal"><a href="#__codelineno-0-964">964</a></span>
-<span class="normal"><a href="#__codelineno-0-965">965</a></span>
-<span class="normal"><a href="#__codelineno-0-966">966</a></span>
-<span class="normal"><a href="#__codelineno-0-967">967</a></span>
-<span class="normal"><a href="#__codelineno-0-968">968</a></span>
-<span class="normal"><a href="#__codelineno-0-969">969</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-934" name="__codelineno-0-934"></a><span class="nd">@register_task</span><span class="p">()</span>
-<a id="__codelineno-0-935" name="__codelineno-0-935"></a><span class="k">def</span><span class="w"> </span><span class="nf">python_code</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-936" name="__codelineno-0-936"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute a snippet of Python code.&quot;&quot;&quot;</span>
-<a id="__codelineno-0-937" name="__codelineno-0-937"></a>    <span class="n">task_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">&quot;python_code_task&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-938" name="__codelineno-0-938"></a>    <span class="n">task_type</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">type</span> <span class="ow">or</span> <span class="s2">&quot;python_code&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-939" name="__codelineno-0-939"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
-<a id="__codelineno-0-940" name="__codelineno-0-940"></a>
-<a id="__codelineno-0-941" name="__codelineno-0-941"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-942" name="__codelineno-0-942"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
-<a id="__codelineno-0-943" name="__codelineno-0-943"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
-<a id="__codelineno-0-944" name="__codelineno-0-944"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>
-<a id="__codelineno-0-945" name="__codelineno-0-945"></a>
-<a id="__codelineno-0-946" name="__codelineno-0-946"></a>        <span class="n">code</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;code&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-947" name="__codelineno-0-947"></a>        <span class="n">result_variable</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;result_variable&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-948" name="__codelineno-0-948"></a>
-<a id="__codelineno-0-949" name="__codelineno-0-949"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">code</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-950" name="__codelineno-0-950"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;code&#39; (string) is required.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-951" name="__codelineno-0-951"></a>        <span class="k">if</span> <span class="n">result_variable</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result_variable</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-952" name="__codelineno-0-952"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;result_variable&#39; must be a string.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-953" name="__codelineno-0-953"></a>
-<a id="__codelineno-0-954" name="__codelineno-0-954"></a>        <span class="n">result_value</span> <span class="o">=</span> <span class="n">_execute_code</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">result_variable</span><span class="p">)</span>
-<a id="__codelineno-0-955" name="__codelineno-0-955"></a>
-<a id="__codelineno-0-956" name="__codelineno-0-956"></a>        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="n">result_value</span><span class="p">}</span>
-<a id="__codelineno-0-957" name="__codelineno-0-957"></a>        <span class="n">log_task_result</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
-<a id="__codelineno-0-958" name="__codelineno-0-958"></a>        <span class="k">return</span> <span class="n">result</span>
-<a id="__codelineno-0-959" name="__codelineno-0-959"></a>
-<a id="__codelineno-0-960" name="__codelineno-0-960"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-0-961" name="__codelineno-0-961"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
-<a id="__codelineno-0-962" name="__codelineno-0-962"></a>            <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span>
-<a id="__codelineno-0-963" name="__codelineno-0-963"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
-<a id="__codelineno-0-964" name="__codelineno-0-964"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
-<a id="__codelineno-0-965" name="__codelineno-0-965"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
-<a id="__codelineno-0-966" name="__codelineno-0-966"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
-<a id="__codelineno-0-967" name="__codelineno-0-967"></a>        <span class="p">)</span>
-<a id="__codelineno-0-968" name="__codelineno-0-968"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
-<a id="__codelineno-0-969" name="__codelineno-0-969"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-803">803</a></span>
+<span class="normal"><a href="#__codelineno-0-804">804</a></span>
+<span class="normal"><a href="#__codelineno-0-805">805</a></span>
+<span class="normal"><a href="#__codelineno-0-806">806</a></span>
+<span class="normal"><a href="#__codelineno-0-807">807</a></span>
+<span class="normal"><a href="#__codelineno-0-808">808</a></span>
+<span class="normal"><a href="#__codelineno-0-809">809</a></span>
+<span class="normal"><a href="#__codelineno-0-810">810</a></span>
+<span class="normal"><a href="#__codelineno-0-811">811</a></span>
+<span class="normal"><a href="#__codelineno-0-812">812</a></span>
+<span class="normal"><a href="#__codelineno-0-813">813</a></span>
+<span class="normal"><a href="#__codelineno-0-814">814</a></span>
+<span class="normal"><a href="#__codelineno-0-815">815</a></span>
+<span class="normal"><a href="#__codelineno-0-816">816</a></span>
+<span class="normal"><a href="#__codelineno-0-817">817</a></span>
+<span class="normal"><a href="#__codelineno-0-818">818</a></span>
+<span class="normal"><a href="#__codelineno-0-819">819</a></span>
+<span class="normal"><a href="#__codelineno-0-820">820</a></span>
+<span class="normal"><a href="#__codelineno-0-821">821</a></span>
+<span class="normal"><a href="#__codelineno-0-822">822</a></span>
+<span class="normal"><a href="#__codelineno-0-823">823</a></span>
+<span class="normal"><a href="#__codelineno-0-824">824</a></span>
+<span class="normal"><a href="#__codelineno-0-825">825</a></span>
+<span class="normal"><a href="#__codelineno-0-826">826</a></span>
+<span class="normal"><a href="#__codelineno-0-827">827</a></span>
+<span class="normal"><a href="#__codelineno-0-828">828</a></span>
+<span class="normal"><a href="#__codelineno-0-829">829</a></span>
+<span class="normal"><a href="#__codelineno-0-830">830</a></span>
+<span class="normal"><a href="#__codelineno-0-831">831</a></span>
+<span class="normal"><a href="#__codelineno-0-832">832</a></span>
+<span class="normal"><a href="#__codelineno-0-833">833</a></span>
+<span class="normal"><a href="#__codelineno-0-834">834</a></span>
+<span class="normal"><a href="#__codelineno-0-835">835</a></span>
+<span class="normal"><a href="#__codelineno-0-836">836</a></span>
+<span class="normal"><a href="#__codelineno-0-837">837</a></span>
+<span class="normal"><a href="#__codelineno-0-838">838</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-803" name="__codelineno-0-803"></a><span class="nd">@register_task</span><span class="p">()</span>
+<a id="__codelineno-0-804" name="__codelineno-0-804"></a><span class="k">def</span><span class="w"> </span><span class="nf">python_code</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-0-805" name="__codelineno-0-805"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute a snippet of Python code.&quot;&quot;&quot;</span>
+<a id="__codelineno-0-806" name="__codelineno-0-806"></a>    <span class="n">task_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">&quot;python_code_task&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-807" name="__codelineno-0-807"></a>    <span class="n">task_type</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">type</span> <span class="ow">or</span> <span class="s2">&quot;python_code&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-808" name="__codelineno-0-808"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
+<a id="__codelineno-0-809" name="__codelineno-0-809"></a>
+<a id="__codelineno-0-810" name="__codelineno-0-810"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-811" name="__codelineno-0-811"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
+<a id="__codelineno-0-812" name="__codelineno-0-812"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
+<a id="__codelineno-0-813" name="__codelineno-0-813"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>
+<a id="__codelineno-0-814" name="__codelineno-0-814"></a>
+<a id="__codelineno-0-815" name="__codelineno-0-815"></a>        <span class="n">code</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;code&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-816" name="__codelineno-0-816"></a>        <span class="n">result_variable</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;result_variable&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-817" name="__codelineno-0-817"></a>
+<a id="__codelineno-0-818" name="__codelineno-0-818"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">code</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-819" name="__codelineno-0-819"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;code&#39; (string) is required.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-820" name="__codelineno-0-820"></a>        <span class="k">if</span> <span class="n">result_variable</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result_variable</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-821" name="__codelineno-0-821"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;result_variable&#39; must be a string.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-822" name="__codelineno-0-822"></a>
+<a id="__codelineno-0-823" name="__codelineno-0-823"></a>        <span class="n">result_value</span> <span class="o">=</span> <span class="n">_execute_code</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">result_variable</span><span class="p">)</span>
+<a id="__codelineno-0-824" name="__codelineno-0-824"></a>
+<a id="__codelineno-0-825" name="__codelineno-0-825"></a>        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="n">result_value</span><span class="p">}</span>
+<a id="__codelineno-0-826" name="__codelineno-0-826"></a>        <span class="n">log_task_result</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>  <span class="c1"># Log the result as a dict</span>
+<a id="__codelineno-0-827" name="__codelineno-0-827"></a>        <span class="k">return</span> <span class="n">result</span>  <span class="c1"># Return the dictionary</span>
+<a id="__codelineno-0-828" name="__codelineno-0-828"></a>
+<a id="__codelineno-0-829" name="__codelineno-0-829"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-0-830" name="__codelineno-0-830"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
+<a id="__codelineno-0-831" name="__codelineno-0-831"></a>            <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span>
+<a id="__codelineno-0-832" name="__codelineno-0-832"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
+<a id="__codelineno-0-833" name="__codelineno-0-833"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
+<a id="__codelineno-0-834" name="__codelineno-0-834"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
+<a id="__codelineno-0-835" name="__codelineno-0-835"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
+<a id="__codelineno-0-836" name="__codelineno-0-836"></a>        <span class="p">)</span>
+<a id="__codelineno-0-837" name="__codelineno-0-837"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+<a id="__codelineno-0-838" name="__codelineno-0-838"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -2989,7 +2980,133 @@
 
             <details class="quote">
               <summary>Source code in <code>src/yaml_workflow/tasks/python_tasks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-761">761</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-630">630</a></span>
+<span class="normal"><a href="#__codelineno-0-631">631</a></span>
+<span class="normal"><a href="#__codelineno-0-632">632</a></span>
+<span class="normal"><a href="#__codelineno-0-633">633</a></span>
+<span class="normal"><a href="#__codelineno-0-634">634</a></span>
+<span class="normal"><a href="#__codelineno-0-635">635</a></span>
+<span class="normal"><a href="#__codelineno-0-636">636</a></span>
+<span class="normal"><a href="#__codelineno-0-637">637</a></span>
+<span class="normal"><a href="#__codelineno-0-638">638</a></span>
+<span class="normal"><a href="#__codelineno-0-639">639</a></span>
+<span class="normal"><a href="#__codelineno-0-640">640</a></span>
+<span class="normal"><a href="#__codelineno-0-641">641</a></span>
+<span class="normal"><a href="#__codelineno-0-642">642</a></span>
+<span class="normal"><a href="#__codelineno-0-643">643</a></span>
+<span class="normal"><a href="#__codelineno-0-644">644</a></span>
+<span class="normal"><a href="#__codelineno-0-645">645</a></span>
+<span class="normal"><a href="#__codelineno-0-646">646</a></span>
+<span class="normal"><a href="#__codelineno-0-647">647</a></span>
+<span class="normal"><a href="#__codelineno-0-648">648</a></span>
+<span class="normal"><a href="#__codelineno-0-649">649</a></span>
+<span class="normal"><a href="#__codelineno-0-650">650</a></span>
+<span class="normal"><a href="#__codelineno-0-651">651</a></span>
+<span class="normal"><a href="#__codelineno-0-652">652</a></span>
+<span class="normal"><a href="#__codelineno-0-653">653</a></span>
+<span class="normal"><a href="#__codelineno-0-654">654</a></span>
+<span class="normal"><a href="#__codelineno-0-655">655</a></span>
+<span class="normal"><a href="#__codelineno-0-656">656</a></span>
+<span class="normal"><a href="#__codelineno-0-657">657</a></span>
+<span class="normal"><a href="#__codelineno-0-658">658</a></span>
+<span class="normal"><a href="#__codelineno-0-659">659</a></span>
+<span class="normal"><a href="#__codelineno-0-660">660</a></span>
+<span class="normal"><a href="#__codelineno-0-661">661</a></span>
+<span class="normal"><a href="#__codelineno-0-662">662</a></span>
+<span class="normal"><a href="#__codelineno-0-663">663</a></span>
+<span class="normal"><a href="#__codelineno-0-664">664</a></span>
+<span class="normal"><a href="#__codelineno-0-665">665</a></span>
+<span class="normal"><a href="#__codelineno-0-666">666</a></span>
+<span class="normal"><a href="#__codelineno-0-667">667</a></span>
+<span class="normal"><a href="#__codelineno-0-668">668</a></span>
+<span class="normal"><a href="#__codelineno-0-669">669</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-630" name="__codelineno-0-630"></a><span class="nd">@register_task</span><span class="p">()</span>
+<a id="__codelineno-0-631" name="__codelineno-0-631"></a><span class="k">def</span><span class="w"> </span><span class="nf">python_function</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-0-632" name="__codelineno-0-632"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute a Python function from a specified module.&quot;&quot;&quot;</span>
+<a id="__codelineno-0-633" name="__codelineno-0-633"></a>    <span class="n">task_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">&quot;python_function_task&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-634" name="__codelineno-0-634"></a>    <span class="n">task_type</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">type</span> <span class="ow">or</span> <span class="s2">&quot;python_function&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-635" name="__codelineno-0-635"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
+<a id="__codelineno-0-636" name="__codelineno-0-636"></a>
+<a id="__codelineno-0-637" name="__codelineno-0-637"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-638" name="__codelineno-0-638"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
+<a id="__codelineno-0-639" name="__codelineno-0-639"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
+<a id="__codelineno-0-640" name="__codelineno-0-640"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>  <span class="c1"># Store for helpers</span>
+<a id="__codelineno-0-641" name="__codelineno-0-641"></a>
+<a id="__codelineno-0-642" name="__codelineno-0-642"></a>        <span class="c1"># Get module/function from processed inputs</span>
+<a id="__codelineno-0-643" name="__codelineno-0-643"></a>        <span class="n">module_name</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;module&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-644" name="__codelineno-0-644"></a>        <span class="n">function_name</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;function&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-645" name="__codelineno-0-645"></a>
+<a id="__codelineno-0-646" name="__codelineno-0-646"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">module_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-647" name="__codelineno-0-647"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;module&#39; (string) is required.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-648" name="__codelineno-0-648"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">function_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">function_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-649" name="__codelineno-0-649"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;function&#39; (string) is required.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-650" name="__codelineno-0-650"></a>
+<a id="__codelineno-0-651" name="__codelineno-0-651"></a>        <span class="c1"># Load and execute</span>
+<a id="__codelineno-0-652" name="__codelineno-0-652"></a>        <span class="n">func</span> <span class="o">=</span> <span class="n">_load_function</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="n">function_name</span><span class="p">)</span>
+<a id="__codelineno-0-653" name="__codelineno-0-653"></a>        <span class="n">result_value</span> <span class="o">=</span> <span class="n">_execute_python_function</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
+<a id="__codelineno-0-654" name="__codelineno-0-654"></a>
+<a id="__codelineno-0-655" name="__codelineno-0-655"></a>        <span class="c1"># Log the result (as a dict for consistency in logs)</span>
+<a id="__codelineno-0-656" name="__codelineno-0-656"></a>        <span class="n">log_task_result</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">result</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="n">result_value</span><span class="p">})</span>
+<a id="__codelineno-0-657" name="__codelineno-0-657"></a>        <span class="c1"># Return the raw result_value, engine will wrap it</span>
+<a id="__codelineno-0-658" name="__codelineno-0-658"></a>        <span class="k">return</span> <span class="n">result_value</span>
+<a id="__codelineno-0-659" name="__codelineno-0-659"></a>
+<a id="__codelineno-0-660" name="__codelineno-0-660"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-0-661" name="__codelineno-0-661"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
+<a id="__codelineno-0-662" name="__codelineno-0-662"></a>            <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span>
+<a id="__codelineno-0-663" name="__codelineno-0-663"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
+<a id="__codelineno-0-664" name="__codelineno-0-664"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
+<a id="__codelineno-0-665" name="__codelineno-0-665"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
+<a id="__codelineno-0-666" name="__codelineno-0-666"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
+<a id="__codelineno-0-667" name="__codelineno-0-667"></a>        <span class="p">)</span>
+<a id="__codelineno-0-668" name="__codelineno-0-668"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+<a id="__codelineno-0-669" name="__codelineno-0-669"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="yaml_workflow.tasks.python_tasks.python_module" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">python_module</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span></code>
+
+<a href="#yaml_workflow.tasks.python_tasks.python_module" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Execute a Python module as a script.</p>
+
+
+            <details class="quote">
+              <summary>Source code in <code>src/yaml_workflow/tasks/python_tasks.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-736">736</a></span>
+<span class="normal"><a href="#__codelineno-0-737">737</a></span>
+<span class="normal"><a href="#__codelineno-0-738">738</a></span>
+<span class="normal"><a href="#__codelineno-0-739">739</a></span>
+<span class="normal"><a href="#__codelineno-0-740">740</a></span>
+<span class="normal"><a href="#__codelineno-0-741">741</a></span>
+<span class="normal"><a href="#__codelineno-0-742">742</a></span>
+<span class="normal"><a href="#__codelineno-0-743">743</a></span>
+<span class="normal"><a href="#__codelineno-0-744">744</a></span>
+<span class="normal"><a href="#__codelineno-0-745">745</a></span>
+<span class="normal"><a href="#__codelineno-0-746">746</a></span>
+<span class="normal"><a href="#__codelineno-0-747">747</a></span>
+<span class="normal"><a href="#__codelineno-0-748">748</a></span>
+<span class="normal"><a href="#__codelineno-0-749">749</a></span>
+<span class="normal"><a href="#__codelineno-0-750">750</a></span>
+<span class="normal"><a href="#__codelineno-0-751">751</a></span>
+<span class="normal"><a href="#__codelineno-0-752">752</a></span>
+<span class="normal"><a href="#__codelineno-0-753">753</a></span>
+<span class="normal"><a href="#__codelineno-0-754">754</a></span>
+<span class="normal"><a href="#__codelineno-0-755">755</a></span>
+<span class="normal"><a href="#__codelineno-0-756">756</a></span>
+<span class="normal"><a href="#__codelineno-0-757">757</a></span>
+<span class="normal"><a href="#__codelineno-0-758">758</a></span>
+<span class="normal"><a href="#__codelineno-0-759">759</a></span>
+<span class="normal"><a href="#__codelineno-0-760">760</a></span>
+<span class="normal"><a href="#__codelineno-0-761">761</a></span>
 <span class="normal"><a href="#__codelineno-0-762">762</a></span>
 <span class="normal"><a href="#__codelineno-0-763">763</a></span>
 <span class="normal"><a href="#__codelineno-0-764">764</a></span>
@@ -3028,35 +3145,60 @@
 <span class="normal"><a href="#__codelineno-0-797">797</a></span>
 <span class="normal"><a href="#__codelineno-0-798">798</a></span>
 <span class="normal"><a href="#__codelineno-0-799">799</a></span>
-<span class="normal"><a href="#__codelineno-0-800">800</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-761" name="__codelineno-0-761"></a><span class="nd">@register_task</span><span class="p">()</span>
-<a id="__codelineno-0-762" name="__codelineno-0-762"></a><span class="k">def</span><span class="w"> </span><span class="nf">python_function</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-763" name="__codelineno-0-763"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute a Python function from a specified module.&quot;&quot;&quot;</span>
-<a id="__codelineno-0-764" name="__codelineno-0-764"></a>    <span class="n">task_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">&quot;python_function_task&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-765" name="__codelineno-0-765"></a>    <span class="n">task_type</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">type</span> <span class="ow">or</span> <span class="s2">&quot;python_function&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-766" name="__codelineno-0-766"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
-<a id="__codelineno-0-767" name="__codelineno-0-767"></a>
-<a id="__codelineno-0-768" name="__codelineno-0-768"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-769" name="__codelineno-0-769"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
-<a id="__codelineno-0-770" name="__codelineno-0-770"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
-<a id="__codelineno-0-771" name="__codelineno-0-771"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>  <span class="c1"># Store for helpers</span>
+<span class="normal"><a href="#__codelineno-0-800">800</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-736" name="__codelineno-0-736"></a><span class="nd">@register_task</span><span class="p">()</span>
+<a id="__codelineno-0-737" name="__codelineno-0-737"></a><span class="k">def</span><span class="w"> </span><span class="nf">python_module</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-0-738" name="__codelineno-0-738"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute a Python module as a script.&quot;&quot;&quot;</span>
+<a id="__codelineno-0-739" name="__codelineno-0-739"></a>    <span class="n">task_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">&quot;python_module_task&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-740" name="__codelineno-0-740"></a>    <span class="n">task_type</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">type</span> <span class="ow">or</span> <span class="s2">&quot;python_module&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-741" name="__codelineno-0-741"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
+<a id="__codelineno-0-742" name="__codelineno-0-742"></a>
+<a id="__codelineno-0-743" name="__codelineno-0-743"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-744" name="__codelineno-0-744"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
+<a id="__codelineno-0-745" name="__codelineno-0-745"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
+<a id="__codelineno-0-746" name="__codelineno-0-746"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>
+<a id="__codelineno-0-747" name="__codelineno-0-747"></a>
+<a id="__codelineno-0-748" name="__codelineno-0-748"></a>        <span class="n">module_name</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;module&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-749" name="__codelineno-0-749"></a>        <span class="n">args</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;args&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-750" name="__codelineno-0-750"></a>        <span class="n">cwd</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cwd&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-751" name="__codelineno-0-751"></a>        <span class="n">timeout</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timeout&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-752" name="__codelineno-0-752"></a>
+<a id="__codelineno-0-753" name="__codelineno-0-753"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">module_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-754" name="__codelineno-0-754"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;module&#39; (string) is required.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-755" name="__codelineno-0-755"></a>        <span class="k">if</span> <span class="n">args</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+<a id="__codelineno-0-756" name="__codelineno-0-756"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;args&#39; must be a list of strings.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-757" name="__codelineno-0-757"></a>        <span class="k">if</span> <span class="n">cwd</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cwd</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-758" name="__codelineno-0-758"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;cwd&#39; must be a string.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-759" name="__codelineno-0-759"></a>        <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-760" name="__codelineno-0-760"></a>            <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-761" name="__codelineno-0-761"></a>                <span class="n">timeout</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">timeout</span><span class="p">)</span>
+<a id="__codelineno-0-762" name="__codelineno-0-762"></a>            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+<a id="__codelineno-0-763" name="__codelineno-0-763"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;timeout&#39; must be a number.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-764" name="__codelineno-0-764"></a>
+<a id="__codelineno-0-765" name="__codelineno-0-765"></a>        <span class="n">returncode</span><span class="p">,</span> <span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="n">_execute_module</span><span class="p">(</span>
+<a id="__codelineno-0-766" name="__codelineno-0-766"></a>            <span class="n">module_name</span><span class="o">=</span><span class="n">module_name</span><span class="p">,</span>
+<a id="__codelineno-0-767" name="__codelineno-0-767"></a>            <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">,</span>
+<a id="__codelineno-0-768" name="__codelineno-0-768"></a>            <span class="n">cwd</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span>
+<a id="__codelineno-0-769" name="__codelineno-0-769"></a>            <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+<a id="__codelineno-0-770" name="__codelineno-0-770"></a>            <span class="n">workspace</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span>  <span class="c1"># Pass workspace path</span>
+<a id="__codelineno-0-771" name="__codelineno-0-771"></a>        <span class="p">)</span>
 <a id="__codelineno-0-772" name="__codelineno-0-772"></a>
-<a id="__codelineno-0-773" name="__codelineno-0-773"></a>        <span class="c1"># Get module/function from processed inputs</span>
-<a id="__codelineno-0-774" name="__codelineno-0-774"></a>        <span class="n">module_name</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;module&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-775" name="__codelineno-0-775"></a>        <span class="n">function_name</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;function&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-776" name="__codelineno-0-776"></a>
-<a id="__codelineno-0-777" name="__codelineno-0-777"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">module_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-778" name="__codelineno-0-778"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;module&#39; (string) is required.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-779" name="__codelineno-0-779"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">function_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">function_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-780" name="__codelineno-0-780"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;function&#39; (string) is required.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-781" name="__codelineno-0-781"></a>
-<a id="__codelineno-0-782" name="__codelineno-0-782"></a>        <span class="c1"># Load and execute</span>
-<a id="__codelineno-0-783" name="__codelineno-0-783"></a>        <span class="n">func</span> <span class="o">=</span> <span class="n">_load_function</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="n">function_name</span><span class="p">)</span>
-<a id="__codelineno-0-784" name="__codelineno-0-784"></a>        <span class="n">result_value</span> <span class="o">=</span> <span class="n">_execute_python_function</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">config</span><span class="p">)</span>
-<a id="__codelineno-0-785" name="__codelineno-0-785"></a>
-<a id="__codelineno-0-786" name="__codelineno-0-786"></a>        <span class="c1"># Log the result (as a dict for consistency in logs)</span>
-<a id="__codelineno-0-787" name="__codelineno-0-787"></a>        <span class="n">log_task_result</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">result</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="n">result_value</span><span class="p">})</span>
-<a id="__codelineno-0-788" name="__codelineno-0-788"></a>        <span class="c1"># Return the raw result_value, engine will wrap it</span>
-<a id="__codelineno-0-789" name="__codelineno-0-789"></a>        <span class="k">return</span> <span class="n">result_value</span>
+<a id="__codelineno-0-773" name="__codelineno-0-773"></a>        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-774" name="__codelineno-0-774"></a>            <span class="s2">&quot;returncode&quot;</span><span class="p">:</span> <span class="n">returncode</span><span class="p">,</span>
+<a id="__codelineno-0-775" name="__codelineno-0-775"></a>            <span class="s2">&quot;stdout&quot;</span><span class="p">:</span> <span class="n">stdout</span><span class="p">,</span>
+<a id="__codelineno-0-776" name="__codelineno-0-776"></a>            <span class="s2">&quot;stderr&quot;</span><span class="p">:</span> <span class="n">stderr</span><span class="p">,</span>
+<a id="__codelineno-0-777" name="__codelineno-0-777"></a>        <span class="p">}</span>
+<a id="__codelineno-0-778" name="__codelineno-0-778"></a>
+<a id="__codelineno-0-779" name="__codelineno-0-779"></a>        <span class="c1"># Optionally raise error on non-zero exit code</span>
+<a id="__codelineno-0-780" name="__codelineno-0-780"></a>        <span class="n">check</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;check&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-0-781" name="__codelineno-0-781"></a>        <span class="k">if</span> <span class="n">check</span> <span class="ow">and</span> <span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-0-782" name="__codelineno-0-782"></a>            <span class="n">error_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Module &#39;</span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s2">&#39; failed with exit code </span><span class="si">{</span><span class="n">returncode</span><span class="si">}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">Stderr:</span><span class="se">\n</span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-0-783" name="__codelineno-0-783"></a>            <span class="c1"># Fix: Wrap the failure reason in a standard error type</span>
+<a id="__codelineno-0-784" name="__codelineno-0-784"></a>            <span class="k">raise</span> <span class="n">TaskExecutionError</span><span class="p">(</span>
+<a id="__codelineno-0-785" name="__codelineno-0-785"></a>                <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span> <span class="n">original_error</span><span class="o">=</span><span class="ne">RuntimeError</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+<a id="__codelineno-0-786" name="__codelineno-0-786"></a>            <span class="p">)</span>
+<a id="__codelineno-0-787" name="__codelineno-0-787"></a>
+<a id="__codelineno-0-788" name="__codelineno-0-788"></a>        <span class="n">log_task_result</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+<a id="__codelineno-0-789" name="__codelineno-0-789"></a>        <span class="k">return</span> <span class="n">result</span>
 <a id="__codelineno-0-790" name="__codelineno-0-790"></a>
 <a id="__codelineno-0-791" name="__codelineno-0-791"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
 <a id="__codelineno-0-792" name="__codelineno-0-792"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
@@ -3068,157 +3210,6 @@
 <a id="__codelineno-0-798" name="__codelineno-0-798"></a>        <span class="p">)</span>
 <a id="__codelineno-0-799" name="__codelineno-0-799"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
 <a id="__codelineno-0-800" name="__codelineno-0-800"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="yaml_workflow.tasks.python_tasks.python_module" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">python_module</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span></code>
-
-<a href="#yaml_workflow.tasks.python_tasks.python_module" class="headerlink" title="Permanent link">&para;</a></h4>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Execute a Python module as a script.</p>
-
-
-            <details class="quote">
-              <summary>Source code in <code>src/yaml_workflow/tasks/python_tasks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-867">867</a></span>
-<span class="normal"><a href="#__codelineno-0-868">868</a></span>
-<span class="normal"><a href="#__codelineno-0-869">869</a></span>
-<span class="normal"><a href="#__codelineno-0-870">870</a></span>
-<span class="normal"><a href="#__codelineno-0-871">871</a></span>
-<span class="normal"><a href="#__codelineno-0-872">872</a></span>
-<span class="normal"><a href="#__codelineno-0-873">873</a></span>
-<span class="normal"><a href="#__codelineno-0-874">874</a></span>
-<span class="normal"><a href="#__codelineno-0-875">875</a></span>
-<span class="normal"><a href="#__codelineno-0-876">876</a></span>
-<span class="normal"><a href="#__codelineno-0-877">877</a></span>
-<span class="normal"><a href="#__codelineno-0-878">878</a></span>
-<span class="normal"><a href="#__codelineno-0-879">879</a></span>
-<span class="normal"><a href="#__codelineno-0-880">880</a></span>
-<span class="normal"><a href="#__codelineno-0-881">881</a></span>
-<span class="normal"><a href="#__codelineno-0-882">882</a></span>
-<span class="normal"><a href="#__codelineno-0-883">883</a></span>
-<span class="normal"><a href="#__codelineno-0-884">884</a></span>
-<span class="normal"><a href="#__codelineno-0-885">885</a></span>
-<span class="normal"><a href="#__codelineno-0-886">886</a></span>
-<span class="normal"><a href="#__codelineno-0-887">887</a></span>
-<span class="normal"><a href="#__codelineno-0-888">888</a></span>
-<span class="normal"><a href="#__codelineno-0-889">889</a></span>
-<span class="normal"><a href="#__codelineno-0-890">890</a></span>
-<span class="normal"><a href="#__codelineno-0-891">891</a></span>
-<span class="normal"><a href="#__codelineno-0-892">892</a></span>
-<span class="normal"><a href="#__codelineno-0-893">893</a></span>
-<span class="normal"><a href="#__codelineno-0-894">894</a></span>
-<span class="normal"><a href="#__codelineno-0-895">895</a></span>
-<span class="normal"><a href="#__codelineno-0-896">896</a></span>
-<span class="normal"><a href="#__codelineno-0-897">897</a></span>
-<span class="normal"><a href="#__codelineno-0-898">898</a></span>
-<span class="normal"><a href="#__codelineno-0-899">899</a></span>
-<span class="normal"><a href="#__codelineno-0-900">900</a></span>
-<span class="normal"><a href="#__codelineno-0-901">901</a></span>
-<span class="normal"><a href="#__codelineno-0-902">902</a></span>
-<span class="normal"><a href="#__codelineno-0-903">903</a></span>
-<span class="normal"><a href="#__codelineno-0-904">904</a></span>
-<span class="normal"><a href="#__codelineno-0-905">905</a></span>
-<span class="normal"><a href="#__codelineno-0-906">906</a></span>
-<span class="normal"><a href="#__codelineno-0-907">907</a></span>
-<span class="normal"><a href="#__codelineno-0-908">908</a></span>
-<span class="normal"><a href="#__codelineno-0-909">909</a></span>
-<span class="normal"><a href="#__codelineno-0-910">910</a></span>
-<span class="normal"><a href="#__codelineno-0-911">911</a></span>
-<span class="normal"><a href="#__codelineno-0-912">912</a></span>
-<span class="normal"><a href="#__codelineno-0-913">913</a></span>
-<span class="normal"><a href="#__codelineno-0-914">914</a></span>
-<span class="normal"><a href="#__codelineno-0-915">915</a></span>
-<span class="normal"><a href="#__codelineno-0-916">916</a></span>
-<span class="normal"><a href="#__codelineno-0-917">917</a></span>
-<span class="normal"><a href="#__codelineno-0-918">918</a></span>
-<span class="normal"><a href="#__codelineno-0-919">919</a></span>
-<span class="normal"><a href="#__codelineno-0-920">920</a></span>
-<span class="normal"><a href="#__codelineno-0-921">921</a></span>
-<span class="normal"><a href="#__codelineno-0-922">922</a></span>
-<span class="normal"><a href="#__codelineno-0-923">923</a></span>
-<span class="normal"><a href="#__codelineno-0-924">924</a></span>
-<span class="normal"><a href="#__codelineno-0-925">925</a></span>
-<span class="normal"><a href="#__codelineno-0-926">926</a></span>
-<span class="normal"><a href="#__codelineno-0-927">927</a></span>
-<span class="normal"><a href="#__codelineno-0-928">928</a></span>
-<span class="normal"><a href="#__codelineno-0-929">929</a></span>
-<span class="normal"><a href="#__codelineno-0-930">930</a></span>
-<span class="normal"><a href="#__codelineno-0-931">931</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-867" name="__codelineno-0-867"></a><span class="nd">@register_task</span><span class="p">()</span>
-<a id="__codelineno-0-868" name="__codelineno-0-868"></a><span class="k">def</span><span class="w"> </span><span class="nf">python_module</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-869" name="__codelineno-0-869"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute a Python module as a script.&quot;&quot;&quot;</span>
-<a id="__codelineno-0-870" name="__codelineno-0-870"></a>    <span class="n">task_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">&quot;python_module_task&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-871" name="__codelineno-0-871"></a>    <span class="n">task_type</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">type</span> <span class="ow">or</span> <span class="s2">&quot;python_module&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-872" name="__codelineno-0-872"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
-<a id="__codelineno-0-873" name="__codelineno-0-873"></a>
-<a id="__codelineno-0-874" name="__codelineno-0-874"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-875" name="__codelineno-0-875"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
-<a id="__codelineno-0-876" name="__codelineno-0-876"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
-<a id="__codelineno-0-877" name="__codelineno-0-877"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>
-<a id="__codelineno-0-878" name="__codelineno-0-878"></a>
-<a id="__codelineno-0-879" name="__codelineno-0-879"></a>        <span class="n">module_name</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;module&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-880" name="__codelineno-0-880"></a>        <span class="n">args</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;args&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-881" name="__codelineno-0-881"></a>        <span class="n">cwd</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cwd&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-882" name="__codelineno-0-882"></a>        <span class="n">timeout</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timeout&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-883" name="__codelineno-0-883"></a>
-<a id="__codelineno-0-884" name="__codelineno-0-884"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">module_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-885" name="__codelineno-0-885"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;module&#39; (string) is required.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-886" name="__codelineno-0-886"></a>        <span class="k">if</span> <span class="n">args</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-<a id="__codelineno-0-887" name="__codelineno-0-887"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;args&#39; must be a list of strings.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-888" name="__codelineno-0-888"></a>        <span class="k">if</span> <span class="n">cwd</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cwd</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-889" name="__codelineno-0-889"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;cwd&#39; must be a string.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-890" name="__codelineno-0-890"></a>        <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-891" name="__codelineno-0-891"></a>            <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-892" name="__codelineno-0-892"></a>                <span class="n">timeout</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">timeout</span><span class="p">)</span>
-<a id="__codelineno-0-893" name="__codelineno-0-893"></a>            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-<a id="__codelineno-0-894" name="__codelineno-0-894"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;timeout&#39; must be a number.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-895" name="__codelineno-0-895"></a>
-<a id="__codelineno-0-896" name="__codelineno-0-896"></a>        <span class="n">returncode</span><span class="p">,</span> <span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="n">_execute_module</span><span class="p">(</span>
-<a id="__codelineno-0-897" name="__codelineno-0-897"></a>            <span class="n">module_name</span><span class="o">=</span><span class="n">module_name</span><span class="p">,</span>
-<a id="__codelineno-0-898" name="__codelineno-0-898"></a>            <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">,</span>
-<a id="__codelineno-0-899" name="__codelineno-0-899"></a>            <span class="n">cwd</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span>
-<a id="__codelineno-0-900" name="__codelineno-0-900"></a>            <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
-<a id="__codelineno-0-901" name="__codelineno-0-901"></a>            <span class="n">workspace</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span>  <span class="c1"># Pass workspace path</span>
-<a id="__codelineno-0-902" name="__codelineno-0-902"></a>        <span class="p">)</span>
-<a id="__codelineno-0-903" name="__codelineno-0-903"></a>
-<a id="__codelineno-0-904" name="__codelineno-0-904"></a>        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-905" name="__codelineno-0-905"></a>            <span class="s2">&quot;returncode&quot;</span><span class="p">:</span> <span class="n">returncode</span><span class="p">,</span>
-<a id="__codelineno-0-906" name="__codelineno-0-906"></a>            <span class="s2">&quot;stdout&quot;</span><span class="p">:</span> <span class="n">stdout</span><span class="p">,</span>
-<a id="__codelineno-0-907" name="__codelineno-0-907"></a>            <span class="s2">&quot;stderr&quot;</span><span class="p">:</span> <span class="n">stderr</span><span class="p">,</span>
-<a id="__codelineno-0-908" name="__codelineno-0-908"></a>        <span class="p">}</span>
-<a id="__codelineno-0-909" name="__codelineno-0-909"></a>
-<a id="__codelineno-0-910" name="__codelineno-0-910"></a>        <span class="c1"># Optionally raise error on non-zero exit code</span>
-<a id="__codelineno-0-911" name="__codelineno-0-911"></a>        <span class="n">check</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;check&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-<a id="__codelineno-0-912" name="__codelineno-0-912"></a>        <span class="k">if</span> <span class="n">check</span> <span class="ow">and</span> <span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-<a id="__codelineno-0-913" name="__codelineno-0-913"></a>            <span class="n">error_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Module &#39;</span><span class="si">{</span><span class="n">module_name</span><span class="si">}</span><span class="s2">&#39; failed with exit code </span><span class="si">{</span><span class="n">returncode</span><span class="si">}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">Stderr:</span><span class="se">\n</span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span>
-<a id="__codelineno-0-914" name="__codelineno-0-914"></a>            <span class="c1"># Fix: Wrap the failure reason in a standard error type</span>
-<a id="__codelineno-0-915" name="__codelineno-0-915"></a>            <span class="k">raise</span> <span class="n">TaskExecutionError</span><span class="p">(</span>
-<a id="__codelineno-0-916" name="__codelineno-0-916"></a>                <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span> <span class="n">original_error</span><span class="o">=</span><span class="ne">RuntimeError</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
-<a id="__codelineno-0-917" name="__codelineno-0-917"></a>            <span class="p">)</span>
-<a id="__codelineno-0-918" name="__codelineno-0-918"></a>
-<a id="__codelineno-0-919" name="__codelineno-0-919"></a>        <span class="n">log_task_result</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
-<a id="__codelineno-0-920" name="__codelineno-0-920"></a>        <span class="k">return</span> <span class="n">result</span>
-<a id="__codelineno-0-921" name="__codelineno-0-921"></a>
-<a id="__codelineno-0-922" name="__codelineno-0-922"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-0-923" name="__codelineno-0-923"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
-<a id="__codelineno-0-924" name="__codelineno-0-924"></a>            <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span>
-<a id="__codelineno-0-925" name="__codelineno-0-925"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
-<a id="__codelineno-0-926" name="__codelineno-0-926"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
-<a id="__codelineno-0-927" name="__codelineno-0-927"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
-<a id="__codelineno-0-928" name="__codelineno-0-928"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
-<a id="__codelineno-0-929" name="__codelineno-0-929"></a>        <span class="p">)</span>
-<a id="__codelineno-0-930" name="__codelineno-0-930"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
-<a id="__codelineno-0-931" name="__codelineno-0-931"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3241,523 +3232,129 @@
 
             <details class="quote">
               <summary>Source code in <code>src/yaml_workflow/tasks/python_tasks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-803">803</a></span>
-<span class="normal"><a href="#__codelineno-0-804">804</a></span>
-<span class="normal"><a href="#__codelineno-0-805">805</a></span>
-<span class="normal"><a href="#__codelineno-0-806">806</a></span>
-<span class="normal"><a href="#__codelineno-0-807">807</a></span>
-<span class="normal"><a href="#__codelineno-0-808">808</a></span>
-<span class="normal"><a href="#__codelineno-0-809">809</a></span>
-<span class="normal"><a href="#__codelineno-0-810">810</a></span>
-<span class="normal"><a href="#__codelineno-0-811">811</a></span>
-<span class="normal"><a href="#__codelineno-0-812">812</a></span>
-<span class="normal"><a href="#__codelineno-0-813">813</a></span>
-<span class="normal"><a href="#__codelineno-0-814">814</a></span>
-<span class="normal"><a href="#__codelineno-0-815">815</a></span>
-<span class="normal"><a href="#__codelineno-0-816">816</a></span>
-<span class="normal"><a href="#__codelineno-0-817">817</a></span>
-<span class="normal"><a href="#__codelineno-0-818">818</a></span>
-<span class="normal"><a href="#__codelineno-0-819">819</a></span>
-<span class="normal"><a href="#__codelineno-0-820">820</a></span>
-<span class="normal"><a href="#__codelineno-0-821">821</a></span>
-<span class="normal"><a href="#__codelineno-0-822">822</a></span>
-<span class="normal"><a href="#__codelineno-0-823">823</a></span>
-<span class="normal"><a href="#__codelineno-0-824">824</a></span>
-<span class="normal"><a href="#__codelineno-0-825">825</a></span>
-<span class="normal"><a href="#__codelineno-0-826">826</a></span>
-<span class="normal"><a href="#__codelineno-0-827">827</a></span>
-<span class="normal"><a href="#__codelineno-0-828">828</a></span>
-<span class="normal"><a href="#__codelineno-0-829">829</a></span>
-<span class="normal"><a href="#__codelineno-0-830">830</a></span>
-<span class="normal"><a href="#__codelineno-0-831">831</a></span>
-<span class="normal"><a href="#__codelineno-0-832">832</a></span>
-<span class="normal"><a href="#__codelineno-0-833">833</a></span>
-<span class="normal"><a href="#__codelineno-0-834">834</a></span>
-<span class="normal"><a href="#__codelineno-0-835">835</a></span>
-<span class="normal"><a href="#__codelineno-0-836">836</a></span>
-<span class="normal"><a href="#__codelineno-0-837">837</a></span>
-<span class="normal"><a href="#__codelineno-0-838">838</a></span>
-<span class="normal"><a href="#__codelineno-0-839">839</a></span>
-<span class="normal"><a href="#__codelineno-0-840">840</a></span>
-<span class="normal"><a href="#__codelineno-0-841">841</a></span>
-<span class="normal"><a href="#__codelineno-0-842">842</a></span>
-<span class="normal"><a href="#__codelineno-0-843">843</a></span>
-<span class="normal"><a href="#__codelineno-0-844">844</a></span>
-<span class="normal"><a href="#__codelineno-0-845">845</a></span>
-<span class="normal"><a href="#__codelineno-0-846">846</a></span>
-<span class="normal"><a href="#__codelineno-0-847">847</a></span>
-<span class="normal"><a href="#__codelineno-0-848">848</a></span>
-<span class="normal"><a href="#__codelineno-0-849">849</a></span>
-<span class="normal"><a href="#__codelineno-0-850">850</a></span>
-<span class="normal"><a href="#__codelineno-0-851">851</a></span>
-<span class="normal"><a href="#__codelineno-0-852">852</a></span>
-<span class="normal"><a href="#__codelineno-0-853">853</a></span>
-<span class="normal"><a href="#__codelineno-0-854">854</a></span>
-<span class="normal"><a href="#__codelineno-0-855">855</a></span>
-<span class="normal"><a href="#__codelineno-0-856">856</a></span>
-<span class="normal"><a href="#__codelineno-0-857">857</a></span>
-<span class="normal"><a href="#__codelineno-0-858">858</a></span>
-<span class="normal"><a href="#__codelineno-0-859">859</a></span>
-<span class="normal"><a href="#__codelineno-0-860">860</a></span>
-<span class="normal"><a href="#__codelineno-0-861">861</a></span>
-<span class="normal"><a href="#__codelineno-0-862">862</a></span>
-<span class="normal"><a href="#__codelineno-0-863">863</a></span>
-<span class="normal"><a href="#__codelineno-0-864">864</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-803" name="__codelineno-0-803"></a><span class="nd">@register_task</span><span class="p">()</span>
-<a id="__codelineno-0-804" name="__codelineno-0-804"></a><span class="k">def</span><span class="w"> </span><span class="nf">python_script</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-805" name="__codelineno-0-805"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute an external Python script.&quot;&quot;&quot;</span>
-<a id="__codelineno-0-806" name="__codelineno-0-806"></a>    <span class="n">task_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">&quot;python_script_task&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-807" name="__codelineno-0-807"></a>    <span class="n">task_type</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">type</span> <span class="ow">or</span> <span class="s2">&quot;python_script&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-808" name="__codelineno-0-808"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
-<a id="__codelineno-0-809" name="__codelineno-0-809"></a>
-<a id="__codelineno-0-810" name="__codelineno-0-810"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-811" name="__codelineno-0-811"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
-<a id="__codelineno-0-812" name="__codelineno-0-812"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
-<a id="__codelineno-0-813" name="__codelineno-0-813"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>
-<a id="__codelineno-0-814" name="__codelineno-0-814"></a>
-<a id="__codelineno-0-815" name="__codelineno-0-815"></a>        <span class="n">script_path_in</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;script_path&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-816" name="__codelineno-0-816"></a>        <span class="n">args</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;args&quot;</span><span class="p">)</span>  <span class="c1"># Should be list or None</span>
-<a id="__codelineno-0-817" name="__codelineno-0-817"></a>        <span class="n">cwd</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cwd&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-818" name="__codelineno-0-818"></a>        <span class="n">timeout</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timeout&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-819" name="__codelineno-0-819"></a>
-<a id="__codelineno-0-820" name="__codelineno-0-820"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">script_path_in</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">script_path_in</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-821" name="__codelineno-0-821"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;script_path&#39; (string) is required.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-822" name="__codelineno-0-822"></a>        <span class="k">if</span> <span class="n">args</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-<a id="__codelineno-0-823" name="__codelineno-0-823"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;args&#39; must be a list of strings.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-824" name="__codelineno-0-824"></a>        <span class="k">if</span> <span class="n">cwd</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cwd</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
-<a id="__codelineno-0-825" name="__codelineno-0-825"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;cwd&#39; must be a string.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-826" name="__codelineno-0-826"></a>        <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-827" name="__codelineno-0-827"></a>            <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-828" name="__codelineno-0-828"></a>                <span class="n">timeout</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">timeout</span><span class="p">)</span>
-<a id="__codelineno-0-829" name="__codelineno-0-829"></a>            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-<a id="__codelineno-0-830" name="__codelineno-0-830"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;timeout&#39; must be a number.&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-831" name="__codelineno-0-831"></a>
-<a id="__codelineno-0-832" name="__codelineno-0-832"></a>        <span class="n">script_path</span> <span class="o">=</span> <span class="n">_find_script</span><span class="p">(</span><span class="n">script_path_in</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
-<a id="__codelineno-0-833" name="__codelineno-0-833"></a>        <span class="n">returncode</span><span class="p">,</span> <span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="n">_execute_script</span><span class="p">(</span>
-<a id="__codelineno-0-834" name="__codelineno-0-834"></a>            <span class="n">script_path</span><span class="o">=</span><span class="n">script_path</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">,</span> <span class="n">cwd</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span>
-<a id="__codelineno-0-835" name="__codelineno-0-835"></a>        <span class="p">)</span>
-<a id="__codelineno-0-836" name="__codelineno-0-836"></a>
-<a id="__codelineno-0-837" name="__codelineno-0-837"></a>        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-838" name="__codelineno-0-838"></a>            <span class="s2">&quot;returncode&quot;</span><span class="p">:</span> <span class="n">returncode</span><span class="p">,</span>
-<a id="__codelineno-0-839" name="__codelineno-0-839"></a>            <span class="s2">&quot;stdout&quot;</span><span class="p">:</span> <span class="n">stdout</span><span class="p">,</span>
-<a id="__codelineno-0-840" name="__codelineno-0-840"></a>            <span class="s2">&quot;stderr&quot;</span><span class="p">:</span> <span class="n">stderr</span><span class="p">,</span>
-<a id="__codelineno-0-841" name="__codelineno-0-841"></a>        <span class="p">}</span>
-<a id="__codelineno-0-842" name="__codelineno-0-842"></a>
-<a id="__codelineno-0-843" name="__codelineno-0-843"></a>        <span class="c1"># Optionally raise error on non-zero exit code</span>
-<a id="__codelineno-0-844" name="__codelineno-0-844"></a>        <span class="n">check</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;check&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>  <span class="c1"># Default to True</span>
-<a id="__codelineno-0-845" name="__codelineno-0-845"></a>        <span class="k">if</span> <span class="n">check</span> <span class="ow">and</span> <span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
-<a id="__codelineno-0-846" name="__codelineno-0-846"></a>            <span class="n">error_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Script &#39;</span><span class="si">{</span><span class="n">script_path</span><span class="si">}</span><span class="s2">&#39; failed with exit code </span><span class="si">{</span><span class="n">returncode</span><span class="si">}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">Stderr:</span><span class="se">\n</span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span>
-<a id="__codelineno-0-847" name="__codelineno-0-847"></a>            <span class="c1"># Fix: Wrap the failure reason in a standard error type</span>
-<a id="__codelineno-0-848" name="__codelineno-0-848"></a>            <span class="k">raise</span> <span class="n">TaskExecutionError</span><span class="p">(</span>
-<a id="__codelineno-0-849" name="__codelineno-0-849"></a>                <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span> <span class="n">original_error</span><span class="o">=</span><span class="ne">RuntimeError</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
-<a id="__codelineno-0-850" name="__codelineno-0-850"></a>            <span class="p">)</span>
-<a id="__codelineno-0-851" name="__codelineno-0-851"></a>
-<a id="__codelineno-0-852" name="__codelineno-0-852"></a>        <span class="n">log_task_result</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
-<a id="__codelineno-0-853" name="__codelineno-0-853"></a>        <span class="k">return</span> <span class="n">result</span>
-<a id="__codelineno-0-854" name="__codelineno-0-854"></a>
-<a id="__codelineno-0-855" name="__codelineno-0-855"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-0-856" name="__codelineno-0-856"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
-<a id="__codelineno-0-857" name="__codelineno-0-857"></a>            <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span>
-<a id="__codelineno-0-858" name="__codelineno-0-858"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
-<a id="__codelineno-0-859" name="__codelineno-0-859"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
-<a id="__codelineno-0-860" name="__codelineno-0-860"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
-<a id="__codelineno-0-861" name="__codelineno-0-861"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
-<a id="__codelineno-0-862" name="__codelineno-0-862"></a>        <span class="p">)</span>
-<a id="__codelineno-0-863" name="__codelineno-0-863"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
-<a id="__codelineno-0-864" name="__codelineno-0-864"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
-</code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h4 id="yaml_workflow.tasks.python_tasks.python_task" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">python_task</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span></code>
-
-<a href="#yaml_workflow.tasks.python_tasks.python_task" class="headerlink" title="Permanent link">&para;</a></h4>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Execute a Python task with the given operation and inputs.</p>
-<p>The task supports two modes:
-1. Operation mode: Execute predefined operations (multiply, divide, custom)
-2. Code mode: Execute arbitrary Python code</p>
-
-
-<p><span class="doc-section-title">Parameters:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Name</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Default</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                <code>config</code>
-            </td>
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="TaskConfig (yaml_workflow.tasks.TaskConfig)" href="../#yaml_workflow.tasks.TaskConfig">TaskConfig</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>TaskConfig object containing task configuration</p>
-              </div>
-            </td>
-            <td>
-                <em>required</em>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-    <p><span class="doc-section-title">Returns:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><span title="typing.Dict">Dict</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>]</code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>Dict containing the result of the operation/code and task metadata</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<p><span class="doc-section-title">Raises:</span></p>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody>
-          <tr class="doc-section-item">
-            <td>
-                  <code><a class="autorefs autorefs-internal" title="TaskExecutionError (yaml_workflow.exceptions.TaskExecutionError)" href="../../exceptions/#yaml_workflow.exceptions.TaskExecutionError">TaskExecutionError</a></code>
-            </td>
-            <td>
-              <div class="doc-md-description">
-                <p>If the task fails for any reason.</p>
-              </div>
-            </td>
-          </tr>
-      </tbody>
-    </table>
-
-
-<details class="example-yaml-usage" open>
-  <summary>Example YAML usage</summary>
-  <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">multiply_numbers</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">inputs</span><span class="p">:</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="nt">operation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">multiply</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">      </span><span class="nt">numbers</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">2</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">3</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">4</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">      </span><span class="nt">factor</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">execute_code</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="nt">inputs</span><span class="p">:</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">      </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">        </span><span class="no">x = 10</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">        </span><span class="no">y = 20</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">        </span><span class="no">result = x + y</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">function_mode</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">python</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="nt">inputs</span><span class="p">:</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">      </span><span class="nt">operation</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">function</span>
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">      </span><span class="nt">code</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">        </span><span class="no">def process(x, y):</span>
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">            </span><span class="no">return x + y</span>
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">      </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">args.x</span><span class="nv"> </span><span class="s">}}&quot;</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="s">&quot;{{</span><span class="nv"> </span><span class="s">args.y</span><span class="nv"> </span><span class="s">}}&quot;</span><span class="p p-Indicator">]</span>
-</code></pre></div>
-</details>
-
-            <details class="quote">
-              <summary>Source code in <code>src/yaml_workflow/tasks/python_tasks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-403">403</a></span>
-<span class="normal"><a href="#__codelineno-0-404">404</a></span>
-<span class="normal"><a href="#__codelineno-0-405">405</a></span>
-<span class="normal"><a href="#__codelineno-0-406">406</a></span>
-<span class="normal"><a href="#__codelineno-0-407">407</a></span>
-<span class="normal"><a href="#__codelineno-0-408">408</a></span>
-<span class="normal"><a href="#__codelineno-0-409">409</a></span>
-<span class="normal"><a href="#__codelineno-0-410">410</a></span>
-<span class="normal"><a href="#__codelineno-0-411">411</a></span>
-<span class="normal"><a href="#__codelineno-0-412">412</a></span>
-<span class="normal"><a href="#__codelineno-0-413">413</a></span>
-<span class="normal"><a href="#__codelineno-0-414">414</a></span>
-<span class="normal"><a href="#__codelineno-0-415">415</a></span>
-<span class="normal"><a href="#__codelineno-0-416">416</a></span>
-<span class="normal"><a href="#__codelineno-0-417">417</a></span>
-<span class="normal"><a href="#__codelineno-0-418">418</a></span>
-<span class="normal"><a href="#__codelineno-0-419">419</a></span>
-<span class="normal"><a href="#__codelineno-0-420">420</a></span>
-<span class="normal"><a href="#__codelineno-0-421">421</a></span>
-<span class="normal"><a href="#__codelineno-0-422">422</a></span>
-<span class="normal"><a href="#__codelineno-0-423">423</a></span>
-<span class="normal"><a href="#__codelineno-0-424">424</a></span>
-<span class="normal"><a href="#__codelineno-0-425">425</a></span>
-<span class="normal"><a href="#__codelineno-0-426">426</a></span>
-<span class="normal"><a href="#__codelineno-0-427">427</a></span>
-<span class="normal"><a href="#__codelineno-0-428">428</a></span>
-<span class="normal"><a href="#__codelineno-0-429">429</a></span>
-<span class="normal"><a href="#__codelineno-0-430">430</a></span>
-<span class="normal"><a href="#__codelineno-0-431">431</a></span>
-<span class="normal"><a href="#__codelineno-0-432">432</a></span>
-<span class="normal"><a href="#__codelineno-0-433">433</a></span>
-<span class="normal"><a href="#__codelineno-0-434">434</a></span>
-<span class="normal"><a href="#__codelineno-0-435">435</a></span>
-<span class="normal"><a href="#__codelineno-0-436">436</a></span>
-<span class="normal"><a href="#__codelineno-0-437">437</a></span>
-<span class="normal"><a href="#__codelineno-0-438">438</a></span>
-<span class="normal"><a href="#__codelineno-0-439">439</a></span>
-<span class="normal"><a href="#__codelineno-0-440">440</a></span>
-<span class="normal"><a href="#__codelineno-0-441">441</a></span>
-<span class="normal"><a href="#__codelineno-0-442">442</a></span>
-<span class="normal"><a href="#__codelineno-0-443">443</a></span>
-<span class="normal"><a href="#__codelineno-0-444">444</a></span>
-<span class="normal"><a href="#__codelineno-0-445">445</a></span>
-<span class="normal"><a href="#__codelineno-0-446">446</a></span>
-<span class="normal"><a href="#__codelineno-0-447">447</a></span>
-<span class="normal"><a href="#__codelineno-0-448">448</a></span>
-<span class="normal"><a href="#__codelineno-0-449">449</a></span>
-<span class="normal"><a href="#__codelineno-0-450">450</a></span>
-<span class="normal"><a href="#__codelineno-0-451">451</a></span>
-<span class="normal"><a href="#__codelineno-0-452">452</a></span>
-<span class="normal"><a href="#__codelineno-0-453">453</a></span>
-<span class="normal"><a href="#__codelineno-0-454">454</a></span>
-<span class="normal"><a href="#__codelineno-0-455">455</a></span>
-<span class="normal"><a href="#__codelineno-0-456">456</a></span>
-<span class="normal"><a href="#__codelineno-0-457">457</a></span>
-<span class="normal"><a href="#__codelineno-0-458">458</a></span>
-<span class="normal"><a href="#__codelineno-0-459">459</a></span>
-<span class="normal"><a href="#__codelineno-0-460">460</a></span>
-<span class="normal"><a href="#__codelineno-0-461">461</a></span>
-<span class="normal"><a href="#__codelineno-0-462">462</a></span>
-<span class="normal"><a href="#__codelineno-0-463">463</a></span>
-<span class="normal"><a href="#__codelineno-0-464">464</a></span>
-<span class="normal"><a href="#__codelineno-0-465">465</a></span>
-<span class="normal"><a href="#__codelineno-0-466">466</a></span>
-<span class="normal"><a href="#__codelineno-0-467">467</a></span>
-<span class="normal"><a href="#__codelineno-0-468">468</a></span>
-<span class="normal"><a href="#__codelineno-0-469">469</a></span>
-<span class="normal"><a href="#__codelineno-0-470">470</a></span>
-<span class="normal"><a href="#__codelineno-0-471">471</a></span>
-<span class="normal"><a href="#__codelineno-0-472">472</a></span>
-<span class="normal"><a href="#__codelineno-0-473">473</a></span>
-<span class="normal"><a href="#__codelineno-0-474">474</a></span>
-<span class="normal"><a href="#__codelineno-0-475">475</a></span>
-<span class="normal"><a href="#__codelineno-0-476">476</a></span>
-<span class="normal"><a href="#__codelineno-0-477">477</a></span>
-<span class="normal"><a href="#__codelineno-0-478">478</a></span>
-<span class="normal"><a href="#__codelineno-0-479">479</a></span>
-<span class="normal"><a href="#__codelineno-0-480">480</a></span>
-<span class="normal"><a href="#__codelineno-0-481">481</a></span>
-<span class="normal"><a href="#__codelineno-0-482">482</a></span>
-<span class="normal"><a href="#__codelineno-0-483">483</a></span>
-<span class="normal"><a href="#__codelineno-0-484">484</a></span>
-<span class="normal"><a href="#__codelineno-0-485">485</a></span>
-<span class="normal"><a href="#__codelineno-0-486">486</a></span>
-<span class="normal"><a href="#__codelineno-0-487">487</a></span>
-<span class="normal"><a href="#__codelineno-0-488">488</a></span>
-<span class="normal"><a href="#__codelineno-0-489">489</a></span>
-<span class="normal"><a href="#__codelineno-0-490">490</a></span>
-<span class="normal"><a href="#__codelineno-0-491">491</a></span>
-<span class="normal"><a href="#__codelineno-0-492">492</a></span>
-<span class="normal"><a href="#__codelineno-0-493">493</a></span>
-<span class="normal"><a href="#__codelineno-0-494">494</a></span>
-<span class="normal"><a href="#__codelineno-0-495">495</a></span>
-<span class="normal"><a href="#__codelineno-0-496">496</a></span>
-<span class="normal"><a href="#__codelineno-0-497">497</a></span>
-<span class="normal"><a href="#__codelineno-0-498">498</a></span>
-<span class="normal"><a href="#__codelineno-0-499">499</a></span>
-<span class="normal"><a href="#__codelineno-0-500">500</a></span>
-<span class="normal"><a href="#__codelineno-0-501">501</a></span>
-<span class="normal"><a href="#__codelineno-0-502">502</a></span>
-<span class="normal"><a href="#__codelineno-0-503">503</a></span>
-<span class="normal"><a href="#__codelineno-0-504">504</a></span>
-<span class="normal"><a href="#__codelineno-0-505">505</a></span>
-<span class="normal"><a href="#__codelineno-0-506">506</a></span>
-<span class="normal"><a href="#__codelineno-0-507">507</a></span>
-<span class="normal"><a href="#__codelineno-0-508">508</a></span>
-<span class="normal"><a href="#__codelineno-0-509">509</a></span>
-<span class="normal"><a href="#__codelineno-0-510">510</a></span>
-<span class="normal"><a href="#__codelineno-0-511">511</a></span>
-<span class="normal"><a href="#__codelineno-0-512">512</a></span>
-<span class="normal"><a href="#__codelineno-0-513">513</a></span>
-<span class="normal"><a href="#__codelineno-0-514">514</a></span>
-<span class="normal"><a href="#__codelineno-0-515">515</a></span>
-<span class="normal"><a href="#__codelineno-0-516">516</a></span>
-<span class="normal"><a href="#__codelineno-0-517">517</a></span>
-<span class="normal"><a href="#__codelineno-0-518">518</a></span>
-<span class="normal"><a href="#__codelineno-0-519">519</a></span>
-<span class="normal"><a href="#__codelineno-0-520">520</a></span>
-<span class="normal"><a href="#__codelineno-0-521">521</a></span>
-<span class="normal"><a href="#__codelineno-0-522">522</a></span>
-<span class="normal"><a href="#__codelineno-0-523">523</a></span>
-<span class="normal"><a href="#__codelineno-0-524">524</a></span>
-<span class="normal"><a href="#__codelineno-0-525">525</a></span>
-<span class="normal"><a href="#__codelineno-0-526">526</a></span>
-<span class="normal"><a href="#__codelineno-0-527">527</a></span>
-<span class="normal"><a href="#__codelineno-0-528">528</a></span>
-<span class="normal"><a href="#__codelineno-0-529">529</a></span>
-<span class="normal"><a href="#__codelineno-0-530">530</a></span>
-<span class="normal"><a href="#__codelineno-0-531">531</a></span>
-<span class="normal"><a href="#__codelineno-0-532">532</a></span>
-<span class="normal"><a href="#__codelineno-0-533">533</a></span>
-<span class="normal"><a href="#__codelineno-0-534">534</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-403" name="__codelineno-0-403"></a><span class="nd">@register_task</span><span class="p">(</span><span class="s2">&quot;python&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-404" name="__codelineno-0-404"></a><span class="k">def</span><span class="w"> </span><span class="nf">python_task</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<a id="__codelineno-0-405" name="__codelineno-0-405"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute a Python task with the given operation and inputs.</span>
-<a id="__codelineno-0-406" name="__codelineno-0-406"></a>
-<a id="__codelineno-0-407" name="__codelineno-0-407"></a><span class="sd">    The task supports two modes:</span>
-<a id="__codelineno-0-408" name="__codelineno-0-408"></a><span class="sd">    1. Operation mode: Execute predefined operations (multiply, divide, custom)</span>
-<a id="__codelineno-0-409" name="__codelineno-0-409"></a><span class="sd">    2. Code mode: Execute arbitrary Python code</span>
-<a id="__codelineno-0-410" name="__codelineno-0-410"></a>
-<a id="__codelineno-0-411" name="__codelineno-0-411"></a><span class="sd">    Args:</span>
-<a id="__codelineno-0-412" name="__codelineno-0-412"></a><span class="sd">        config: TaskConfig object containing task configuration</span>
-<a id="__codelineno-0-413" name="__codelineno-0-413"></a>
-<a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">        Dict containing the result of the operation/code and task metadata</span>
-<a id="__codelineno-0-416" name="__codelineno-0-416"></a>
-<a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">    Raises:</span>
-<a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="sd">        TaskExecutionError: If the task fails for any reason.</span>
-<a id="__codelineno-0-419" name="__codelineno-0-419"></a>
-<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">    Example YAML usage:</span>
-<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">        ```yaml</span>
-<a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">        steps:</span>
-<a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">          - name: multiply_numbers</span>
-<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">            task: python</span>
-<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">            inputs:</span>
-<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">              operation: multiply</span>
-<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">              numbers: [2, 3, 4]</span>
-<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">              factor: 2</span>
-<a id="__codelineno-0-429" name="__codelineno-0-429"></a>
-<a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">          - name: execute_code</span>
-<a id="__codelineno-0-431" name="__codelineno-0-431"></a><span class="sd">            task: python</span>
-<a id="__codelineno-0-432" name="__codelineno-0-432"></a><span class="sd">            inputs:</span>
-<a id="__codelineno-0-433" name="__codelineno-0-433"></a><span class="sd">              code: |</span>
-<a id="__codelineno-0-434" name="__codelineno-0-434"></a><span class="sd">                x = 10</span>
-<a id="__codelineno-0-435" name="__codelineno-0-435"></a><span class="sd">                y = 20</span>
-<a id="__codelineno-0-436" name="__codelineno-0-436"></a><span class="sd">                result = x + y</span>
-<a id="__codelineno-0-437" name="__codelineno-0-437"></a>
-<a id="__codelineno-0-438" name="__codelineno-0-438"></a><span class="sd">          - name: function_mode</span>
-<a id="__codelineno-0-439" name="__codelineno-0-439"></a><span class="sd">            task: python</span>
-<a id="__codelineno-0-440" name="__codelineno-0-440"></a><span class="sd">            inputs:</span>
-<a id="__codelineno-0-441" name="__codelineno-0-441"></a><span class="sd">              operation: function</span>
-<a id="__codelineno-0-442" name="__codelineno-0-442"></a><span class="sd">              code: |</span>
-<a id="__codelineno-0-443" name="__codelineno-0-443"></a><span class="sd">                def process(x, y):</span>
-<a id="__codelineno-0-444" name="__codelineno-0-444"></a><span class="sd">                    return x + y</span>
-<a id="__codelineno-0-445" name="__codelineno-0-445"></a><span class="sd">              args: [&quot;{{ args.x }}&quot;, &quot;{{ args.y }}&quot;]</span>
-<a id="__codelineno-0-446" name="__codelineno-0-446"></a><span class="sd">        ```</span>
-<a id="__codelineno-0-447" name="__codelineno-0-447"></a><span class="sd">    &quot;&quot;&quot;</span>
-<a id="__codelineno-0-448" name="__codelineno-0-448"></a>    <span class="n">task_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">&quot;python_task&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-449" name="__codelineno-0-449"></a>    <span class="n">task_type</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">type</span> <span class="ow">or</span> <span class="s2">&quot;python&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-450" name="__codelineno-0-450"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
-<a id="__codelineno-0-451" name="__codelineno-0-451"></a>
-<a id="__codelineno-0-452" name="__codelineno-0-452"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-453" name="__codelineno-0-453"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
-<a id="__codelineno-0-454" name="__codelineno-0-454"></a>
-<a id="__codelineno-0-455" name="__codelineno-0-455"></a>        <span class="c1"># Process inputs first to handle any templates</span>
-<a id="__codelineno-0-456" name="__codelineno-0-456"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
-<a id="__codelineno-0-457" name="__codelineno-0-457"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>  <span class="c1"># Store for use in helpers</span>
-<a id="__codelineno-0-458" name="__codelineno-0-458"></a>
-<a id="__codelineno-0-459" name="__codelineno-0-459"></a>        <span class="c1"># --- Input Validation ---</span>
-<a id="__codelineno-0-460" name="__codelineno-0-460"></a>        <span class="n">has_code</span> <span class="o">=</span> <span class="s2">&quot;code&quot;</span> <span class="ow">in</span> <span class="n">processed</span>
-<a id="__codelineno-0-461" name="__codelineno-0-461"></a>        <span class="n">has_operation</span> <span class="o">=</span> <span class="s2">&quot;operation&quot;</span> <span class="ow">in</span> <span class="n">processed</span>
-<a id="__codelineno-0-462" name="__codelineno-0-462"></a>
-<a id="__codelineno-0-463" name="__codelineno-0-463"></a>        <span class="c1"># Allow code and operation ONLY if operation is &#39;function&#39;</span>
-<a id="__codelineno-0-464" name="__codelineno-0-464"></a>        <span class="k">if</span> <span class="n">has_code</span> <span class="ow">and</span> <span class="n">has_operation</span> <span class="ow">and</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;operation&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;function&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-465" name="__codelineno-0-465"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-<a id="__codelineno-0-466" name="__codelineno-0-466"></a>                <span class="s2">&quot;Cannot specify both &#39;code&#39; and &#39;operation&#39; unless operation is &#39;function&#39;&quot;</span>
-<a id="__codelineno-0-467" name="__codelineno-0-467"></a>            <span class="p">)</span>
-<a id="__codelineno-0-468" name="__codelineno-0-468"></a>        <span class="c1"># Still require at least one</span>
-<a id="__codelineno-0-469" name="__codelineno-0-469"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">has_code</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">has_operation</span><span class="p">:</span>
-<a id="__codelineno-0-470" name="__codelineno-0-470"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-<a id="__codelineno-0-471" name="__codelineno-0-471"></a>                <span class="s2">&quot;Either &#39;code&#39; or &#39;operation&#39; must be specified for Python task&quot;</span>
-<a id="__codelineno-0-472" name="__codelineno-0-472"></a>            <span class="p">)</span>
-<a id="__codelineno-0-473" name="__codelineno-0-473"></a>
-<a id="__codelineno-0-474" name="__codelineno-0-474"></a>        <span class="n">operation</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;operation&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-475" name="__codelineno-0-475"></a>
-<a id="__codelineno-0-476" name="__codelineno-0-476"></a>        <span class="n">result</span> <span class="o">=</span> <span class="kc">None</span>
-<a id="__codelineno-0-477" name="__codelineno-0-477"></a>        <span class="n">operation_result</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># Initialize operation_result</span>
-<a id="__codelineno-0-478" name="__codelineno-0-478"></a>
-<a id="__codelineno-0-479" name="__codelineno-0-479"></a>        <span class="k">if</span> <span class="s2">&quot;code&quot;</span> <span class="ow">in</span> <span class="n">processed</span><span class="p">:</span>
-<a id="__codelineno-0-480" name="__codelineno-0-480"></a>            <span class="k">if</span> <span class="s2">&quot;operation&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">processed</span><span class="p">:</span>
-<a id="__codelineno-0-481" name="__codelineno-0-481"></a>                <span class="n">code_result</span> <span class="o">=</span> <span class="n">execute_code</span><span class="p">(</span><span class="n">processed</span><span class="p">[</span><span class="s2">&quot;code&quot;</span><span class="p">],</span> <span class="n">config</span><span class="p">)</span>
-<a id="__codelineno-0-482" name="__codelineno-0-482"></a>                <span class="c1"># Create the result dict for code-only execution</span>
-<a id="__codelineno-0-483" name="__codelineno-0-483"></a>                <span class="n">operation_result</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="n">code_result</span><span class="p">}</span>
-<a id="__codelineno-0-484" name="__codelineno-0-484"></a>            <span class="k">elif</span> <span class="n">processed</span><span class="p">[</span><span class="s2">&quot;operation&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;function&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-485" name="__codelineno-0-485"></a>                <span class="k">if</span> <span class="ow">not</span> <span class="n">has_code</span><span class="p">:</span>
-<a id="__codelineno-0-486" name="__codelineno-0-486"></a>                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-<a id="__codelineno-0-487" name="__codelineno-0-487"></a>                        <span class="s2">&quot;&#39;code&#39; parameter is required for function operation&quot;</span>
-<a id="__codelineno-0-488" name="__codelineno-0-488"></a>                    <span class="p">)</span>
-<a id="__codelineno-0-489" name="__codelineno-0-489"></a>                <span class="c1"># Capture the result from execute_function</span>
-<a id="__codelineno-0-490" name="__codelineno-0-490"></a>                <span class="n">func_result</span> <span class="o">=</span> <span class="n">execute_function</span><span class="p">(</span><span class="n">processed</span><span class="p">[</span><span class="s2">&quot;code&quot;</span><span class="p">],</span> <span class="n">config</span><span class="p">)</span>
-<a id="__codelineno-0-491" name="__codelineno-0-491"></a>                <span class="n">operation_result</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;result&quot;</span><span class="p">:</span> <span class="n">func_result</span><span class="p">}</span>
-<a id="__codelineno-0-492" name="__codelineno-0-492"></a>            <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;multiply&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-493" name="__codelineno-0-493"></a>                <span class="n">operation_result</span> <span class="o">=</span> <span class="n">handle_multiply_operation</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<a id="__codelineno-0-494" name="__codelineno-0-494"></a>            <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;divide&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-495" name="__codelineno-0-495"></a>                <span class="n">operation_result</span> <span class="o">=</span> <span class="n">handle_divide_operation</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<a id="__codelineno-0-496" name="__codelineno-0-496"></a>            <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;custom&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-497" name="__codelineno-0-497"></a>                <span class="n">operation_result</span> <span class="o">=</span> <span class="n">handle_custom_operation</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<a id="__codelineno-0-498" name="__codelineno-0-498"></a>            <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-499" name="__codelineno-0-499"></a>                <span class="c1"># This path should technically be unreachable due to earlier checks</span>
-<a id="__codelineno-0-500" name="__codelineno-0-500"></a>                <span class="c1"># but raising here for safety.</span>
-<a id="__codelineno-0-501" name="__codelineno-0-501"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown or unhandled operation: </span><span class="si">{</span><span class="n">operation</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-502" name="__codelineno-0-502"></a>        <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-503" name="__codelineno-0-503"></a>            <span class="k">if</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;multiply&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-504" name="__codelineno-0-504"></a>                <span class="n">operation_result</span> <span class="o">=</span> <span class="n">handle_multiply_operation</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<a id="__codelineno-0-505" name="__codelineno-0-505"></a>            <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;divide&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-506" name="__codelineno-0-506"></a>                <span class="n">operation_result</span> <span class="o">=</span> <span class="n">handle_divide_operation</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<a id="__codelineno-0-507" name="__codelineno-0-507"></a>            <span class="k">elif</span> <span class="n">operation</span> <span class="o">==</span> <span class="s2">&quot;custom&quot;</span><span class="p">:</span>
-<a id="__codelineno-0-508" name="__codelineno-0-508"></a>                <span class="n">operation_result</span> <span class="o">=</span> <span class="n">handle_custom_operation</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<a id="__codelineno-0-509" name="__codelineno-0-509"></a>            <span class="k">else</span><span class="p">:</span>
-<a id="__codelineno-0-510" name="__codelineno-0-510"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown operation: </span><span class="si">{</span><span class="n">operation</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<a id="__codelineno-0-511" name="__codelineno-0-511"></a>
-<a id="__codelineno-0-512" name="__codelineno-0-512"></a>        <span class="c1"># Return the dictionary produced by the operation handlers or code execution</span>
-<a id="__codelineno-0-513" name="__codelineno-0-513"></a>        <span class="k">if</span> <span class="n">operation_result</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-514" name="__codelineno-0-514"></a>            <span class="c1"># This case should ideally not be hit if validation is correct,</span>
-<a id="__codelineno-0-515" name="__codelineno-0-515"></a>            <span class="c1"># but provide a default empty dict for safety.</span>
-<a id="__codelineno-0-516" name="__codelineno-0-516"></a>            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
-<a id="__codelineno-0-517" name="__codelineno-0-517"></a>                <span class="s2">&quot;Operation result was unexpectedly None for step </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">task_name</span>
-<a id="__codelineno-0-518" name="__codelineno-0-518"></a>            <span class="p">)</span>
-<a id="__codelineno-0-519" name="__codelineno-0-519"></a>            <span class="n">operation_result</span> <span class="o">=</span> <span class="p">{}</span>
-<a id="__codelineno-0-520" name="__codelineno-0-520"></a>
-<a id="__codelineno-0-521" name="__codelineno-0-521"></a>        <span class="n">log_task_result</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">operation_result</span><span class="p">)</span>
-<a id="__codelineno-0-522" name="__codelineno-0-522"></a>        <span class="k">return</span> <span class="n">operation_result</span>
-<a id="__codelineno-0-523" name="__codelineno-0-523"></a>
-<a id="__codelineno-0-524" name="__codelineno-0-524"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-0-525" name="__codelineno-0-525"></a>        <span class="c1"># Centralized error handling for python_task specific errors (e.g., config validation)</span>
-<a id="__codelineno-0-526" name="__codelineno-0-526"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
-<a id="__codelineno-0-527" name="__codelineno-0-527"></a>            <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span>
-<a id="__codelineno-0-528" name="__codelineno-0-528"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
-<a id="__codelineno-0-529" name="__codelineno-0-529"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
-<a id="__codelineno-0-530" name="__codelineno-0-530"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
-<a id="__codelineno-0-531" name="__codelineno-0-531"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
-<a id="__codelineno-0-532" name="__codelineno-0-532"></a>        <span class="p">)</span>
-<a id="__codelineno-0-533" name="__codelineno-0-533"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
-<a id="__codelineno-0-534" name="__codelineno-0-534"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-672">672</a></span>
+<span class="normal"><a href="#__codelineno-0-673">673</a></span>
+<span class="normal"><a href="#__codelineno-0-674">674</a></span>
+<span class="normal"><a href="#__codelineno-0-675">675</a></span>
+<span class="normal"><a href="#__codelineno-0-676">676</a></span>
+<span class="normal"><a href="#__codelineno-0-677">677</a></span>
+<span class="normal"><a href="#__codelineno-0-678">678</a></span>
+<span class="normal"><a href="#__codelineno-0-679">679</a></span>
+<span class="normal"><a href="#__codelineno-0-680">680</a></span>
+<span class="normal"><a href="#__codelineno-0-681">681</a></span>
+<span class="normal"><a href="#__codelineno-0-682">682</a></span>
+<span class="normal"><a href="#__codelineno-0-683">683</a></span>
+<span class="normal"><a href="#__codelineno-0-684">684</a></span>
+<span class="normal"><a href="#__codelineno-0-685">685</a></span>
+<span class="normal"><a href="#__codelineno-0-686">686</a></span>
+<span class="normal"><a href="#__codelineno-0-687">687</a></span>
+<span class="normal"><a href="#__codelineno-0-688">688</a></span>
+<span class="normal"><a href="#__codelineno-0-689">689</a></span>
+<span class="normal"><a href="#__codelineno-0-690">690</a></span>
+<span class="normal"><a href="#__codelineno-0-691">691</a></span>
+<span class="normal"><a href="#__codelineno-0-692">692</a></span>
+<span class="normal"><a href="#__codelineno-0-693">693</a></span>
+<span class="normal"><a href="#__codelineno-0-694">694</a></span>
+<span class="normal"><a href="#__codelineno-0-695">695</a></span>
+<span class="normal"><a href="#__codelineno-0-696">696</a></span>
+<span class="normal"><a href="#__codelineno-0-697">697</a></span>
+<span class="normal"><a href="#__codelineno-0-698">698</a></span>
+<span class="normal"><a href="#__codelineno-0-699">699</a></span>
+<span class="normal"><a href="#__codelineno-0-700">700</a></span>
+<span class="normal"><a href="#__codelineno-0-701">701</a></span>
+<span class="normal"><a href="#__codelineno-0-702">702</a></span>
+<span class="normal"><a href="#__codelineno-0-703">703</a></span>
+<span class="normal"><a href="#__codelineno-0-704">704</a></span>
+<span class="normal"><a href="#__codelineno-0-705">705</a></span>
+<span class="normal"><a href="#__codelineno-0-706">706</a></span>
+<span class="normal"><a href="#__codelineno-0-707">707</a></span>
+<span class="normal"><a href="#__codelineno-0-708">708</a></span>
+<span class="normal"><a href="#__codelineno-0-709">709</a></span>
+<span class="normal"><a href="#__codelineno-0-710">710</a></span>
+<span class="normal"><a href="#__codelineno-0-711">711</a></span>
+<span class="normal"><a href="#__codelineno-0-712">712</a></span>
+<span class="normal"><a href="#__codelineno-0-713">713</a></span>
+<span class="normal"><a href="#__codelineno-0-714">714</a></span>
+<span class="normal"><a href="#__codelineno-0-715">715</a></span>
+<span class="normal"><a href="#__codelineno-0-716">716</a></span>
+<span class="normal"><a href="#__codelineno-0-717">717</a></span>
+<span class="normal"><a href="#__codelineno-0-718">718</a></span>
+<span class="normal"><a href="#__codelineno-0-719">719</a></span>
+<span class="normal"><a href="#__codelineno-0-720">720</a></span>
+<span class="normal"><a href="#__codelineno-0-721">721</a></span>
+<span class="normal"><a href="#__codelineno-0-722">722</a></span>
+<span class="normal"><a href="#__codelineno-0-723">723</a></span>
+<span class="normal"><a href="#__codelineno-0-724">724</a></span>
+<span class="normal"><a href="#__codelineno-0-725">725</a></span>
+<span class="normal"><a href="#__codelineno-0-726">726</a></span>
+<span class="normal"><a href="#__codelineno-0-727">727</a></span>
+<span class="normal"><a href="#__codelineno-0-728">728</a></span>
+<span class="normal"><a href="#__codelineno-0-729">729</a></span>
+<span class="normal"><a href="#__codelineno-0-730">730</a></span>
+<span class="normal"><a href="#__codelineno-0-731">731</a></span>
+<span class="normal"><a href="#__codelineno-0-732">732</a></span>
+<span class="normal"><a href="#__codelineno-0-733">733</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-672" name="__codelineno-0-672"></a><span class="nd">@register_task</span><span class="p">()</span>
+<a id="__codelineno-0-673" name="__codelineno-0-673"></a><span class="k">def</span><span class="w"> </span><span class="nf">python_script</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<a id="__codelineno-0-674" name="__codelineno-0-674"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute an external Python script.&quot;&quot;&quot;</span>
+<a id="__codelineno-0-675" name="__codelineno-0-675"></a>    <span class="n">task_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">name</span> <span class="ow">or</span> <span class="s2">&quot;python_script_task&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-676" name="__codelineno-0-676"></a>    <span class="n">task_type</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">type</span> <span class="ow">or</span> <span class="s2">&quot;python_script&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-677" name="__codelineno-0-677"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
+<a id="__codelineno-0-678" name="__codelineno-0-678"></a>
+<a id="__codelineno-0-679" name="__codelineno-0-679"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-680" name="__codelineno-0-680"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
+<a id="__codelineno-0-681" name="__codelineno-0-681"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
+<a id="__codelineno-0-682" name="__codelineno-0-682"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>
+<a id="__codelineno-0-683" name="__codelineno-0-683"></a>
+<a id="__codelineno-0-684" name="__codelineno-0-684"></a>        <span class="n">script_path_in</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;script_path&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-685" name="__codelineno-0-685"></a>        <span class="n">args</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;args&quot;</span><span class="p">)</span>  <span class="c1"># Should be list or None</span>
+<a id="__codelineno-0-686" name="__codelineno-0-686"></a>        <span class="n">cwd</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;cwd&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-687" name="__codelineno-0-687"></a>        <span class="n">timeout</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;timeout&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-688" name="__codelineno-0-688"></a>
+<a id="__codelineno-0-689" name="__codelineno-0-689"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">script_path_in</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">script_path_in</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-690" name="__codelineno-0-690"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;script_path&#39; (string) is required.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-691" name="__codelineno-0-691"></a>        <span class="k">if</span> <span class="n">args</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+<a id="__codelineno-0-692" name="__codelineno-0-692"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;args&#39; must be a list of strings.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-693" name="__codelineno-0-693"></a>        <span class="k">if</span> <span class="n">cwd</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cwd</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-694" name="__codelineno-0-694"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;cwd&#39; must be a string.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-695" name="__codelineno-0-695"></a>        <span class="k">if</span> <span class="n">timeout</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-696" name="__codelineno-0-696"></a>            <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-697" name="__codelineno-0-697"></a>                <span class="n">timeout</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">timeout</span><span class="p">)</span>
+<a id="__codelineno-0-698" name="__codelineno-0-698"></a>            <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+<a id="__codelineno-0-699" name="__codelineno-0-699"></a>                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input &#39;timeout&#39; must be a number.&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-700" name="__codelineno-0-700"></a>
+<a id="__codelineno-0-701" name="__codelineno-0-701"></a>        <span class="n">script_path</span> <span class="o">=</span> <span class="n">_find_script</span><span class="p">(</span><span class="n">script_path_in</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
+<a id="__codelineno-0-702" name="__codelineno-0-702"></a>        <span class="n">returncode</span><span class="p">,</span> <span class="n">stdout</span><span class="p">,</span> <span class="n">stderr</span> <span class="o">=</span> <span class="n">_execute_script</span><span class="p">(</span>
+<a id="__codelineno-0-703" name="__codelineno-0-703"></a>            <span class="n">script_path</span><span class="o">=</span><span class="n">script_path</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">,</span> <span class="n">cwd</span><span class="o">=</span><span class="n">cwd</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span>
+<a id="__codelineno-0-704" name="__codelineno-0-704"></a>        <span class="p">)</span>
+<a id="__codelineno-0-705" name="__codelineno-0-705"></a>
+<a id="__codelineno-0-706" name="__codelineno-0-706"></a>        <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-707" name="__codelineno-0-707"></a>            <span class="s2">&quot;returncode&quot;</span><span class="p">:</span> <span class="n">returncode</span><span class="p">,</span>
+<a id="__codelineno-0-708" name="__codelineno-0-708"></a>            <span class="s2">&quot;stdout&quot;</span><span class="p">:</span> <span class="n">stdout</span><span class="p">,</span>
+<a id="__codelineno-0-709" name="__codelineno-0-709"></a>            <span class="s2">&quot;stderr&quot;</span><span class="p">:</span> <span class="n">stderr</span><span class="p">,</span>
+<a id="__codelineno-0-710" name="__codelineno-0-710"></a>        <span class="p">}</span>
+<a id="__codelineno-0-711" name="__codelineno-0-711"></a>
+<a id="__codelineno-0-712" name="__codelineno-0-712"></a>        <span class="c1"># Optionally raise error on non-zero exit code</span>
+<a id="__codelineno-0-713" name="__codelineno-0-713"></a>        <span class="n">check</span> <span class="o">=</span> <span class="n">processed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;check&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>  <span class="c1"># Default to True</span>
+<a id="__codelineno-0-714" name="__codelineno-0-714"></a>        <span class="k">if</span> <span class="n">check</span> <span class="ow">and</span> <span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-0-715" name="__codelineno-0-715"></a>            <span class="n">error_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Script &#39;</span><span class="si">{</span><span class="n">script_path</span><span class="si">}</span><span class="s2">&#39; failed with exit code </span><span class="si">{</span><span class="n">returncode</span><span class="si">}</span><span class="s2">.</span><span class="se">\n</span><span class="s2">Stderr:</span><span class="se">\n</span><span class="si">{</span><span class="n">stderr</span><span class="si">}</span><span class="s2">&quot;</span>
+<a id="__codelineno-0-716" name="__codelineno-0-716"></a>            <span class="c1"># Fix: Wrap the failure reason in a standard error type</span>
+<a id="__codelineno-0-717" name="__codelineno-0-717"></a>            <span class="k">raise</span> <span class="n">TaskExecutionError</span><span class="p">(</span>
+<a id="__codelineno-0-718" name="__codelineno-0-718"></a>                <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span> <span class="n">original_error</span><span class="o">=</span><span class="ne">RuntimeError</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span>
+<a id="__codelineno-0-719" name="__codelineno-0-719"></a>            <span class="p">)</span>
+<a id="__codelineno-0-720" name="__codelineno-0-720"></a>
+<a id="__codelineno-0-721" name="__codelineno-0-721"></a>        <span class="n">log_task_result</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+<a id="__codelineno-0-722" name="__codelineno-0-722"></a>        <span class="k">return</span> <span class="n">result</span>
+<a id="__codelineno-0-723" name="__codelineno-0-723"></a>
+<a id="__codelineno-0-724" name="__codelineno-0-724"></a>    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-0-725" name="__codelineno-0-725"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
+<a id="__codelineno-0-726" name="__codelineno-0-726"></a>            <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span>
+<a id="__codelineno-0-727" name="__codelineno-0-727"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
+<a id="__codelineno-0-728" name="__codelineno-0-728"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
+<a id="__codelineno-0-729" name="__codelineno-0-729"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
+<a id="__codelineno-0-730" name="__codelineno-0-730"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
+<a id="__codelineno-0-731" name="__codelineno-0-731"></a>        <span class="p">)</span>
+<a id="__codelineno-0-732" name="__codelineno-0-732"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+<a id="__codelineno-0-733" name="__codelineno-0-733"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

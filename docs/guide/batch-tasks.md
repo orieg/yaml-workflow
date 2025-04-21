@@ -40,9 +40,10 @@ steps:
       chunk_size: "{{ args.chunk_size }}"
       max_workers: 2  # Process up to 2 chunks in parallel
       task:  # Task configuration for processing each item
-        task: shell
+        task: python_code 
         inputs:
-          command: |
+          code: |
+            # Access item via batch namespace
             echo "Processing item {{ batch.item }} ({{ batch.index + 1 }}/{{ batch.total }})"
             ./process.sh "{{ batch.item }}"
 ```
@@ -66,7 +67,7 @@ steps:
     inputs:
       items: "{{ args.files }}"
       task:
-        task: python
+        task: python_code
         inputs:
           code: |
             # Access batch context
@@ -93,13 +94,13 @@ steps:
         max_attempts: 3
         delay: 5
       task:
-        task: shell
+        task: python_code
         inputs:
-          command: "./process.sh {{ batch.item }}"
+          code: "./process.sh {{ batch.item }}"
           
   handle_results:
     name: handle_results
-    task: python
+    task: python_code
     inputs:
       code: |
         results = steps['process_with_retries']['results']
@@ -124,7 +125,7 @@ steps:
     inputs:
       items: "{{ args.items }}"
       task:
-        task: python
+        task: python_code
         inputs:
           code: |
             # Process item and update state
@@ -139,7 +140,7 @@ steps:
             
   check_progress:
     name: check_progress
-    task: python
+    task: python_code
     inputs:
       code: |
         batch_results = steps['process_items']['results']
@@ -169,9 +170,9 @@ steps:
         max_attempts: 3       # Retry failed items up to 3 times
         delay: 5              # Wait 5 seconds between retries
       task:
-        task: shell
+        task: python_code
         inputs:
-          command: "./process.sh {{ batch.item }}"
+          code: "./process.sh {{ batch.item }}"
           timeout: 300        # Timeout after 5 minutes
           working_dir: "{{ env.WORKSPACE }}/{{ batch.item }}"
 ```
@@ -234,7 +235,7 @@ env:
 steps:
   validate_inputs:
     name: validate_inputs
-    task: python
+    task: python_code
     inputs:
       code: |
         files = args['input_files']
@@ -253,7 +254,7 @@ steps:
         max_attempts: 3
         delay: 5
       task:
-        task: shell
+        task: python_code
         inputs:
           command: |
             echo "[{{ batch.index + 1 }}/{{ batch.total }}] Processing {{ batch.item }}"
@@ -266,7 +267,7 @@ steps:
           
   generate_report:
     name: generate_report
-    task: python
+    task: python_code
     inputs:
       code: |
         results = steps['process_files']['results']

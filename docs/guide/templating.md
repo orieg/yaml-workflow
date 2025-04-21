@@ -129,7 +129,7 @@ steps:
     inputs:
       items: "{{ steps.get_items.result }}"
       task:
-        task: python
+        task: python_code
         inputs:
           code: |
             {% for opt in args.options %}
@@ -167,7 +167,7 @@ steps:
 ```yaml
 steps:
   - name: process_data
-    task: python
+    task: python_code
     params:
       function: process_batch
       args:
@@ -192,7 +192,7 @@ steps:
       
       # Processing task
       task:
-        task: python
+        task: python_code
         inputs:
           code: "process_item()"
       
@@ -231,3 +231,30 @@ steps:
    # Bad: Potential type issues
    debug: "{{ env.DEBUG }}"
    ```
+
+# Accessing complex data structures
+- name: access_complex_data
+  task: python_code
+  inputs:
+    code: |
+      user_name = steps.load_user.result.name
+      first_permission = steps.load_user.result.permissions[0]
+      result = f"User {user_name} has permission: {first_permission}"
+
+- name: process_values
+  task: python_code
+  inputs:
+    code: |
+      print(f"Processing user: {user}")
+      # Use api_key securely
+      result = user + api_key
+
+# Using includes in a Python task
+- name: dynamic_python_logic
+  task: python_code
+  inputs:
+    code: |
+      {% include 'path/to/python_helper.py' %}
+      
+      # Now call functions defined in the included file
+      result = helper_function(args.input)

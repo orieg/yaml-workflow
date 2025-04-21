@@ -39,7 +39,7 @@ steps:
 
   transform:
     name: transform
-    task: python
+    task: python_code
     inputs:
       code: |
         # Access data through namespaces
@@ -234,7 +234,7 @@ steps:
 
   check_results:
     name: check_results
-    task: python
+    task: python_code
     inputs:
       code: |
         results = steps['process_files']['results']
@@ -386,4 +386,23 @@ For more detailed information:
 - [Task Types](tasks.md)
 - [Templating Guide](guide/templating.md)
 - [Batch Processing Guide](guide/batch-tasks.md)
-- [Error Handling Guide](guide/error-handling.md) 
+- [Error Handling Guide](guide/error-handling.md)
+
+## Variable Templating
+
+Use Jinja2 templates for dynamic values:
+
+```yaml
+steps:
+  - name: download_data
+    task: shell
+    inputs:
+      command: "curl -o {{ args.output_dir }}/data.zip {{ env.DATA_URL }}"
+  
+  - name: process_downloaded_data
+    task: python_code # Use python_code for inline Python
+    inputs:
+      code: |
+        input_file = f\"{{ args.output_dir }}/data.zip\"
+        result = process(input_file)
+``` 

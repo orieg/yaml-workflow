@@ -400,140 +400,6 @@ def print_message_task(config: TaskConfig) -> dict:
     return {"success": True, "printed_length": len(message)}
 
 
-@register_task("python")
-def python_task(config: TaskConfig) -> Dict[str, Any]:
-    """Execute a Python task with the given operation and inputs.
-
-    The task supports two modes:
-    1. Operation mode: Execute predefined operations (multiply, divide, custom)
-    2. Code mode: Execute arbitrary Python code
-
-    Args:
-        config: TaskConfig object containing task configuration
-
-    Returns:
-        Dict containing the result of the operation/code and task metadata
-
-    Raises:
-        TaskExecutionError: If the task fails for any reason.
-
-    Example YAML usage:
-        ```yaml
-        steps:
-          - name: multiply_numbers
-            task: python
-            inputs:
-              operation: multiply
-              numbers: [2, 3, 4]
-              factor: 2
-
-          - name: execute_code
-            task: python
-            inputs:
-              code: |
-                x = 10
-                y = 20
-                result = x + y
-
-          - name: function_mode
-            task: python
-            inputs:
-              operation: function
-              code: |
-                def process(x, y):
-                    return x + y
-              args: ["{{ args.x }}", "{{ args.y }}"]
-        ```
-    """
-    task_name = str(config.name or "python_task")
-    task_type = str(config.type or "python")
-    logger = get_task_logger(config.workspace, task_name)
-
-    try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
-
-        # Process inputs first to handle any templates
-        processed = config.process_inputs()
-        config._processed_inputs = processed  # Store for use in helpers
-
-        # --- Input Validation ---
-        has_code = "code" in processed
-        has_operation = "operation" in processed
-
-        # Allow code and operation ONLY if operation is 'function'
-        if has_code and has_operation and processed.get("operation") != "function":
-            raise ValueError(
-                "Cannot specify both 'code' and 'operation' unless operation is 'function'"
-            )
-        # Still require at least one
-        if not has_code and not has_operation:
-            raise ValueError(
-                "Either 'code' or 'operation' must be specified for Python task"
-            )
-
-        operation = processed.get("operation")
-
-        result = None
-        operation_result = None  # Initialize operation_result
-
-        if "code" in processed:
-            if "operation" not in processed:
-                code_result = execute_code(processed["code"], config)
-                # Create the result dict for code-only execution
-                operation_result = {"result": code_result}
-            elif processed["operation"] == "function":
-                if not has_code:
-                    raise ValueError(
-                        "'code' parameter is required for function operation"
-                    )
-                # Capture the result from execute_function
-                func_result = execute_function(processed["code"], config)
-                operation_result = {"result": func_result}
-            elif operation == "multiply":
-                operation_result = handle_multiply_operation(config)
-            elif operation == "divide":
-                operation_result = handle_divide_operation(config)
-            elif operation == "custom":
-                operation_result = handle_custom_operation(config)
-            else:
-                # This path should technically be unreachable due to earlier checks
-                # but raising here for safety.
-                raise ValueError(f"Unknown or unhandled operation: {operation}")
-        else:
-            if operation == "multiply":
-                operation_result = handle_multiply_operation(config)
-            elif operation == "divide":
-                operation_result = handle_divide_operation(config)
-            elif operation == "custom":
-                operation_result = handle_custom_operation(config)
-            else:
-                raise ValueError(f"Unknown operation: {operation}")
-
-        # Return the dictionary produced by the operation handlers or code execution
-        if operation_result is None:
-            # This case should ideally not be hit if validation is correct,
-            # but provide a default empty dict for safety.
-            logger.warning(
-                "Operation result was unexpectedly None for step %s", task_name
-            )
-            operation_result = {}
-
-        log_task_result(logger, operation_result)
-        return operation_result
-
-    except Exception as e:
-        # Centralized error handling for python_task specific errors (e.g., config validation)
-        context = ErrorContext(
-            step_name=task_name,
-            task_type=task_type,
-            error=e,
-            task_config=config.step,
-            template_context=config._context,
-        )
-        handle_task_error(context)
-        return {}  # Unreachable
-
-
 def _load_function(module_name: str, function_name: str) -> Callable:
     """Load a function from a module."""
     try:
@@ -733,15 +599,18 @@ def _execute_code(
         if captured_stderr:
             logger.warning(f"Captured stderr from python_code:\n{captured_stderr}")
 
-        # Extract result if specified
+        # Extract result
         if result_variable:
             if result_variable not in exec_context:
                 raise NameError(
                     f"Result variable '{result_variable}' not found after code execution."
                 )
             return exec_context[result_variable]
+        elif "result" in exec_context:
+            # Default: return 'result' variable if it exists
+            return exec_context["result"]
         else:
-            # Default: return None if no result_variable specified
+            # Default: return None if no result_variable specified and no 'result' variable exists
             return None
 
     except Exception as e:
@@ -954,8 +823,8 @@ def python_code(config: TaskConfig) -> Dict[str, Any]:
         result_value = _execute_code(code, config, result_variable)
 
         result = {"result": result_value}
-        log_task_result(logger, result)
-        return result
+        log_task_result(logger, result)  # Log the result as a dict
+        return result  # Return the dictionary
 
     except Exception as e:
         context = ErrorContext(

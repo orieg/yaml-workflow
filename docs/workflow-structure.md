@@ -64,7 +64,7 @@ steps:
       type: "csv"
 
   - name: transform
-    task: python
+    task: python_code
     description: Transform data
     params:
       input: "{{ args.input_file }}"
@@ -122,11 +122,10 @@ Example Template Access:
 ```yaml
 steps:
   - name: process
-    task: python
+    task: python_code
     params: # Note: 'params' under a step are task-specific inputs, not the workflow params
       # Access workflow parameters' runtime values via args namespace
-      input_file: "{{ args.input_file }}"
-      batch_size: "{{ args.batch_size }}"
+      input_data: "{{ args.data_source }}"
       
       # Access environment variables
       api_url: "{{ env.API_URL }}"
@@ -250,4 +249,44 @@ Environment variables in the workflow engine are handled through the workflow co
    ```
 
 3. **In Shell Tasks**
+   ```bash
+   # Access args.input_file and env.API_KEY
+   process_script.sh "{{ args.input_file }}" "{{ env.API_KEY }}"
    ```
+
+4. **In Python Tasks** (`python_code` example)
+   ```yaml
+   steps:
+     - name: process_data
+       task: python_code # Updated
+       inputs:
+         code: |
+           # Access args and env namespaces
+           input_file = args.get('input_file')
+           api_key = env.get('API_KEY')
+           result = process(input_file, api_key)
+   ```
+
+### Batch Task Context (`batch`)
+
+Available inside tasks executed by the `batch` task:
+
+```yaml
+steps:
+  - name: process_batch
+    task: batch
+    inputs:
+      items: ["A", "B", "C"]
+      task:
+        task: python_code # Updated
+        inputs:
+          code: |
+            # Access batch context variables
+            current_item = batch['item']
+            item_index = batch['index']
+            total_items = batch['total']
+            print(f"Processing {current_item} ({item_index + 1}/{total_items})")
+            result = current_item.lower()
+```
+
+</rewritten_file>
