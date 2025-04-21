@@ -21,7 +21,7 @@ def test_simple_template_rendering(temp_workspace):
     step = {
         "name": "test_template",
         "task": "template",
-        "inputs": {"template": "Hello, {{ name }}!", "output": "greeting.txt"},
+        "inputs": {"template": "Hello, {{ name }}!", "output_file": "greeting.txt"},
     }
 
     config = TaskConfig(step, {"name": "Alice"}, temp_workspace)
@@ -42,7 +42,7 @@ def test_template_with_loops(temp_workspace, template_context):
 {% for item in items %}
 - {{ item }}
 {% endfor %}""",
-            "output": "items.txt",
+            "output_file": "items.txt",
         },
     }
 
@@ -74,7 +74,7 @@ Color is not blue
 Size is large
 {% endif %}
 """,
-            "output": "settings.txt",
+            "output_file": "settings.txt",
         },
     }
 
@@ -100,7 +100,7 @@ def test_template_filters(temp_workspace):
 {{ items | join(', ') }}
 {{ number | float | round(2) }}
 """,
-            "output": "filtered.txt",
+            "output_file": "filtered.txt",
         },
     }
 
@@ -125,7 +125,7 @@ def test_template_error_handling(temp_workspace):
     step = {
         "name": "test_template",
         "task": "template",
-        "inputs": {"template": "{{ undefined_variable }}", "output": "error.txt"},
+        "inputs": {"template": "{{ undefined_variable }}", "output_file": "error.txt"},
     }
 
     config = TaskConfig(step, {}, temp_workspace)
@@ -138,7 +138,10 @@ def test_template_whitespace_control(temp_workspace):
     step = {
         "name": "test_template",
         "task": "template",
-        "inputs": {"template": "{{ items|join('\n') }}", "output": "whitespace.txt"},
+        "inputs": {
+            "template": "{{ items|join('\n') }}",
+            "output_file": "whitespace.txt",
+        },
     }
 
     config = TaskConfig(step, {"items": ["a", "b", "c"]}, temp_workspace)
@@ -161,7 +164,7 @@ def test_template_from_file(temp_workspace):
         "task": "template",
         "inputs": {
             "template": template_file.read_text(),  # Read template content directly since render_template doesn't support template_file
-            "output": "welcome.txt",
+            "output_file": "welcome.txt",
         },
     }
 
@@ -186,7 +189,7 @@ def test_template_with_includes(temp_workspace):
         "task": "template",
         "inputs": {
             "template": "{% include 'header.txt' %}\nContent for {{ user }}",
-            "output": "page.txt",
+            "output_file": "page.txt",
         },
     }
 

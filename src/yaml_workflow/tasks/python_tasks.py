@@ -2,6 +2,7 @@
 Python task implementations for executing Python functions.
 """
 
+import asyncio
 import importlib
 import inspect
 import io
@@ -559,288 +560,54 @@ def _execute_python_function(func: Callable, config: TaskConfig) -> Any:
     sig = inspect.signature(func)
     params = sig.parameters
 
-    func_args: Dict[str, Any] = {}
-    bound_params: List[str] = []  # Track parameters that are explicitly bound
-    positional_params: List[str] = []  # Track names of positional-only or pos/kw params
-    keyword_params: Dict[str, Any] = (
-        {}
-    )  # Track keyword arguments provided in task inputs
-
-    # Identify parameter types
-    for name, param in params.items():
-        if param.kind in (
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        ):
-            positional_params.append(name)
-        # TaskConfig binding handled later
-        # VAR_POSITIONAL and VAR_KEYWORD handled later
-
-    # Bind TaskConfig if requested
-    for name, param in params.items():
-        if param.annotation is TaskConfig:
-            if name in func_args:
-                raise ValueError(
-                    f"Parameter {name} cannot be both TaskConfig and provided in inputs"
-                )
-            func_args[name] = config
-            bound_params.append(name)
-            if name in positional_params:
-                positional_params.remove(
-                    name
-                )  # Remove from positional list if bound as config
-            break  # Assume only one TaskConfig param needed
-
-    # Process 'args' list from inputs for positional parameters
+    # Prepare arguments from processed inputs
     input_args = processed.get("args", [])
+    input_kwargs = processed.get("kwargs", {})
+
+    # Validate input types
     if not isinstance(input_args, list):
         raise TypeError("Input 'args' must be a list.")
-
-    # Match input_args to available positional parameters
-    num_positional_needed = len(positional_params)
-    num_args_provided = len(input_args)
-
-    if num_args_provided > num_positional_needed:
-        # Check if there is a *args parameter to absorb extras
-        has_var_positional = any(
-            p.kind == inspect.Parameter.VAR_POSITIONAL for p in params.values()
-        )
-        if not has_var_positional:
-            raise TypeError(
-                f"Function {func.__name__}() takes {num_positional_needed} positional arguments but {num_args_provided} were given"
-            )
-        # If *args exists, the extras will be handled later
-
-    for i, arg_val in enumerate(input_args):
-        if i < num_positional_needed:
-            param_name = positional_params[i]
-            if (
-                param_name in func_args
-            ):  # Should not happen if TaskConfig logic is correct
-                raise ValueError(f"Parameter {param_name} bound multiple times")
-            func_args[param_name] = arg_val
-            bound_params.append(param_name)
-        # else: Extra positional args handled by *args later
-
-    # Mark 'args' as processed for positional binding
-    if input_args:
-        bound_params.append("args")
-
-    # Process 'kwargs' and other inputs for remaining parameters
-    input_kwargs = processed.get("kwargs", {})
     if not isinstance(input_kwargs, dict):
         raise TypeError("Input 'kwargs' must be a dictionary.")
 
-    # Combine explicit kwargs with other top-level inputs
-    # Note: 'kwargs' input takes precedence over other inputs if keys clash
-    all_kw_inputs = {
-        k: v
-        for k, v in processed.items()
-        if k
-        not in ["args", "kwargs", "module", "function"]  # Exclude task-specific keys
-    }
-    all_kw_inputs.update(input_kwargs)  # Explicit kwargs override others
-
-    for name, value in all_kw_inputs.items():
-        if name in params:
-            kw_param: Optional[inspect.Parameter] = params.get(name)
-            if kw_param is None:  # Should not happen if name is in params
-                raise RuntimeError(
-                    f"Internal error: Parameter '{name}' not found in signature."
-                )
-
-            if name in func_args:  # Already bound positionally or as TaskConfig
-                # Allow overriding default value with keyword arg, but not positional
-                if name in positional_params and name in bound_params:
-                    # Check if it was bound by position
-                    is_positional_bound = False
-                    try:
-                        pos_index = positional_params.index(name)
-                        if pos_index < len(input_args):
-                            is_positional_bound = True
-                    except ValueError:
-                        pass  # Not a positional param name
-
-                    if is_positional_bound:
-                        raise TypeError(
-                            f"Function {func.__name__}() got multiple values for argument '{name}'"
-                        )
-                # If not bound positionally, allow keyword override (e.g., for param with default)
-                func_args[name] = value
-            elif kw_param.kind in (
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                inspect.Parameter.KEYWORD_ONLY,
-            ):
-                func_args[name] = value
-                bound_params.append(name)
-            elif kw_param.kind == inspect.Parameter.VAR_KEYWORD:
-                pass  # Handled later
-            # else: VAR_POSITIONAL or POSITIONAL_ONLY (which cannot be passed by keyword)
-            # POSITIONAL_ONLY error caught by func(**func_args) later
-        else:
-            # Parameter not in function signature, potential **kwargs target
-            keyword_params[name] = value  # Store for potential **kwargs
-
-    # Check for missing required arguments *before* checking for unexpected kwargs
-    missing_required = []
-    for name, param in params.items():
-        # Check POSITIONAL_OR_KEYWORD and KEYWORD_ONLY that are required
-        if (
-            param.kind
-            in (
-                inspect.Parameter.POSITIONAL_OR_KEYWORD,
-                inspect.Parameter.KEYWORD_ONLY,
-            )
-            and param.default is inspect.Parameter.empty
-            and name not in func_args
-            and param.annotation is not TaskConfig  # Exclude TaskConfig if injected
-        ):
-            # Double-check it wasn't provided positionally if it's POSITIONAL_OR_KEYWORD
-            is_positional = name in positional_params
-            was_positionally_provided = False
-            if is_positional:
-                try:
-                    pos_index = positional_params.index(name)
-                    if pos_index < len(input_args):
-                        was_positionally_provided = (
-                            True  # It should be in func_args if provided
-                        )
-                except ValueError:
-                    pass  # Should not happen
-
-            if not was_positionally_provided:
-                missing_required.append(name)
-
-        # Check POSITIONAL_ONLY separately
-        elif (
-            param.kind == inspect.Parameter.POSITIONAL_ONLY
-            and param.default is inspect.Parameter.empty
-            and name
-            not in func_args  # Should be caught by positional binding, but check defensively
-        ):
-            missing_required.append(name)
-
-    if missing_required:
-        raise ValueError(f"Missing required argument(s): {', '.join(missing_required)}")
-
-    # --- Now prepare arguments for the final call --- #
-
-    final_args = []
-    final_kwargs = {}
-
-    # 1. Collect positional args explicitly bound from input `args`
-    pos_args_bound_count = 0
-    for i, param_name in enumerate(positional_params):
-        if i < len(input_args):
-            # Check if it was bound to func_args (it should have been)
-            if param_name in func_args:
-                final_args.append(func_args[param_name])
-                pos_args_bound_count += 1
-            else:
-                # This case should be unlikely given the previous logic
-                # but indicates an issue if reached.
-                raise RuntimeError(
-                    f"Internal error: Positional parameter {param_name} expected but not bound."
-                )
-        else:
-            # Positional parameter exists but not enough args provided.
-            # If it has a default, it will be handled by Python.
-            # If it's required, the check above should have caught it.
-            pass
-
-    # 2. Collect extra positional args for *args if present
-    var_positional_name = None
-    for name, param in params.items():
-        if param.kind == inspect.Parameter.VAR_POSITIONAL:
-            var_positional_name = name
-            break
-    if var_positional_name:
-        extra_args = input_args[pos_args_bound_count:]
-        final_args.extend(extra_args)
-
-    # 3. Collect keyword arguments for named parameters
-    for name, value in func_args.items():
-        fk_param: Optional[inspect.Parameter] = params.get(name)
-        # Ensure param exists before proceeding (should always be true if name is in func_args)
-        if fk_param is None:
-            # This indicates an internal logic error if reached
-            raise RuntimeError(
-                f"Internal error: Parameter '{name}' not found in signature despite being in func_args."
-            )
-
-        # Assert param is not None to satisfy mypy before using its attributes
-        assert fk_param is not None
-
-        # Now we can safely use param, knowing it's not None
-        if fk_param.kind != inspect.Parameter.POSITIONAL_ONLY:
-            # Only include if it's not POSITIONAL_ONLY (which must be in final_args)
-            # Check if it was *already* added via positional args binding
-            is_positionally_bound = False
-            try:
-                pos_index = positional_params.index(name)
-                if pos_index < pos_args_bound_count:
-                    is_positionally_bound = True
-            except ValueError:
-                pass
-
-            if not is_positionally_bound:
-                final_kwargs[name] = value
-
-    # 4. Collect extra keyword arguments for **kwargs if present
-    var_keyword_name = None
-    for name, param in params.items():
-        if param.kind == inspect.Parameter.VAR_KEYWORD:
-            var_keyword_name = name
-            break
-    if var_keyword_name:
-        # Pass only the keyword arguments explicitly gathered for **kwargs
-        final_kwargs.update(keyword_params)
-    elif keyword_params:
-        # Extra keywords provided but no **kwargs parameter
-        # Ensure keyword_params doesn't contain func_args already assigned
-        unexpected_kwargs = {
-            k: v for k, v in keyword_params.items() if k not in func_args
-        }
-        if unexpected_kwargs:
-            # Raise the TypeError only *after* confirming required args are present
-            raise TypeError(
-                f"Function {func.__name__}() got unexpected keyword arguments: {list(unexpected_kwargs.keys())}"
-            )
-
-    # Call the function
+    # Attempt to bind arguments using inspect.bind
+    # This handles positional, keyword, defaults, *args, **kwargs, etc.
     try:
-        return func(*final_args, **final_kwargs)
+        bound_args = sig.bind(*input_args, **input_kwargs)
+        bound_args.apply_defaults()  # Apply defaults for unbound optional parameters
+
+        # Now call the function with the bound arguments
+        logger.debug(f"Calling {func.__name__} with bound args: {bound_args.arguments}")
+        if inspect.iscoroutinefunction(func):
+            # Execute async function
+            logger.debug(f"Executing async function {func.__name__}")
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            result = loop.run_until_complete(
+                func(*bound_args.args, **bound_args.kwargs)
+            )
+            if not asyncio.get_event_loop().is_running():
+                loop.close()
+        else:
+            # Execute sync function
+            logger.debug(f"Executing sync function {func.__name__}")
+            result = func(*bound_args.args, **bound_args.kwargs)
+
+        logger.debug(f"Function returned: {result}")
+        return result
+
     except TypeError as e:
-        # Improve error message for TypeError during call
-        # Check for common errors like missing required args that might have been missed
-        if (
-            "required positional argument" in str(e)
-            or "missing" in str(e).lower()
-            and "required argument" in str(e).lower()
-        ):
-            # Try to identify the missing argument from the signature vs provided
-            provided_arg_names = set(final_kwargs.keys()) | {
-                positional_params[i] for i in range(len(final_args))
-            }
-            for name, missing_check_param in params.items():
-                if (
-                    missing_check_param.default is inspect.Parameter.empty
-                    and name not in provided_arg_names
-                    and missing_check_param.kind
-                    not in (
-                        inspect.Parameter.VAR_POSITIONAL,
-                        inspect.Parameter.VAR_KEYWORD,
-                    )
-                    # Check TaskConfig annotation using the correct variable
-                    and missing_check_param.annotation is not TaskConfig
-                ):
-                    # This check might be redundant now, but keep for safety
-                    # If we missed it earlier, raise it now.
-                    raise ValueError(
-                        f"Missing required argument: {name}"
-                    ) from e  # pylint: disable=redundant-value-error
-        # Re-raise original TypeError if it's something else
-        raise TypeError(f"Error calling function '{func.__name__}': {e}") from e
+        # Let TypeError from binding propagate up
+        # Include function name in the error for clarity
+        raise TypeError(f"Error binding arguments for {func.__name__}: {e}") from e
+    except Exception as e:
+        # Catch other errors during function execution
+        logger.error(f"Error executing function {func.__name__}: {e}", exc_info=True)
+        # Wrap in a generic exception or re-raise depending on desired handling
+        raise Exception(f"Error during execution of {func.__name__}: {e}") from e
 
 
 def _find_script(script_path: str, workspace: Path) -> Path:
@@ -1003,6 +770,7 @@ def python_function(config: TaskConfig) -> Dict[str, Any]:
         processed = config.process_inputs()
         config._processed_inputs = processed  # Store for helpers
 
+        # Get module/function from processed inputs
         module_name = processed.get("module")
         function_name = processed.get("function")
 
@@ -1015,9 +783,10 @@ def python_function(config: TaskConfig) -> Dict[str, Any]:
         func = _load_function(module_name, function_name)
         result_value = _execute_python_function(func, config)
 
-        result = {"result": result_value}
-        log_task_result(logger, result)
-        return result
+        # Log the result (as a dict for consistency in logs)
+        log_task_result(logger, result={"result": result_value})
+        # Return the raw result_value, engine will wrap it
+        return result_value
 
     except Exception as e:
         context = ErrorContext(

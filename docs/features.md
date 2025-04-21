@@ -18,16 +18,22 @@ args:
     type: string
     description: Input file to process
     default: input.csv
-  
+  api_key_param: 
+    type: string
+    description: API key, can be passed via CLI
+    required: false
+
 env:
   WORKSPACE: /data/processing
-  API_KEY: "{{ args.api_key }}"
+  # Env var set from a param (accessed via args namespace)
+  API_KEY: "{{ args.api_key_param }}"
 
 steps:
   read_data:
     name: read_data
     task: read_file
     inputs:
+      # Accessing param via args namespace
       file_path: "{{ args.input_file }}"
       encoding: utf-8
 
@@ -37,36 +43,54 @@ steps:
     inputs:
       code: |
         # Access data through namespaces
-        data = steps['read_data']['result']
-        workspace = env['WORKSPACE']
-        
+        data = context['steps']['read_data']['result']
+        workspace = context['env']['WORKSPACE']
+        # Access param value via context dictionary if needed inside Python
+        api_key = context['args']['api_key_param'] 
         # Process data
-        result = transform_data(data)
+        result = transform_data(data, api_key)
 ```
 
 ### Namespace Support
 
 Access variables through isolated namespaces:
 
-- `args`: Command-line arguments and workflow parameters
-- `env`: Environment variables
-- `steps`: Results from previous steps
-- `batch`: Batch processing context (in batch tasks)
-- `current`: Information about the current task
+- `params`: (Definition Block) The top-level `params:` block in your workflow YAML is used to *define* the expected parameters, their types, descriptions, defaults, and whether they are required.
+- `args`: (Runtime Namespace) Holds the *resolved runtime values* of workflow parameters for use in tasks and templates. This namespace contains values from the `params:` block defaults, potentially overridden by arguments passed via the command line (`name=value` format). Access via `{{ args.PARAM_NAME }}`.
+- `env`: Environment variables (`{{ env.VAR_NAME }}`).
+- `steps`: Results from previous steps (`{{ steps.STEP_NAME.result }}` or `{{ steps.STEP_NAME.result.KEY }}`).
+- `batch`: Batch processing context (`{{ batch.item }}`, `{{ batch.index }}`, etc.).
+- `current`: Information about the current task (`{{ current.name }}`).
+- `workflow`: Workflow-level information (`{{ workflow.workspace }}`, `{{ workflow.run_id }}`).
 
 Example:
 ```yaml
+# Workflow Definition (my_workflow.yaml)
+name: cli_example
+params:
+  input_file_param: 
+    description: Input file defined in params
+    default: default.csv
+  debug_level:
+    description: Debug level defined in params
+    default: info
+
 steps:
   process_data:
     name: process_data
     task: shell
     inputs:
       command: |
-        # Access from different namespaces
-        echo "Input: {{ args.input_file }}"
-        echo "API Key: {{ env.API_KEY }}"
-        echo "Previous: {{ steps.previous.result }}"
-        echo "Current: {{ steps.current.name }}"
+        # Example Command Line:
+        # python -m yaml_workflow run my_workflow.yaml input_file_param=override.csv extra_cli_arg=cli_value
+        
+        # Access resolved values via 'args' namespace:
+        echo "Input File: {{ args.input_file_param }}"  # Will output: override.csv
+        echo "Debug Level: {{ args.debug_level }}"     # Will output: info (default, not overridden)
+        echo "Extra CLI Arg: {{ args.extra_cli_arg }}" # Will output: cli_value
+        echo "API Key (env): {{ env.API_KEY }}"
+        echo "Previous Step Result: {{ steps.previous.result }}" # Example only
+        echo "Current Step Name: {{ current.name }}"
 ```
 
 ### Error Handling
