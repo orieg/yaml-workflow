@@ -149,7 +149,7 @@ class WorkflowEngine:
                 )
 
         # Validate required sections
-        if not self.workflow.get("steps") and not self.workflow.get("flows"):
+        if "steps" not in self.workflow and "flows" not in self.workflow:
             raise WorkflowError(
                 "Invalid workflow file: missing both 'steps' and 'flows' sections"
             )
@@ -196,8 +196,7 @@ class WorkflowEngine:
         }
 
         # Add workflow file path if available
-        if self.workflow_file:
-            self.context["workflow_file"] = str(self.workflow_file.absolute())
+        self.context["workflow_file"] = str(self.workflow_file.absolute()) if self.workflow_file else ""
 
         # Load default parameter values from workflow file
         params = self.workflow.get("params", {})
@@ -631,41 +630,33 @@ class WorkflowEngine:
             "execution_state": self.state.metadata["execution_state"],
         }
 
-    def setup_workspace(self) -> Path:
-        """
-        Set up the workspace for this workflow run.
-
-        Returns:
-            Path: Path to the workspace directory
-        """
-        # Get workflow name from usage section or file name
-        workflow_name = self.workflow.get("usage", {}).get("name") or (
-            self.workflow_file.stem if self.workflow_file else "unnamed_workflow"
-        )
+    def setup_workspace(self, base_dir: str, workspace: Optional[str]) -> Path:
+        """Set up the workspace directory for the workflow run."""
+        # Determine workflow name (used for subfolder)
+        if self.workflow_file:
+            workflow_name = self.workflow_file.stem
+        else:
+            workflow_name = self.workflow.get("name", "workflow")
 
         # Create workspace
-        self.workspace = create_workspace(
+        workspace_path, run_number = create_workspace(
+            base_dir=base_dir,
             workflow_name=workflow_name,
-            custom_dir=getattr(self, "workspace_dir", None),
-            base_dir=getattr(self, "base_dir", "runs"),
+            workspace=workspace,
         )
 
-        # Initialize workspace info in context
-        workspace_info = get_workspace_info(self.workspace)
-        self.context.update(
-            {
-                "workspace": str(self.workspace),
-                "run_number": int(self.workspace.name.split("_run_")[-1]),
-                "timestamp": datetime.now().isoformat(),
-                "workflow_name": workflow_name,
-                "workflow_file": str(
-                    self.workflow_file.absolute() if self.workflow_file else ""
-                ),
-            }
+        # Update context with workspace details
+        self.context["workflow_name"] = workflow_name
+        self.context["run_number"] = run_number
+        self.context["timestamp"] = datetime.now().strftime("%Y%m%d_%H%M%S")
+        # <<< Ensure workflow_file path is set in context >>>
+        self.context["workflow_file"] = (
+            str(self.workflow_file.absolute()) if self.workflow_file else ""
         )
+        # <<< Also set the main workspace path in context >>>
+        self.context["workspace"] = str(workspace_path.absolute())
 
-        self.logger.info(f"Created workspace: {self.workspace}")
-        return self.workspace
+        return workspace_path
 
     def resolve_template(self, template_str: str) -> str:
         """
