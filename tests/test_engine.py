@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 
 import pytest
@@ -914,3 +915,343 @@ def test_setup_workspace_workflow_name_from_file(tmp_path):
 #     assert "Value 'abc' is shorter than minimum length 5" in str(exc_info.value)
 
 # Add more tests below as needed
+
+
+def test_complex_error_flow_handling(tmp_path):
+    """Test complex error flow handling scenarios including:
+    1. Invalid on_error.next target handling (lines 355-362)
+    2. Error template failure handling (lines 705-716)
+    3. Retry with delay handling (lines 731-753)
+    """
+    # Track retry delays
+    delay_times = []
+
+    # Custom test task to track delays
+    @register_task("delay_tracker")
+    def delay_tracker_task(config: TaskConfig):
+        nonlocal delay_times
+
+        # For retry testing
+        retry_count = len(delay_times)
+        if retry_count < 2:
+            delay_times.append(time.time())
+            raise ValueError(f"Deliberate failure for retry {retry_count + 1}")
+
+        # Return success on third try
+        delay_times.append(time.time())
+        return {"attempts": len(delay_times)}
+
+    # --- Test 1: Invalid error flow target ---
+    workflow_invalid_target = {
+        "steps": [
+            {
+                "name": "step1",
+                "task": "echo",
+                "inputs": {"message": "Initial step"},
+            },
+            {
+                "name": "step2_invalid_jump",
+                "task": "fail",
+                "inputs": {"message": "Failure with invalid jump"},
+                "on_error": {"next": "nonexistent_step"},  # Target doesn't exist
+            },
+        ]
+    }
+
+    engine = WorkflowEngine(workflow_invalid_target, base_dir=tmp_path)
+
+    # Should raise WorkflowError with specific message about invalid target
+    with pytest.raises(WorkflowError) as exc_info:
+        engine.run()
+
+    assert "Invalid on_error.next target 'nonexistent_step'" in str(exc_info.value)
+
+    # --- Test 2: Error template failure ---
+    workflow_template_error = {
+        "steps": [
+            {
+                "name": "step1",
+                "task": "fail",
+                "inputs": {"message": "Template error test"},
+                "on_error": {
+                    "action": "fail",
+                    # Use invalid template syntax that will fail during error handling
+                    "message": "Error with invalid template: {{ error.missing_key.nonexistent }}",
+                },
+            },
+        ]
+    }
+
+    engine = WorkflowEngine(workflow_template_error, base_dir=tmp_path)
+
+    # Should still fail and preserve original error, with warning about template
+    with pytest.raises(WorkflowError) as exc_info:
+        engine.run()
+
+    # Check that original error is preserved despite template error
+    assert "Template error test" in str(exc_info.value)
+
+    # Check the state to see the fallback error message
+    state = engine.state.get_state()
+    assert state["steps"]["step1"]["status"] == "failed"
+    # Template error fallback message includes original error
+    assert "Template error test" in state["steps"]["step1"]["error"]
+    assert "failed to format custom message" in state["steps"]["step1"]["error"]
+
+    # --- Test 3: Retry with delay ---
+    workflow_retry_delay = {
+        "steps": [
+            {
+                "name": "step_with_delay",
+                "task": "delay_tracker",
+                "on_error": {
+                    "retry": 2,
+                    "delay": 0.25,  # 250ms delay between retries
+                    "message": "Retrying after delay",
+                },
+            },
+        ]
+    }
+
+    # Reset delay tracking
+    delay_times = []
+
+    engine = WorkflowEngine(workflow_retry_delay, base_dir=tmp_path)
+    result = engine.run()
+
+    # Should complete successfully after retries
+    assert result["status"] == "completed"
+
+    # Should have 3 tracked times (initial + 2 retries)
+    assert len(delay_times) == 3
+
+    # Check that delays were actually applied
+    # First retry should be at least 0.25s after initial attempt
+    assert delay_times[1] - delay_times[0] >= 0.25
+    # Second retry should be at least 0.25s after first retry
+    assert delay_times[2] - delay_times[1] >= 0.25
+
+    # Check final state and output
+    assert result["outputs"]["step_with_delay"]["result"]["attempts"] == 3
+
+
+def test_complex_flow_transitions_and_conditions(tmp_path):
+    """Test complex flow transitions with conditions and error handling.
+    Specifically targets lines 947-974 in engine.py covering:
+    - Conditional step execution
+    - Skipping steps based on conditions
+    - Flow jump handling after steps are skipped
+    - Mark skipped steps during final state update
+    """
+    # Setup workflow with conditions and flow jumps
+    workflow = {
+        "steps": [
+            {
+                "name": "init_var",
+                "task": "python_code",
+                "inputs": {"code": "result = {'status': 'good', 'counter': 0}"},
+            },
+            {
+                "name": "check_condition_true",
+                "task": "echo",
+                "inputs": {"message": "This step should run"},
+                # Condition is true, step should execute
+                "condition": "{{ steps.init_var.result.status == 'good' }}",
+            },
+            {
+                "name": "check_condition_false",
+                "task": "echo",
+                "inputs": {"message": "This step should be skipped"},
+                # Condition is false, step should be skipped
+                "condition": "{{ steps.init_var.result.status == 'bad' }}",
+            },
+            {
+                "name": "jump_source",
+                "task": "fail",
+                "inputs": {"message": "Error that triggers jump"},
+                # Should jump to recovery_step
+                "on_error": {"next": "recovery_step"},
+            },
+            {
+                "name": "skipped_after_jump",
+                "task": "echo",
+                "inputs": {"message": "This step should be skipped due to jump"},
+            },
+            {
+                "name": "recovery_step",
+                "task": "python_code",
+                "inputs": {"code": "result = {'recovered': True}"},
+            },
+            {
+                "name": "final_step",
+                "task": "python_code",
+                "inputs": {"code": "result = {'completed': True}"},
+            },
+        ]
+    }
+
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run()
+
+    # Workflow should complete
+    assert result["status"] == "completed"
+
+    # Get final state
+    final_state = engine.state.get_state()
+
+    # --- Verify conditions handled correctly ---
+    # Step with true condition should run
+    assert final_state["steps"]["check_condition_true"]["status"] == "completed"
+
+    # Step with false condition should be marked as skipped
+    assert final_state["steps"]["check_condition_false"]["status"] == "skipped"
+    assert "Condition" in final_state["steps"]["check_condition_false"]["reason"]
+
+    # --- Verify jump handling ---
+    # Source step should be failed
+    assert final_state["steps"]["jump_source"]["status"] == "failed"
+
+    # Step after failed step should be skipped due to jump
+    assert final_state["steps"]["skipped_after_jump"]["status"] == "skipped"
+    assert (
+        "Workflow execution path"
+        in final_state["steps"]["skipped_after_jump"]["reason"]
+    )
+
+    # Recovery step should run
+    assert final_state["steps"]["recovery_step"]["status"] == "completed"
+    assert result["outputs"]["recovery_step"]["result"]["recovered"] is True
+
+    # Final step should also run
+    assert final_state["steps"]["final_step"]["status"] == "completed"
+    assert result["outputs"]["final_step"]["result"]["completed"] is True
+
+    # --- Verify context structure ---
+    # Verify all completed steps have proper results in context
+    assert "init_var" in result["context"]["steps"]
+    assert result["context"]["steps"]["init_var"]["result"]["status"] == "good"
+    assert "recovery_step" in result["context"]["steps"]
+    assert result["context"]["steps"]["recovery_step"]["result"]["recovered"] is True
+
+
+def test_complex_template_resolution_and_validation(tmp_path):
+    """Test complex template resolution scenarios and parameter validation.
+    Specifically targets lines 31-36 and 75-82 in template.py and related lines in engine.py.
+    Tests:
+    - Complex nested templates
+    - Error handling for undefined variables
+    - Template resolution with default filters
+    - Parameter validation errors
+    """
+    # --- Test 1: Basic arithmetic templates ---
+    workflow_basic_templates = {
+        "params": {
+            "base_value": 10,
+            "multiplier": 5,
+        },
+        "steps": [
+            {
+                "name": "math_template",
+                "task": "echo",
+                "inputs": {
+                    # Simple arithmetic template
+                    "message": "Result: {{ args.base_value * args.multiplier }}"
+                },
+            },
+            {
+                "name": "template_with_default",
+                "task": "echo",
+                "inputs": {
+                    "message": "{{ args.nonexistent | default('fallback_value') }}"
+                },
+            },
+        ],
+    }
+
+    engine = WorkflowEngine(workflow_basic_templates, base_dir=tmp_path)
+    result = engine.run()
+
+    # Check math template resolution
+    assert result["outputs"]["math_template"]["result"] == "Result: 50"
+
+    # Check default filter worked for missing key
+    assert result["outputs"]["template_with_default"]["result"] == "fallback_value"
+
+    # --- Test 2: Error for undefined variables in strict mode ---
+    workflow_undefined_vars = {
+        "steps": [
+            {
+                "name": "undefined_var",
+                "task": "echo",
+                "inputs": {
+                    "message": "{{ nonexistent_variable }}",
+                },
+            },
+        ],
+    }
+
+    engine = WorkflowEngine(workflow_undefined_vars, base_dir=tmp_path)
+
+    # Should fail with TemplateError due to undefined variable
+    with pytest.raises(WorkflowError) as exc_info:
+        engine.run()
+
+    # Check error message indicates template issue
+    assert (
+        "nonexistent" in str(exc_info.value).lower()
+        or "undefined" in str(exc_info.value).lower()
+    )
+
+    # --- Test 3: Required parameter validation ---
+    workflow_required_param = {
+        "params": {
+            "required_param": {
+                "required": True,
+            },
+        },
+        "steps": [
+            {
+                "name": "step1",
+                "task": "echo",
+                "inputs": {"message": "{{ args.required_param }}"},
+            },
+        ],
+    }
+
+    engine = WorkflowEngine(workflow_required_param, base_dir=tmp_path)
+
+    # Should fail because required_param is not provided
+    with pytest.raises(WorkflowError) as exc_info:
+        engine.run()
+
+    # Check error message about required parameter
+    assert "Required parameter 'required_param' is undefined" in str(exc_info.value)
+
+    # Verify the error is marked in the state
+    state = engine.state.get_state()
+    assert state["execution_state"]["status"] == "failed"
+    assert (
+        state["execution_state"]["failed_step"]["step_name"] == "parameter_validation"
+    )
+
+    # --- Test 4: Access to variable through step outputs ---
+    workflow_step_access = {
+        "steps": [
+            {
+                "name": "set_var",
+                "task": "python_code",
+                "inputs": {"code": "result = {'value': 42}"},
+            },
+            {
+                "name": "access_var",
+                "task": "echo",
+                "inputs": {"message": "Value is: {{ steps.set_var.result.value }}"},
+            },
+        ],
+    }
+
+    engine = WorkflowEngine(workflow_step_access, base_dir=tmp_path)
+    result = engine.run()
+
+    # Check that variable was accessed correctly
+    assert result["outputs"]["access_var"]["result"] == "Value is: 42"
