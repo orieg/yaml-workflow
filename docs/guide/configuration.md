@@ -44,6 +44,11 @@ steps:
     task: file_check
     params:
       path: "{{ args.input_file }}"
+  - name: process_data
+    task: python_code
+    description: Processes input data based on environment.
+    inputs:
+      data_source: "{{ args.source }}"
   - name: process_batch
     task: batch
     inputs:
@@ -57,7 +62,7 @@ steps:
       
       # Processing task
       task:
-        task: python
+        task: python_code
         inputs:
           code: "process_item()"
       
@@ -100,7 +105,7 @@ steps:
       chunk_size: 10
       # ... other batch parameters ...
       task: # The task to run on each item/chunk
-        task: python 
+        task: python_code 
         # ... sub-task inputs ... 
 ```
 
@@ -140,3 +145,17 @@ Available template variables are organized in namespaces:
     {{ workflow.run_id }}        # Unique run ID
     {{ workflow.timestamp }}     # Current time
     ``` 
+
+# Use StrictUndefined to catch missing variables
+settings:
+  error_handling:
+    undefined_variables: strict
+
+steps:
+  - name: task_with_potential_error
+    task: python_code # Use python_code for example
+    inputs:
+      code: |
+        # This will raise TemplateError if 'args.maybe_missing' is not provided
+        value = "{{ args.maybe_missing }}"
+        result = value.upper() 

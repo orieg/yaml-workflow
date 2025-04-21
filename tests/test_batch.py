@@ -49,7 +49,7 @@ def test_batch_basic(workspace, basic_context, sample_items):
         "inputs": {
             "items": sample_items,
             "task": {
-                "task": "python",
+                "task": "python_code",
                 "inputs": {"code": "result = f'Processing {item}'"},
             },
         },
@@ -79,7 +79,7 @@ def test_batch_with_failures(workspace, basic_context):
         "inputs": {
             "items": items,
             "task": {
-                "task": "python",
+                "task": "python_code",
                 "inputs": {
                     "code": """if "fail" in item:
     raise ValueError(f"Failed to process {item}")
@@ -113,7 +113,7 @@ def test_batch_chunk_processing(workspace, basic_context, sample_items):
             "chunk_size": 3,
             "max_workers": 2,
             "task": {
-                "task": "python",
+                "task": "python_code",
                 "inputs": {
                     "code": """result = f'Processing {item} in chunk {batch["chunk_index"]}'\
 """
@@ -149,7 +149,7 @@ def test_batch_template_resolution(workspace, basic_context):
             "items": '{{ args["items"] | map("upper") | list }}',
             "chunk_size": '{{ args["multiplier"] }}',  # Template in configuration
             "task": {
-                "task": "python",
+                "task": "python_code",
                 "inputs": {
                     # Test nested template resolution and conditional logic
                     "code": """
@@ -191,7 +191,9 @@ def test_batch_validation(workspace, basic_context):
     step = {
         "name": "test_batch_validation_items",
         "task": "batch",
-        "inputs": {"task": {"task": "python", "inputs": {"code": "result = 'test'"}}},
+        "inputs": {
+            "task": {"task": "python_code", "inputs": {"code": "result = 'test'"}}
+        },
     }
 
     config = TaskConfig(step, basic_context, workspace)
@@ -218,7 +220,7 @@ def test_batch_validation(workspace, basic_context):
         "inputs": {
             "items": ["item1", "item2"],
             "chunk_size": 0,
-            "task": {"task": "python", "inputs": {"code": "result = 'test'"}},
+            "task": {"task": "python_code", "inputs": {"code": "result = 'test'"}},
         },
     }
 
@@ -234,7 +236,7 @@ def test_batch_validation(workspace, basic_context):
         "inputs": {
             "items": ["item1", "item2"],
             "max_workers": 0,
-            "task": {"task": "python", "inputs": {"code": "result = 'test'"}},
+            "task": {"task": "python_code", "inputs": {"code": "result = 'test'"}},
         },
     }
 
@@ -255,7 +257,7 @@ def test_batch_context_variables(workspace, basic_context, sample_items):
             "items": sample_items[:3],  # Use first 3 items
             "chunk_size": 2,
             "task": {
-                "task": "python",
+                "task": "python_code",
                 "inputs": {
                     "code": """result = {
         'item': batch['item'],
@@ -290,7 +292,7 @@ def test_batch_empty_items(workspace, basic_context):
         "task": "batch",
         "inputs": {
             "items": [],
-            "task": {"task": "python", "inputs": {"code": "result = 'test'"}},
+            "task": {"task": "python_code", "inputs": {"code": "result = 'test'"}},
         },
     }
 
@@ -315,7 +317,7 @@ def test_parallel_execution_time(workspace, basic_context):
             "items": ["file1", "file2", "file3"],
             "max_workers": 3,
             "task": {
-                "task": "python",
+                "task": "python_code",
                 "inputs": {
                     "code": """
 import time
@@ -345,7 +347,7 @@ def test_batch_max_workers(workspace, basic_context):
             "items": list(range(10)),
             "max_workers": 2,
             "task": {
-                "task": "python",
+                "task": "python_code",
                 "inputs": {
                     "code": """
 import time

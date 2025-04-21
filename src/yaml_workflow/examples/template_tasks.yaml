@@ -39,8 +39,8 @@ params:
 steps:
   # Step 1: Validate and parse user data
   - name: validate_input
-    task: python
-    params:
+    task: python_code
+    inputs:
       code: |
         import json
         from typing import Dict, Any
@@ -63,6 +63,7 @@ steps:
           raise ValueError("interests must be a list")
           
         result = user_data
+        result_variable: result
 
   # Step 2: Create base templates
   - name: create_templates

@@ -150,9 +150,9 @@ steps:
 
 Execute Python code within workflows:
 
-- `python`: Run Python code with access to workflow context
+- `python_code`: Run Python code with access to workflow context
   ```yaml
-  task: python
+  task: python_code
   inputs:
     code: string       # Required: Python code to execute
     globals: object    # Optional: Global variables
@@ -304,3 +304,27 @@ Dependencies can be:
 - Single task: `depends_on: task_name`
 - Multiple tasks: `depends_on: [task1, task2]`
 - Conditional: `depends_on: "{{ success_of_task }}"` 
+
+## Examples
+
+### Basic File Processing
+
+```yaml
+steps:
+  - name: read_input
+    task: read_file
+    inputs:
+      file: "input.txt"
+  
+  - name: process_content
+    task: python_code # Updated
+    inputs:
+      code: |
+        content = steps.read_input.result.content
+        # ... process content ...
+        result = processed_content
+```
+
+*   [Shell Tasks](shell-tasks.md): Execute shell commands.
+*   [Python Tasks](python-tasks.md): Execute Python code, functions, scripts, or modules.
+*   [Batch Tasks](batch-tasks.md): Process items in batches. 
