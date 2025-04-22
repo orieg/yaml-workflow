@@ -59,3 +59,6 @@ runs/
 
 # Workflow logs
 logs/
+
+# Workflow execution directory
+/__workflows__/
