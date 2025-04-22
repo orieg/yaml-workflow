@@ -1,433 +1,143 @@
-# Task Modules for Development
+# Task Modules Development Roadmap
 
-## Browser Automation Tasks (`browser.*`)
-- `browser.screenshot` - Capture full/partial page screenshots
-- `browser.pdf` - Generate PDF from pages
-- `browser.scrape` - Extract structured data from pages
-- `browser.form` - Fill and submit forms
-- `browser.test` - Run browser-based tests
-- `browser.monitor` - Monitor page changes/availability
-- `browser.auth` - Handle authentication flows
+This document outlines potential task modules for the YAML Workflow Engine, prioritized based on common automation needs and integration complexity. Use the checkboxes to track implementation progress.
 
-## Atlassian Integration (`atlassian.*`)
-- `atlassian.jira`
-  - Create/update issues
-  - Transition workflows
-  - Add comments
-  - Attach files
-  - Search issues
-  - Update sprints
-- `atlassian.confluence`
-  - Create/update pages
-  - Export content
-  - Manage attachments
-  - Handle templates
-- `atlassian.bitbucket`
-  - Manage pull requests
-  - Review code
-  - Handle repositories
-- `atlassian.bamboo`
-  - Trigger builds
-  - Check build status
-  - Download artifacts
+## High Priority / Core Functionality
 
-## Git Operations (`git.*`)
-- `git.clone` - Clone repositories
-- `git.commit` - Create commits with messages
-- `git.branch` - Branch management
-- `git.merge` - Handle merges
-- `git.tag` - Manage tags
-- `git.pr` - Create/manage pull requests
-- `git.sync` - Sync repositories/branches
+These tasks represent fundamental capabilities for common workflow automation scenarios.
 
-## Database Tasks (`db.*`)
-- `db.query` - Run SQL queries
-- `db.migrate` - Handle migrations
-- `db.backup` - Create backups
-- `db.restore` - Restore from backups
-- `db.compare` - Compare schemas/data
-- `db.seed` - Seed test data
+### HTTP Tasks (`http.*`)
+- [ ] `http.request` - Make HTTP requests (GET, POST, PUT, DELETE), handle auth, headers, bodies, files, retries, SSL, timeouts, validation.
+- [ ] `http.graphql` - Execute GraphQL queries with variables, auth.
+- [ ] `http.websocket` - Manage WebSocket connections, send/receive messages.
+- [ ] `http.webhook` - Create webhook endpoints, process incoming requests, validate signatures.
 
-## Docker Tasks (`docker.*`)
-- `docker.build` - Build images
-- `docker.run` - Run containers
-- `docker.compose` - Manage compose services
-- `docker.clean` - Cleanup resources
-- `docker.push` - Push to registry
-- `docker.test` - Test containers
+### Notification Tasks (`notify.*`)
+- [ ] `notify.slack` - Send Slack messages.
+- [ ] `notify.email` - Send emails.
+- [ ] `notify.teams` - Send MS Teams messages.
+- [ ] `notify.webhook` - Send notifications via generic webhooks.
 
-## Cloud Tasks (`cloud.*`)
-- `cloud.s3` - S3 operations
-- `cloud.lambda` - Lambda management
-- `cloud.ec2` - EC2 instance operations
-- `cloud.azure` - Azure services
-- `cloud.gcp` - Google Cloud Platform
+### Git Operations (`git.*`)
+- [ ] `git.clone` - Clone repositories.
+- [ ] `git.commit` - Create commits.
+- [ ] `git.branch` - Manage branches.
+- [ ] `git.merge` - Handle merges.
+- [ ] `git.tag` - Manage tags.
+- [ ] `git.sync` - Sync repositories/branches.
+- [ ] `git.pr` - Create/manage pull requests (potentially via platform-specific APIs or hub/gh CLI).
 
-## Testing Tasks (`test.*`)
-- `test.unit` - Run unit tests
-- `test.e2e` - End-to-end testing
-- `test.api` - API testing
-- `test.load` - Load testing
-- `test.security` - Security scanning
-- `test.coverage` - Coverage reports
+### Data Processing (`data.*`)
+- [ ] `data.etl` - Extract, Transform, Load data from various sources/destinations.
+- [ ] `data.validate` - Perform schema and data quality validation.
+- [ ] `data.transform` - Handle data type conversions, formatting, enrichment.
 
-## Documentation Tasks (`docs.*`)
-- `docs.generate` - Generate documentation
-- `docs.publish` - Publish to hosting
-- `docs.validate` - Check documentation
-- `docs.screenshot` - Capture documentation
-- `docs.api` - Generate API docs
+### Database Tasks (`db.*`)
+- [ ] `db.query` - Run SQL queries against various database types.
 
-## Build Tasks (`build.*`)
-- `build.package` - Create packages
-- `build.docker` - Build containers
-- `build.docs` - Build documentation
-- `build.assets` - Process assets
-- `build.release` - Create releases
+## Medium Priority / Valuable Additions
 
-## Notification Tasks (`notify.*`)
-- `notify.slack` - Slack messages
-- `notify.email` - Send emails
-- `notify.teams` - MS Teams messages
-- `notify.webhook` - Generic webhooks
-- `notify.mobile` - Mobile notifications
+These tasks offer significant value for specific use cases like CI/CD, cloud interactions, and advanced data handling.
 
-## Monitoring Tasks (`monitor.*`)
-- `monitor.health` - Health checks
-- `monitor.metrics` - Collect metrics
-- `monitor.logs` - Log analysis
-- `monitor.alerts` - Alert on conditions
-- `monitor.report` - Generate reports
+### Docker Tasks (`docker.*`)
+- [ ] `docker.build` - Build container images.
+- [ ] `docker.run` - Run containers.
+- [ ] `docker.compose` - Manage compose services.
+- [ ] `docker.push` - Push images to a registry.
+- [ ] `docker.clean` - Cleanup Docker resources.
+- [ ] `docker.test` - Basic container testing/health checks.
 
-## Security Tasks (`security.*`)
-- `security.scan` - Security scanning
-- `security.audit` - Code auditing
-- `security.secrets` - Secrets management
-- `security.compliance` - Compliance checks
+### Cloud Tasks (`cloud.*`) (Core Operations)
+*Focus on fundamental operations for major providers. Requires careful design for abstraction/configuration.*
+- [ ] `cloud.s3.upload` - Upload files to S3/compatible storage.
+- [ ] `cloud.s3.download` - Download files from S3/compatible storage.
+- [ ] `cloud.s3.list` - List objects in S3/compatible storage.
+- [ ] `cloud.lambda.invoke` - Invoke AWS Lambda functions.
+- [ ] `cloud.azure.blob.upload` - Upload files to Azure Blob Storage.
+- [ ] `cloud.azure.blob.download` - Download files from Azure Blob Storage.
+- [ ] `cloud.gcp.storage.upload` - Upload files to Google Cloud Storage.
+- [ ] `cloud.gcp.storage.download` - Download files from Google Cloud Storage.
+*(Further cloud tasks based on demand)*
 
-## Local Development (`local.*`)
-- `local.serve` - Run development servers
-- `local.watch` - Watch for changes
-- `local.tunnel` - Create tunnels
-- `local.mock` - Mock services
-- `local.profile` - Performance profiling
+### Advanced Database Tasks (`db.*`)
+- [ ] `db.migrate` - Handle database schema migrations.
+- [ ] `db.seed` - Seed test data.
+- [ ] `db.backup` - Create database backups.
+- [ ] `db.restore` - Restore from backups.
 
-## Data Processing (`data.*`) [Planned]
-- `data.etl`
-  - Extract data from various sources (files, databases, APIs)
-  - Transform data with custom functions
-  - Load data to target destinations
-  - Handle large datasets with chunking
-  - Track processing progress
-  - Resume interrupted operations
-- `data.validate`
-  - Schema validation
-  - Data quality checks
-  - Custom validation rules
-  - Validation reporting
-  - Error handling and logging
-- `data.transform`
-  - Data type conversions
-  - Format standardization
-  - Data enrichment
-  - Custom transformations
-  - Batch processing support
-- `data.analyze`
-  - Statistical analysis
-  - Pattern detection
-  - Data profiling
-  - Summary generation
-  - Custom analytics functions
-- `data.visualize`
-  - Generate charts and graphs
-  - Export visualizations
-  - Interactive dashboards
-  - Custom visualization types
-- `data.stream`
-  - Stream processing capabilities
-  - Real-time transformations
-  - Event-based processing
-  - Error handling and recovery
+### Advanced Data Processing (`data.*`)
+- [ ] `data.analyze` - Statistical analysis, profiling, pattern detection.
+- [ ] `data.visualize` - Generate charts and graphs (basic).
+- [ ] `data.stream` - Basic stream processing capabilities.
 
-## API Tasks (`api.*`)
-- `api.test` - Test endpoints
-- `api.mock` - Mock endpoints
-- `api.doc` - Generate documentation
-- `api.validate` - Validate responses
-- `api.monitor` - Monitor endpoints
+### Build Tasks (`build.*`)
+- [ ] `build.package` - Create application packages (e.g., wheels, jars - might leverage shell/python).
+- [ ] `build.assets` - Process static assets.
 
-## HTTP Tasks (`http.*`)
-- `http.request`
-  - Make HTTP requests (GET, POST, PUT, DELETE)
-  - Handle authentication (Basic, Bearer, OAuth)
-  - Manage headers and query parameters
-  - Process request/response bodies
-  - Upload files
-  - Retry logic and error handling
-  - SSL verification options
-  - Timeout configuration
-  - Response validation
-- `http.graphql`
-  - Execute GraphQL queries
-  - Handle variables and fragments
-  - Manage authentication
-  - Process responses
-- `http.websocket`
-  - Establish WebSocket connections
-  - Send/receive messages
-  - Handle connection lifecycle
-  - Implement heartbeat
-- `http.webhook`
-  - Create webhook endpoints
-  - Process incoming requests
-  - Validate signatures
-  - Handle rate limiting
+### Deployment Tasks (`deploy.*`)
+- [ ] `deploy.config` - Manage deployment configurations.
+- [ ] `deploy.verify` - Verify deployment status.
 
-## Deployment Tasks (`deploy.*`)
-- `deploy.package` - Package applications
-- `deploy.release` - Handle releases
-- `deploy.rollback` - Manage rollbacks
-- `deploy.verify` - Verify deployments
-- `deploy.config` - Manage configurations
+### Testing Tasks (`test.*`) (Basic Integration)
+- [ ] `test.api` - Simplified API endpoint testing (building on `http.request`).
+- [ ] `test.unit` - Wrapper for running unit tests via shell/python task (e.g., `pytest`, `unittest`).
 
-## Google Workspace Tasks (`google.*`)
-- `google.drive`
-  - Upload/download files
-  - Manage folders
-  - Share files/folders
-  - Handle permissions
-  - Search content
-  - Track changes
-- `google.sheets`
-  - Read/write data
-  - Format cells
-  - Create charts
-  - Apply formulas
-  - Export/import data
-  - Manage sheets/tabs
-- `google.docs`
-  - Create/edit documents
-  - Add images/tables
-  - Export to PDF/HTML
-  - Track changes
-  - Add comments
-  - Use templates
-- `google.slides`
-  - Create presentations
-  - Manage slides
-  - Add shapes/images
-  - Apply themes
-  - Export formats
-- `google.forms`
-  - Create forms
-  - Collect responses
-  - Export results
-  - Manage questions
-- `google.calendar`
-  - Create events
-  - Manage schedules
-  - Set reminders
-  - Handle invites
+## Low Priority / Future Considerations / Niche
 
-## Microsoft 365 Tasks (`ms365.*`)
-- `ms365.onedrive`
-  - Upload/download files
-  - Sync content
-  - Share files
-  - Manage permissions
-  - Track versions
-- `ms365.excel`
-  - Read/write worksheets
-  - Apply formulas
-  - Create charts
-  - Format cells
-  - Manage workbooks
-  - Run macros
-- `ms365.word`
-  - Create/edit documents
-  - Apply styles
-  - Add tables/images
-  - Track changes
-  - Use templates
-  - Export formats
-- `ms365.powerpoint`
-  - Create presentations
-  - Manage slides
-  - Apply animations
-  - Add media
-  - Export formats
-- `ms365.outlook`
-  - Send emails
-  - Manage calendar
-  - Create meetings
-  - Handle attachments
-- `ms365.teams`
-  - Post messages
-  - Manage channels
-  - Handle meetings
-  - Share files
-- `ms365.sharepoint`
-  - Manage sites
-  - Handle lists
-  - Share documents
-  - Set permissions
+These tasks are specialized, complex, potentially better handled by external tools, or require significant external dependencies/integrations. Consider as plugins or community contributions.
 
-## Local File Tasks (`file.*`)
-- `file.excel`
-  - Read/write worksheets
-  - Apply formulas
-  - Format cells/ranges
-  - Create charts
-  - Filter/sort data
-  - Handle multiple sheets
-  - Convert formats (xlsx, csv, xls)
-  - Extract tables
-  - Apply conditional formatting
-  - Run VBA macros
+### Browser Automation Tasks (`browser.*`)
+- [ ] `browser.screenshot` - Capture screenshots.
+- [ ] `browser.pdf` - Generate PDFs from pages.
+- [ ] `browser.scrape` - Extract data from pages.
+- [ ] `browser.form` - Fill and submit forms.
+- [ ] `browser.test` - Run browser tests.
 
-- `file.pdf`
-  - Create/merge PDFs
-  - Extract text/tables
-  - Add watermarks
-  - Split/rotate pages
-  - Add/remove pages
-  - Fill forms
-  - Add signatures
-  - Extract images
-  - Set metadata
-  - Apply password protection
-  - Optimize file size
+### Specific Vendor Integrations (`atlassian.*`, `google.*`, `ms365.*`)
+*(Implement via `http.request` or dedicated SDKs using `python` task first)*
+- [ ] Atlassian Jira (Create/update issues, etc.)
+- [ ] Atlassian Confluence (Create/update pages, etc.)
+- [ ] Atlassian Bitbucket (Manage PRs, etc.)
+- [ ] Google Drive (Upload/download, manage files)
+- [ ] Google Sheets (Read/write data)
+- [ ] Google Docs (Create/edit documents)
+- [ ] Microsoft OneDrive (Upload/download, manage files)
+- [ ] Microsoft Excel (Read/write data)
+- [ ] *Other vendor-specific tasks...*
 
-- `file.word`
-  - Create/edit documents
-  - Apply styles/formatting
-  - Add tables/images
-  - Replace text/variables
-  - Extract content
-  - Convert formats (docx, doc, rtf)
-  - Track changes
-  - Use templates
-  - Add headers/footers
-  - Handle mail merge
+### Advanced Testing Tasks (`test.*`)
+- [ ] `test.e2e` - End-to-end testing frameworks.
+- [ ] `test.load` - Load testing tools.
+- [ ] `test.security` - Security scanning tools integration.
+- [ ] `test.coverage` - Code coverage reporting integration.
 
-- `file.ppt`
-  - Create/edit presentations
-  - Add/remove slides
-  - Apply slide layouts
-  - Insert shapes/charts
-  - Add text boxes/tables
-  - Manage slide masters
-  - Apply themes/styles
-  - Add animations/transitions
-  - Handle speaker notes
-  - Add headers/footers
-  - Insert images/media
-  - Create custom layouts
-  - Export to PDF/images
-  - Merge presentations
-  - Extract content
-  - Replace placeholders
-  - Manage metadata
-  - Set slide timings
-  - Handle SmartArt
-  - Batch update slides
+### Monitoring Tasks (`monitor.*`)
+*(Integrate with existing monitoring tools via `http.request` or `notify.*`)*
+- [ ] `monitor.health` - Health checks (can use `http.request`).
+- [ ] `monitor.metrics` - Collect metrics (push to external systems).
+- [ ] `monitor.logs` - Log analysis (external systems).
+- [ ] `monitor.alerts` - Alert on conditions (often external).
 
-- `file.archive`
-  - Create zip/tar archives
-  - Extract archives
-  - Add/remove files
-  - Update existing archives
-  - Set compression levels
-  - Handle password protection
-  - Split large archives
-  - Test archive integrity
-  - Handle multiple formats (zip, tar, 7z, rar)
+### Security Tasks (`security.*`)
+*(Leverage external tools via `shell` or specific SDKs)*
+- [ ] `security.scan` - Security scanning tools.
+- [ ] `security.audit` - Code auditing tools.
+- [ ] `security.secrets` - Secure secrets retrieval (focus on integration, not storage).
+- [ ] `security.compliance` - Compliance checks.
 
-- `file.image`
-  - Resize/crop images
-  - Convert formats
-  - Apply filters/effects
-  - Add watermarks
-  - Extract metadata
-  - Optimize file size
-  - Batch processing
-  - Create thumbnails
-  - Handle multiple formats (jpg, png, gif, webp)
+### Documentation Tasks (`docs.*`)
+*(Typically handled in CI/CD pipelines, not runtime workflows)*
+- [ ] `docs.generate` - Generate documentation.
+- [ ] `docs.publish` - Publish documentation.
+- [ ] `docs.validate` - Validate documentation.
 
-- `file.csv`
-  - Read/write CSV
-  - Handle different delimiters
-  - Convert encodings
-  - Validate data
-  - Transform columns
-  - Merge/split files
-  - Handle large files
-  - Sort/filter data
-
-- `file.xml`
-  - Read/write XML
-  - Validate against schema
-  - Transform with XSLT
-  - Query with XPath
-  - Pretty print
-  - Convert to/from JSON
-  - Handle namespaces
-
-- `file.json`
-  - Read/write JSON
-  - Validate schema
-  - Transform data
-  - Merge/split files
-  - Pretty print
-  - Handle large files
-  - Convert to/from other formats
-
-- `file.text`
-  - Read/write text files
-  - Handle different encodings
-  - Find/replace content
-  - Extract patterns
-  - Line operations
-  - Handle large files
-  - Compare files
-
-- `file.markdown`
-  - Convert Markdown to HTML
-  - Convert HTML to Markdown
-  - Apply custom styles
-  - Handle GitHub Flavored Markdown
-  - Process frontmatter
-  - Extract metadata
-  - Handle code blocks
-  - Process tables
-  - Manage images/links
-  - Custom extensions
-  - Generate TOC
-  - Syntax highlighting
-  - Handle math equations
-  - Validate links
-  - Custom templates
-  - Batch conversion
-  - Handle multiple dialects
-  - Export to other formats (PDF, DOCX)
-
-- `file.html`
-  - Parse HTML documents
-  - Extract content/structure
-  - Modify DOM elements
-  - Handle templates
-  - Clean/sanitize HTML
-  - Apply styles/CSS
-  - Validate HTML
-  - Fix malformed HTML
-  - Minify/prettify
-  - Handle encodings
-  - Process forms
-  - Extract metadata
-  - Manage links/images
-  - Convert to other formats
-  - Batch processing
-  - Custom transformations
+### Local Development Tasks (`local.*`)
+*(Generally outside the scope of a workflow engine's runtime tasks)*
+- [ ] `local.serve` - Run development servers.
+- [ ] `local.watch` - Watch for file changes.
+- [ ] `local.tunnel` - Create development tunnels.
+- [ ] `local.mock` - Mock services.
+- [ ] `local.profile` - Performance profiling.
 
 ## Implementation Priority
 
