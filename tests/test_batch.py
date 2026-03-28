@@ -80,12 +80,10 @@ def test_batch_with_failures(workspace, basic_context):
             "items": items,
             "task": {
                 "task": "python_code",
-                "inputs": {
-                    "code": """if "fail" in item:
+                "inputs": {"code": """if "fail" in item:
     raise ValueError(f"Failed to process {item}")
 result = f"Processed {item}"\
-"""
-                },
+"""},
             },
         },
     }
@@ -258,15 +256,13 @@ def test_batch_context_variables(workspace, basic_context, sample_items):
             "chunk_size": 2,
             "task": {
                 "task": "python_code",
-                "inputs": {
-                    "code": """result = {
+                "inputs": {"code": """result = {
         'item': batch['item'],
         'index': batch['index'],
         'total': batch['total'],
         'chunk_index': batch['chunk_index'],
         'chunk_size': batch['chunk_size']
-    }"""
-                },
+    }"""},
             },
         },
     }
@@ -316,13 +312,11 @@ def test_parallel_execution_time(workspace, basic_context):
             "max_workers": 3,
             "task": {
                 "task": "python_code",
-                "inputs": {
-                    "code": """
+                "inputs": {"code": """
 import time
 time.sleep(0.5)
 result = f"Processing {batch['item']}"
-"""
-                },
+"""},
             },
         },
     }
@@ -346,13 +340,11 @@ def test_batch_max_workers(workspace, basic_context):
             "max_workers": 2,
             "task": {
                 "task": "python_code",
-                "inputs": {
-                    "code": """
+                "inputs": {"code": """
 import time
 time.sleep(0.1)
 result = f"Processed {batch['item']}"
-"""
-                },
+"""},
             },
         },
     }
