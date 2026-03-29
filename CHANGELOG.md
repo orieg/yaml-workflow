@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Workflow composition via `imports` — reuse steps/params across YAML files
+  with relative paths, transitive imports, and circular detection
+- Plugin discovery via entry points — `pip install yaml-workflow-myplugin`
+  auto-registers tasks through `yaml_workflow.tasks` entry point group
+- Watch mode (`--watch` / `-w`) — re-run workflow on file changes
+  with 1.5s polling, monitors imports too
+- Windows shell compatibility — auto-detect PowerShell on Windows
+- Performance benchmarks via pytest-benchmark with CI artifact upload
+- Public `context` and `processed_inputs` properties on TaskConfig
+
+### Changed
+- Replaced all `config._context` / `config._processed_inputs` private access
+  with public properties across 10 source files
+
 ## [0.5.0] - 2026-03-29
 
 ### Added

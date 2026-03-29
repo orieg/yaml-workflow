@@ -1586,10 +1586,10 @@
 <a id="__codelineno-0-31" name="__codelineno-0-31"></a>    <span class="n">logger</span> <span class="o">=</span> <span class="n">get_task_logger</span><span class="p">(</span><span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> <span class="n">task_name</span><span class="p">)</span>
 <a id="__codelineno-0-32" name="__codelineno-0-32"></a>
 <a id="__codelineno-0-33" name="__codelineno-0-33"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-34" name="__codelineno-0-34"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
+<a id="__codelineno-0-34" name="__codelineno-0-34"></a>        <span class="n">log_task_execution</span><span class="p">(</span><span class="n">logger</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">context</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">)</span>
 <a id="__codelineno-0-35" name="__codelineno-0-35"></a>
 <a id="__codelineno-0-36" name="__codelineno-0-36"></a>        <span class="n">processed</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">process_inputs</span><span class="p">()</span>
-<a id="__codelineno-0-37" name="__codelineno-0-37"></a>        <span class="n">config</span><span class="o">.</span><span class="n">_processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>
+<a id="__codelineno-0-37" name="__codelineno-0-37"></a>        <span class="n">config</span><span class="o">.</span><span class="n">processed_inputs</span> <span class="o">=</span> <span class="n">processed</span>
 <a id="__codelineno-0-38" name="__codelineno-0-38"></a>
 <a id="__codelineno-0-39" name="__codelineno-0-39"></a>        <span class="c1"># Validate required inputs</span>
 <a id="__codelineno-0-40" name="__codelineno-0-40"></a>        <span class="k">if</span> <span class="s2">&quot;url&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">processed</span><span class="p">:</span>
@@ -1664,7 +1664,7 @@
 <a id="__codelineno-0-109" name="__codelineno-0-109"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
 <a id="__codelineno-0-110" name="__codelineno-0-110"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
 <a id="__codelineno-0-111" name="__codelineno-0-111"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
-<a id="__codelineno-0-112" name="__codelineno-0-112"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
+<a id="__codelineno-0-112" name="__codelineno-0-112"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">context</span><span class="p">,</span>
 <a id="__codelineno-0-113" name="__codelineno-0-113"></a>        <span class="p">)</span>
 <a id="__codelineno-0-114" name="__codelineno-0-114"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
 <a id="__codelineno-0-115" name="__codelineno-0-115"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>

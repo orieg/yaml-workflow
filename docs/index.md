@@ -17,8 +17,11 @@ Define powerful workflows through simple YAML files with advanced features like 
 
 - **YAML-driven** workflow definitions with Jinja2 templating
 - **Multiple task types**: shell, Python, file, template, HTTP, batch
+- **Workflow composition** via `imports` — reuse steps across workflows
+- **Plugin system** via entry points — extend with `pip install`
+- **Watch mode** — re-run automatically on file changes
 - **Dry-run mode** to preview execution without side effects
-- **Workflow visualization** as ASCII diagrams or Mermaid charts
+- **Workflow visualization** as ASCII branching DAGs or Mermaid charts
 - **State persistence** with resume from failures
 - **Parallel execution** with configurable worker pools
 - **Retry mechanisms** with configurable strategies

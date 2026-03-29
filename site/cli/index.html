@@ -666,6 +666,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#watch-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Watch mode
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1499,6 +1508,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#watch-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Watch mode
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1656,103 +1674,108 @@
 <a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>[DRY-RUN] No files were written. No tasks were executed.
 </code></pre></div>
 <p>Dry-run still evaluates conditions and resolves template variables, so you can see exactly which steps would run and what inputs they would receive.</p>
+<h4 id="watch-mode">Watch mode<a class="headerlink" href="#watch-mode" title="Permanent link">&para;</a></h4>
+<p>Automatically re-run the workflow when the YAML file (or any imported files) change:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>yaml-workflow<span class="w"> </span>run<span class="w"> </span>workflows/hello_world.yaml<span class="w"> </span><span class="nv">name</span><span class="o">=</span>Alice<span class="w"> </span>--watch
+</code></pre></div>
+<p>The engine polls file modification times every 1.5 seconds. On change, it prints a separator and re-runs. Press <code>Ctrl+C</code> to stop.</p>
 <h3 id="list-list-available-workflows"><code>list</code> - List Available Workflows<a class="headerlink" href="#list-list-available-workflows" title="Permanent link">&para;</a></h3>
 <p>Display workflows found in a directory:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># List workflows in default directory</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>yaml-workflow<span class="w"> </span>list
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># List workflows in specific directory</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>yaml-workflow<span class="w"> </span>list<span class="w"> </span>--base-dir<span class="w"> </span>my-workflows
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># List workflows in default directory</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>yaml-workflow<span class="w"> </span>list
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># List workflows in specific directory</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>yaml-workflow<span class="w"> </span>list<span class="w"> </span>--base-dir<span class="w"> </span>my-workflows
 </code></pre></div>
 <h3 id="validate-validate-a-workflow"><code>validate</code> - Validate a Workflow<a class="headerlink" href="#validate-validate-a-workflow" title="Permanent link">&para;</a></h3>
 <p>Check a workflow file for configuration errors without running it:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>yaml-workflow<span class="w"> </span>validate<span class="w"> </span>workflows/hello_world.yaml
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>yaml-workflow<span class="w"> </span>validate<span class="w"> </span>workflows/hello_world.yaml
 </code></pre></div>
 <h3 id="visualize-visualize-a-workflow"><code>visualize</code> - Visualize a Workflow<a class="headerlink" href="#visualize-visualize-a-workflow" title="Permanent link">&para;</a></h3>
 <p>Display the workflow step graph as an ASCII diagram or Mermaid chart:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># ASCII output (default) — displays directly in terminal</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>yaml-workflow<span class="w"> </span>visualize<span class="w"> </span>workflows/hello_world.yaml
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Mermaid format — for docs, GitHub markdown, or mermaid.live</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>yaml-workflow<span class="w"> </span>visualize<span class="w"> </span>workflows/hello_world.yaml<span class="w"> </span>--format<span class="w"> </span>mermaid
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
-<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># Visualize a specific flow</span>
-<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>yaml-workflow<span class="w"> </span>visualize<span class="w"> </span>workflows/multi_flow.yaml<span class="w"> </span>--flow<span class="w"> </span>core_only
-<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
-<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="c1"># Save to file</span>
-<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>yaml-workflow<span class="w"> </span>visualize<span class="w"> </span>workflows/pipeline.yaml<span class="w"> </span>-f<span class="w"> </span>mermaid<span class="w"> </span>-o<span class="w"> </span>pipeline.md
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># ASCII output (default) — displays directly in terminal</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>yaml-workflow<span class="w"> </span>visualize<span class="w"> </span>workflows/hello_world.yaml
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Mermaid format — for docs, GitHub markdown, or mermaid.live</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>yaml-workflow<span class="w"> </span>visualize<span class="w"> </span>workflows/hello_world.yaml<span class="w"> </span>--format<span class="w"> </span>mermaid
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Visualize a specific flow</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>yaml-workflow<span class="w"> </span>visualize<span class="w"> </span>workflows/multi_flow.yaml<span class="w"> </span>--flow<span class="w"> </span>core_only
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># Save to file</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>yaml-workflow<span class="w"> </span>visualize<span class="w"> </span>workflows/pipeline.yaml<span class="w"> </span>-f<span class="w"> </span>mermaid<span class="w"> </span>-o<span class="w"> </span>pipeline.md
 </code></pre></div>
 <h4 id="ascii-output">ASCII output<a class="headerlink" href="#ascii-output" title="Permanent link">&para;</a></h4>
 <p>Regular steps render as boxes, conditional steps as diamonds:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>  Workflow: Complex Flow and Error Handling Demo
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>  ┌─────────────────┐
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>  │ setup_workspace  │
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>  │      shell       │
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>  └─────────────────┘
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>           │
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>           ▼
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>  ┌─────────────────┐
-<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>  │  process_core_1  │
-<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>  │       echo       │
-<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>  └─────────────────┘
-<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>           │
-<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>           ▼
-<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>  ┌─────────────────┐
-<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>  │    flaky_step    │
-<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>  │      shell       │
-<a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>  └─────────────────┘  ──error─▶ [handle_flaky_error]
-<a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>           │
-<a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>           ▼
-<a id="__codelineno-8-21" name="__codelineno-8-21" href="#__codelineno-8-21"></a>  ┌─────────────────┐
-<a id="__codelineno-8-22" name="__codelineno-8-22" href="#__codelineno-8-22"></a>  │     cleanup      │
-<a id="__codelineno-8-23" name="__codelineno-8-23" href="#__codelineno-8-23"></a>  │      shell       │
-<a id="__codelineno-8-24" name="__codelineno-8-24" href="#__codelineno-8-24"></a>  └─────────────────┘
-<a id="__codelineno-8-25" name="__codelineno-8-25" href="#__codelineno-8-25"></a>
-<a id="__codelineno-8-26" name="__codelineno-8-26" href="#__codelineno-8-26"></a>  4 steps (0 conditional, 4 always-run)
-<a id="__codelineno-8-27" name="__codelineno-8-27" href="#__codelineno-8-27"></a>  1 error path(s): flaky_step → handle_flaky_error
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>  Workflow: Complex Flow and Error Handling Demo
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  ┌─────────────────┐
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  │ setup_workspace  │
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>  │      shell       │
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>  └─────────────────┘
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>           │
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>           ▼
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>  ┌─────────────────┐
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>  │  process_core_1  │
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>  │       echo       │
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>  └─────────────────┘
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>           │
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>           ▼
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>  ┌─────────────────┐
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>  │    flaky_step    │
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>  │      shell       │
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>  └─────────────────┘  ──error─▶ [handle_flaky_error]
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>           │
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>           ▼
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>  ┌─────────────────┐
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>  │     cleanup      │
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>  │      shell       │
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a>  └─────────────────┘
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a>
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a>  4 steps (0 conditional, 4 always-run)
+<a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a>  1 error path(s): flaky_step → handle_flaky_error
 </code></pre></div>
 <p>Conditional steps render as diamonds:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>  ┌───────────────────┐
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>  │  validate_input   │       always runs
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>  │      shell        │
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>  └───────────────────┘
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>           │
-<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>           ▼
-<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>           ◇
-<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>   ╱   get_timestamp  ╲      runs only if condition is True
-<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>  ◁        shell        ▷
-<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>   ╲                   ╱
-<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>           ◇
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>  ┌───────────────────┐
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>  │  validate_input   │       always runs
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>  │      shell        │
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>  └───────────────────┘
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>           │
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>           ▼
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>           ◇
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>   ╱   get_timestamp  ╲      runs only if condition is True
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>  ◁        shell        ▷
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>   ╲                   ╱
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>           ◇
 </code></pre></div>
 <h4 id="mermaid-output">Mermaid output<a class="headerlink" href="#mermaid-output" title="Permanent link">&para;</a></h4>
 <p>The <code>--format mermaid</code> output can be pasted into <a href="https://mermaid.live">mermaid.live</a>, GitHub markdown fenced blocks, or any Mermaid-compatible renderer:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>```mermaid
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>graph TD
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    create_greeting[&quot;create_greeting&lt;br/&gt;&lt;small&gt;template&lt;/small&gt;&quot;]
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    show_greeting[&quot;show_greeting&lt;br/&gt;&lt;small&gt;shell&lt;/small&gt;&quot;]
-<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>    create_greeting --&gt; show_greeting
-<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>```
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>```mermaid
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>graph TD
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>    create_greeting[&quot;create_greeting&lt;br/&gt;&lt;small&gt;template&lt;/small&gt;&quot;]
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>    show_greeting[&quot;show_greeting&lt;br/&gt;&lt;small&gt;shell&lt;/small&gt;&quot;]
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>    create_greeting --&gt; show_greeting
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>```
 </code></pre></div>
 <h3 id="workspace-manage-workflow-runs"><code>workspace</code> - Manage Workflow Runs<a class="headerlink" href="#workspace-manage-workflow-runs" title="Permanent link">&para;</a></h3>
 <p>Manage workspace directories created by workflow runs:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># List all workflow runs</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>list
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># List runs for a specific workflow</span>
-<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>list<span class="w"> </span>--workflow<span class="w"> </span>hello_world
-<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
-<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1"># Clean up runs older than 30 days</span>
-<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>clean<span class="w"> </span>--older-than<span class="w"> </span><span class="m">30</span>
-<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
-<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="c1"># Dry-run cleanup (show what would be deleted)</span>
-<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>clean<span class="w"> </span>--older-than<span class="w"> </span><span class="m">7</span><span class="w"> </span>--dry-run
-<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>
-<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a><span class="c1"># Remove specific runs</span>
-<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>remove<span class="w"> </span>hello_world_run_1<span class="w"> </span>hello_world_run_2
-<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>
-<a id="__codelineno-11-16" name="__codelineno-11-16" href="#__codelineno-11-16"></a><span class="c1"># Force remove without confirmation</span>
-<a id="__codelineno-11-17" name="__codelineno-11-17" href="#__codelineno-11-17"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>remove<span class="w"> </span>hello_world_run_1<span class="w"> </span>--force
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># List all workflow runs</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>list
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># List runs for a specific workflow</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>list<span class="w"> </span>--workflow<span class="w"> </span>hello_world
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># Clean up runs older than 30 days</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>clean<span class="w"> </span>--older-than<span class="w"> </span><span class="m">30</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="c1"># Dry-run cleanup (show what would be deleted)</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>clean<span class="w"> </span>--older-than<span class="w"> </span><span class="m">7</span><span class="w"> </span>--dry-run
+<a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>
+<a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a><span class="c1"># Remove specific runs</span>
+<a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>remove<span class="w"> </span>hello_world_run_1<span class="w"> </span>hello_world_run_2
+<a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>
+<a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a><span class="c1"># Force remove without confirmation</span>
+<a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>yaml-workflow<span class="w"> </span>workspace<span class="w"> </span>remove<span class="w"> </span>hello_world_run_1<span class="w"> </span>--force
 </code></pre></div>
 <h2 id="all-options">All Options<a class="headerlink" href="#all-options" title="Permanent link">&para;</a></h2>
 <table>
@@ -1808,6 +1831,11 @@
 <td><code>run</code></td>
 <td><code>--dry-run</code>, <code>-n</code></td>
 <td>Preview without executing</td>
+</tr>
+<tr>
+<td><code>run</code></td>
+<td><code>--watch</code>, <code>-w</code></td>
+<td>Watch files and re-run on changes</td>
 </tr>
 <tr>
 <td><code>list</code></td>

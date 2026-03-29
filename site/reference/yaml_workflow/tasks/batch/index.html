@@ -1791,7 +1791,7 @@ task configuration. Each item is passed to the task as an argument.</p>
 <a id="__codelineno-0-231" name="__codelineno-0-231"></a>                        <span class="n">process_item</span><span class="p">,</span>
 <a id="__codelineno-0-232" name="__codelineno-0-232"></a>                        <span class="n">item</span><span class="p">,</span>  <span class="c1"># item: Any</span>
 <a id="__codelineno-0-233" name="__codelineno-0-233"></a>                        <span class="n">sub_task_config_for_item</span><span class="p">,</span>  <span class="c1"># task_config: Dict[str, Any]</span>
-<a id="__codelineno-0-234" name="__codelineno-0-234"></a>                        <span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>  <span class="c1"># context: Dict[str, Any]</span>
+<a id="__codelineno-0-234" name="__codelineno-0-234"></a>                        <span class="n">config</span><span class="o">.</span><span class="n">context</span><span class="p">,</span>  <span class="c1"># context: Dict[str, Any]</span>
 <a id="__codelineno-0-235" name="__codelineno-0-235"></a>                        <span class="n">config</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span>  <span class="c1"># workspace: Path</span>
 <a id="__codelineno-0-236" name="__codelineno-0-236"></a>                        <span class="n">arg_name</span><span class="p">,</span>  <span class="c1"># arg_name: str</span>
 <a id="__codelineno-0-237" name="__codelineno-0-237"></a>                        <span class="n">chunk_index</span><span class="p">,</span>  <span class="c1"># chunk_index: int</span>
@@ -1846,7 +1846,7 @@ task configuration. Each item is passed to the task as an argument.</p>
 <a id="__codelineno-0-286" name="__codelineno-0-286"></a>            <span class="n">task_type</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">task_type</span><span class="p">),</span>
 <a id="__codelineno-0-287" name="__codelineno-0-287"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
 <a id="__codelineno-0-288" name="__codelineno-0-288"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
-<a id="__codelineno-0-289" name="__codelineno-0-289"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
+<a id="__codelineno-0-289" name="__codelineno-0-289"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">context</span><span class="p">,</span>
 <a id="__codelineno-0-290" name="__codelineno-0-290"></a>        <span class="p">)</span>
 <a id="__codelineno-0-291" name="__codelineno-0-291"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">err_context</span><span class="p">)</span>
 <a id="__codelineno-0-292" name="__codelineno-0-292"></a>        <span class="c1"># handle_task_error always raises, so return is unreachable but satisfies type checker</span>

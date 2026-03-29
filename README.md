@@ -32,10 +32,13 @@ Most workflow tools (Airflow, Prefect, Dagster) are designed for distributed clo
 
 - YAML-driven workflow definition with Jinja2 templating
 - Multiple task types: shell, Python, file, template, HTTP, batch
+- Workflow composition via `imports` — reuse steps across workflows
+- Plugin system via entry points — `pip install yaml-workflow-myplugin`
+- Watch mode — `--watch` to re-run on file changes
+- Dry-run mode to preview without executing
+- Workflow visualization (ASCII branching DAG and Mermaid)
 - Parallel execution with configurable worker pools
 - State persistence and resume capability
-- Dry-run mode to preview without executing
-- Workflow visualization (ASCII and Mermaid)
 - Retry mechanisms with configurable strategies
 - Namespaced variables (`args`, `env`, `steps`, `batch`)
 - Flow control with custom step sequences and conditions
@@ -128,6 +131,35 @@ yaml-workflow run workflows/hello_world.yaml name=Alice --dry-run
 [DRY-RUN] Complete. 2 step(s) would execute, 0 would be skipped.
 [DRY-RUN] No files were written. No tasks were executed.
 ```
+
+### Workflow composition
+
+Reuse steps across workflows with `imports`:
+
+```yaml
+# main.yaml
+imports:
+  - ./shared/logging_steps.yaml
+  - ./shared/common_params.yaml
+
+steps:
+  - name: my_step
+    task: shell
+    inputs:
+      command: echo "runs after imported steps"
+```
+
+Imported steps are prepended. Imported params provide defaults that the main workflow can override. Supports transitive imports with circular detection.
+
+### Watch mode
+
+Automatically re-run on file changes during development:
+
+```bash
+yaml-workflow run workflows/hello_world.yaml name=Alice --watch
+```
+
+Monitors the workflow file and all imported files. Press `Ctrl+C` to stop.
 
 ### More commands
 

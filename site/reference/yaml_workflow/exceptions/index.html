@@ -1293,6 +1293,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#yaml_workflow.exceptions.CircularImportError" class="md-nav__link">
+    <span class="md-ellipsis">
+      CircularImportError
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#yaml_workflow.exceptions.ConfigurationError" class="md-nav__link">
     <span class="md-ellipsis">
       ConfigurationError
@@ -1473,6 +1482,15 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#yaml_workflow.exceptions.WorkflowImportError" class="md-nav__link">
+    <span class="md-ellipsis">
+      WorkflowImportError
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#yaml_workflow.exceptions.WorkflowNotFoundError" class="md-nav__link">
     <span class="md-ellipsis">
       WorkflowNotFoundError
@@ -1579,6 +1597,68 @@
 
 
 <h3 id="yaml_workflow.exceptions-classes">Classes<a href="#yaml_workflow.exceptions-classes" class="headerlink" title="Permanent link">&para;</a></h3>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="yaml_workflow.exceptions.CircularImportError" class="doc doc-heading">
+            <code>CircularImportError</code>
+
+
+<a href="#yaml_workflow.exceptions.CircularImportError" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="WorkflowError (yaml_workflow.exceptions.WorkflowError)" href="#yaml_workflow.exceptions.WorkflowError">WorkflowError</a></code></p>
+
+
+        <p>Raised when circular workflow imports are detected.</p>
+
+
+
+
+
+
+
+              <details class="quote">
+                <summary>Source code in <code>src/yaml_workflow/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-224">224</a></span>
+<span class="normal"><a href="#__codelineno-0-225">225</a></span>
+<span class="normal"><a href="#__codelineno-0-226">226</a></span>
+<span class="normal"><a href="#__codelineno-0-227">227</a></span>
+<span class="normal"><a href="#__codelineno-0-228">228</a></span>
+<span class="normal"><a href="#__codelineno-0-229">229</a></span>
+<span class="normal"><a href="#__codelineno-0-230">230</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-224" name="__codelineno-0-224"></a><span class="k">class</span> <span class="nc">CircularImportError</span><span class="p">(</span><span class="n">WorkflowError</span><span class="p">):</span>
+<a id="__codelineno-0-225" name="__codelineno-0-225"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when circular workflow imports are detected.&quot;&quot;&quot;</span>
+<a id="__codelineno-0-226" name="__codelineno-0-226"></a>
+<a id="__codelineno-0-227" name="__codelineno-0-227"></a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">import_chain</span><span class="p">:</span> <span class="nb">list</span><span class="p">):</span>
+<a id="__codelineno-0-228" name="__codelineno-0-228"></a>        <span class="n">chain_str</span> <span class="o">=</span> <span class="s2">&quot; -&gt; &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">p</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">import_chain</span><span class="p">)</span>
+<a id="__codelineno-0-229" name="__codelineno-0-229"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Circular import detected: </span><span class="si">{</span><span class="n">chain_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-230" name="__codelineno-0-230"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">import_chain</span> <span class="o">=</span> <span class="n">import_chain</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
 
 <div class="doc doc-object doc-class">
 
@@ -2769,6 +2849,66 @@
 <a id="__codelineno-0-11" name="__codelineno-0-11"></a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">original_error</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="ne">Exception</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
 <a id="__codelineno-0-13" name="__codelineno-0-13"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">original_error</span> <span class="o">=</span> <span class="n">original_error</span>
+</code></pre></div></td></tr></table></div>
+              </details>
+
+
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h4 id="yaml_workflow.exceptions.WorkflowImportError" class="doc doc-heading">
+            <code>WorkflowImportError</code>
+
+
+<a href="#yaml_workflow.exceptions.WorkflowImportError" class="headerlink" title="Permanent link">&para;</a></h4>
+
+
+    <div class="doc doc-contents ">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="WorkflowError (yaml_workflow.exceptions.WorkflowError)" href="#yaml_workflow.exceptions.WorkflowError">WorkflowError</a></code></p>
+
+
+        <p>Raised when a workflow import fails.</p>
+
+
+
+
+
+
+
+              <details class="quote">
+                <summary>Source code in <code>src/yaml_workflow/exceptions.py</code></summary>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-216">216</a></span>
+<span class="normal"><a href="#__codelineno-0-217">217</a></span>
+<span class="normal"><a href="#__codelineno-0-218">218</a></span>
+<span class="normal"><a href="#__codelineno-0-219">219</a></span>
+<span class="normal"><a href="#__codelineno-0-220">220</a></span>
+<span class="normal"><a href="#__codelineno-0-221">221</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-216" name="__codelineno-0-216"></a><span class="k">class</span> <span class="nc">WorkflowImportError</span><span class="p">(</span><span class="n">WorkflowError</span><span class="p">):</span>
+<a id="__codelineno-0-217" name="__codelineno-0-217"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when a workflow import fails.&quot;&quot;&quot;</span>
+<a id="__codelineno-0-218" name="__codelineno-0-218"></a>
+<a id="__codelineno-0-219" name="__codelineno-0-219"></a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">import_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">reason</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+<a id="__codelineno-0-220" name="__codelineno-0-220"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Import error for &#39;</span><span class="si">{</span><span class="n">import_path</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">reason</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<a id="__codelineno-0-221" name="__codelineno-0-221"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">import_path</span> <span class="o">=</span> <span class="n">import_path</span>
 </code></pre></div></td></tr></table></div>
               </details>
 

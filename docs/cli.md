@@ -80,6 +80,16 @@ Output:
 
 Dry-run still evaluates conditions and resolves template variables, so you can see exactly which steps would run and what inputs they would receive.
 
+#### Watch mode
+
+Automatically re-run the workflow when the YAML file (or any imported files) change:
+
+```bash
+yaml-workflow run workflows/hello_world.yaml name=Alice --watch
+```
+
+The engine polls file modification times every 1.5 seconds. On change, it prints a separator and re-runs. Press `Ctrl+C` to stop.
+
 ### `list` - List Available Workflows
 
 Display workflows found in a directory:
@@ -218,6 +228,7 @@ yaml-workflow workspace remove hello_world_run_1 --force
 | `run` | `--skip-steps` | Comma-separated steps to skip |
 | `run` | `--flow` | Flow name to execute |
 | `run` | `--dry-run`, `-n` | Preview without executing |
+| `run` | `--watch`, `-w` | Watch files and re-run on changes |
 | `list` | `--base-dir` | Directory containing workflows |
 | `validate` | `workflow` | Path to workflow file |
 | `visualize` | `workflow` | Path to workflow file |
