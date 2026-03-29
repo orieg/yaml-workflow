@@ -1,150 +1,81 @@
 # Template Tasks Example
 #
-# This example demonstrates template task features:
-# - Variable interpolation with filters
-# - Error handling with StrictUndefined
-# - Conditional blocks and loops
+# Demonstrates template task features:
+# - Jinja2 variable interpolation
+# - Conditional rendering
 # - Multiple output formats
-# - Template inheritance
 #
 # Usage:
-# yaml-workflow run template_tasks.yaml --user_data='{"name": "Alice", "role": "admin"}'
+#   yaml-workflow run template_tasks.yaml name=Alice role=admin
 
 name: Template Tasks
 description: Demonstrates template task features and best practices
 
-settings:
-  error_handling:
-    undefined_variables: strict
-    show_available: true
-
 params:
-  user_data:
-    description: User information in JSON format
-    type: object
-    properties:
-      name:
-        type: string
-        minLength: 2
-      role:
-        type: string
-        enum: ["admin", "user", "guest"]
-    required: ["name", "role"]
+  name:
+    description: User name
+    type: string
+    default: Alice
+  role:
+    description: User role
+    type: string
+    default: user
   template_format:
     description: Output format (html, markdown, text)
     type: string
-    enum: ["html", "markdown", "text"]
-    default: "html"
+    default: text
 
 steps:
-  # Step 1: Validate and parse user data
+  # Step 1: Validate input
   - name: validate_input
     task: python_code
     inputs:
       code: |
-        import json
-        from typing import Dict, Any
-        
-        # Validate user data
-        try:
-          user_data = json.loads(args.user_data)
-        except json.JSONDecodeError:
-          raise ValueError("Invalid JSON format for user_data")
-          
-        if not isinstance(user_data, dict):
-          raise ValueError("user_data must be a dictionary")
-          
-        required_fields = ["name", "age", "interests"]
-        for field in required_fields:
-          if field not in user_data:
-            raise ValueError(f"Missing required field: {field}")
-            
-        if not isinstance(user_data["interests"], list):
-          raise ValueError("interests must be a list")
-          
-        result = user_data
-        result_variable: result
+        name = args.get("name", "Unknown")
+        role = args.get("role", "user")
+        if len(name) < 2:
+            raise ValueError("Name must be at least 2 characters")
+        result = {
+            "name": name,
+            "role": role,
+            "is_admin": role == "admin",
+        }
 
-  # Step 2: Create base templates
-  - name: create_templates
-    task: write_file
-    params:
-      file_path: output/templates/base.html
-      content: |
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>{% block title %}User Profile{% endblock %}</title>
-          <style>
-            body { font-family: Arial, sans-serif; margin: 2em; }
-            .profile { border: 1px solid #ccc; padding: 1em; }
-            .admin { background-color: #fff3e0; }
-            .permissions { margin-top: 1em; }
-          </style>
-        </head>
-        <body>
-          {% block content %}{% endblock %}
-        </body>
-        </html>
-    condition: "steps.validate_input.status == 'completed'"
-
-  # Step 3: Generate user profile
+  # Step 2: Create profile using template
   - name: generate_profile
     task: template
-    template: |
-      {%- if args.template_format == "html" %}
-      {% extends "output/templates/base.html" %}
-      
-      {% block title %}Profile: {{ steps.validate_input.output.name }}{% endblock %}
-      
-      {% block content %}
-      <div class="profile {% if steps.validate_input.output.is_admin %}admin{% endif %}">
-        <h1>User Profile</h1>
-        <p><strong>Name:</strong> {{ steps.validate_input.output.name }}</p>
-        <p><strong>Role:</strong> {{ steps.validate_input.output.role|title }}</p>
-        
-        <div class="permissions">
-          <h2>Permissions</h2>
-          <ul>
-          {%- for perm, enabled in steps.validate_input.output.permissions.items() %}
-            <li>{{ perm|title }}: {% if enabled %}✓{% else %}✗{% endif %}</li>
-          {%- endfor %}
-          </ul>
+    inputs:
+      template: |
+        {% set user = steps.validate_input.result.result %}
+        {% if args.template_format == "html" %}
+        <div class="profile">
+          <h1>{{ user.name }}</h1>
+          <p>Role: {{ user.role }}</p>
+          {% if user.is_admin %}<p><strong>Admin access enabled</strong></p>{% endif %}
         </div>
-      </div>
-      {% endblock %}
-      
-      {%- elif args.template_format == "markdown" %}
-      # User Profile: {{ steps.validate_input.output.name }}
-      
-      **Role:** {{ steps.validate_input.output.role|title }}
-      
-      ## Permissions
-      {% for perm, enabled in steps.validate_input.output.permissions.items() %}
-      - {{ perm|title }}: {{ "✓" if enabled else "✗" }}
-      {%- endfor %}
-      
-      {%- else %}
-      USER PROFILE
-      ============
-      Name: {{ steps.validate_input.output.name }}
-      Role: {{ steps.validate_input.output.role|upper }}
-      
-      Permissions:
-      {%- for perm, enabled in steps.validate_input.output.permissions.items() %}
-      - {{ "%-6s"|format(perm|title) }}: {{ "[X]" if enabled else "[ ]" }}
-      {%- endfor %}
-      {%- endif %}
-    output: "output/profile.{{ args.template_format }}"
-    condition: "steps.create_templates.status == 'completed'"
+        {% elif args.template_format == "markdown" %}
+        # {{ user.name }}
 
-  # Step 4: Display generated profile
+        **Role:** {{ user.role }}
+        {% if user.is_admin %}
+        > Admin access enabled
+        {% endif %}
+        {% else %}
+        USER PROFILE
+        ============
+        Name: {{ user.name }}
+        Role: {{ user.role }}
+        {% if user.is_admin %}Admin: Yes{% endif %}
+        {% endif %}
+      output_file: "output/profile.{{ args.template_format }}"
+    condition: '{% if steps.validate_input.result.result.name %}True{% else %}False{% endif %}'
+
+  # Step 3: Display generated profile
   - name: show_profile
     task: shell
-    command: |
-      echo "=== Generated Profile ({{ args.template_format }}) ==="
-      echo
-      cat "output/profile.{{ args.template_format }}"
-      echo
-      echo "=== End of Profile ==="
-    condition: "steps.generate_profile.status == 'completed'" 
+    inputs:
+      command: |
+        echo "=== Generated Profile ({{ args.template_format }}) ==="
+        cat "output/profile.{{ args.template_format }}"
+        echo "=== End of Profile ==="
+    condition: '{% if steps.validate_input.result.result.name %}True{% else %}False{% endif %}'

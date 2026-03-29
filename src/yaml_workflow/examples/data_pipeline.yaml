@@ -42,7 +42,7 @@ steps:
       command: |
         echo "Processing JSON data from {{ args.input_file }}"
         echo '{"status": "processed", "format": "json", "records": 42}'
-    condition: '{% if steps.detect_format.result.result.format == "json" %}True{% else %}False{% endif %}'
+    condition: '{% if steps.detect_format.result.format == "json" %}True{% else %}False{% endif %}'
 
   # Step 2b: Process CSV data (only if format is csv)
   - name: process_csv
@@ -51,7 +51,7 @@ steps:
       command: |
         echo "Processing CSV data from {{ args.input_file }}"
         echo "Parsed 156 rows, 8 columns"
-    condition: '{% if steps.detect_format.result.result.format == "csv" %}True{% else %}False{% endif %}'
+    condition: '{% if steps.detect_format.result.format == "csv" %}True{% else %}False{% endif %}'
 
   # Step 2c: Process XML data (only if format is xml)
   - name: process_xml
@@ -60,7 +60,7 @@ steps:
       command: |
         echo "Processing XML data from {{ args.input_file }}"
         echo "Parsed 23 elements"
-    condition: '{% if steps.detect_format.result.result.format == "xml" %}True{% else %}False{% endif %}'
+    condition: '{% if steps.detect_format.result.format == "xml" %}True{% else %}False{% endif %}'
 
   # Step 2d: Handle unknown format
   - name: handle_unknown
@@ -69,14 +69,14 @@ steps:
       command: |
         echo "ERROR: Unknown format '{{ args.format }}'" >&2
         exit 1
-    condition: '{% if steps.detect_format.result.result.format == "unknown" %}True{% else %}False{% endif %}'
+    condition: '{% if steps.detect_format.result.format == "unknown" %}True{% else %}False{% endif %}'
 
   # Step 3: Generate report (always runs)
   - name: generate_report
     task: python_code
     inputs:
       code: |
-        fmt = steps["detect_format"]["result"]["result"]["format"]
+        fmt = steps["detect_format"]["result"]["format"]
         result = {
             "format": fmt,
             "status": "complete",
@@ -89,5 +89,5 @@ steps:
     inputs:
       message: |
         Pipeline complete!
-        Format: {{ steps.detect_format.result.result.format }}
-        Report: {{ steps.generate_report.result.result.message }}
+        Format: {{ steps.detect_format.result.format }}
+        Report: {{ steps.generate_report.result.message }}

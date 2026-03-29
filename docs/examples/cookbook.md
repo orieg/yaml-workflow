@@ -14,9 +14,6 @@ params:
   api_url:
     type: string
     default: "https://jsonplaceholder.typicode.com/users"
-  output_dir:
-    type: string
-    default: "output"
 
 steps:
   # Extract: fetch data from API
@@ -33,18 +30,18 @@ steps:
       code: |
         import json
         users = json.loads(steps["fetch_data"]["result"]["body"])
-        # Extract just names and emails
-        result = [
+        records = [
             {"name": u["name"], "email": u["email"], "city": u["address"]["city"]}
             for u in users
         ]
+        result = {"records": records, "count": len(records)}
 
   # Load: write to JSON file
   - name: save_json
     task: write_json
     inputs:
       file: "output/users.json"
-      data: "{{ steps.transform_data.result.result }}"
+      data: "{{ steps.transform_data.result.records }}"
       indent: 2
 
   # Load: write summary report
@@ -55,7 +52,7 @@ steps:
         ETL Pipeline Report
         ===================
         Source: {{ args.api_url }}
-        Records processed: {{ steps.transform_data.result.result | length }}
+        Records processed: {{ steps.transform_data.result.count }}
         Output: output/users.json
         Status: Complete
       output_file: output/etl_report.txt
@@ -78,16 +75,13 @@ params:
   project_dir:
     type: string
     default: "."
-  python_version:
-    type: string
-    default: "python3"
 
 steps:
   - name: check_environment
     task: shell
     inputs:
       command: |
-        echo "Python: $({{ args.python_version }} --version)"
+        echo "Python: $(python3 --version)"
         echo "Pip: $(pip --version)"
         echo "Project: {{ args.project_dir }}"
 
@@ -130,7 +124,7 @@ steps:
   - name: build_package
     task: shell
     inputs:
-      command: "{{ args.python_version }} -m build {{ args.project_dir }}"
+      command: python3 -m build {{ args.project_dir }}
     on_error:
       action: fail
       message: "Build failed"
@@ -140,8 +134,6 @@ steps:
     inputs:
       message: |
         CI Pipeline Complete
-        - Lint: {{ steps.lint_check.result.return_code | default('skipped') }}
-        - Types: {{ steps.type_check.result.return_code | default('skipped') }}
         - Tests: passed
         - Build: passed
 ```
@@ -158,19 +150,16 @@ params:
   environment:
     type: string
     default: staging
-    allowed_values: [staging, production]
   version:
     type: string
     required: true
 
 steps:
-  # Pre-deployment checks
   - name: validate_version
     task: shell
     inputs:
       command: |
         echo "Deploying version {{ args.version }} to {{ args.environment }}"
-        # Check version format
         if ! echo "{{ args.version }}" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
           echo "Invalid version format. Expected vX.Y.Z" >&2
           exit 1
@@ -187,7 +176,6 @@ steps:
         mkdir -p output/backups
         echo "{{ args.environment }}-backup-$(date +%Y%m%d)" > output/backups/manifest.txt
 
-  # Deploy
   - name: deploy
     task: shell
     inputs:
@@ -202,7 +190,6 @@ steps:
       next: rollback
       message: "Deployment failed, will retry"
 
-  # Post-deployment validation
   - name: health_check
     task: shell
     inputs:
@@ -212,7 +199,7 @@ steps:
         if [ "$DEPLOYED" = "{{ args.version }}" ]; then
           echo "Health check passed: version $DEPLOYED running"
         else
-          echo "Health check failed: expected {{ args.version }}, got $DEPLOYED" >&2
+          echo "Health check failed" >&2
           exit 1
         fi
     on_error:
@@ -227,14 +214,13 @@ steps:
         Version: {{ args.version }}
         Environment: {{ args.environment }}
 
-  # Rollback handler
+  # Rollback handler (only reached via on_error.next)
   - name: rollback
     task: shell
     inputs:
       command: |
         echo "Rolling back deployment..."
         echo "Restored from backup"
-    condition: "False"
 
 flows:
   default: deploy_flow
@@ -245,47 +231,6 @@ flows:
         - deploy
         - health_check
         - notify_success
-```
-
-## File Processing with Batch
-
-Process multiple files in parallel:
-
-```yaml
-name: Batch File Processor
-description: Process a batch of data files in parallel
-
-params:
-  input_dir:
-    type: string
-    default: "data"
-
-steps:
-  - name: list_files
-    task: python_code
-    inputs:
-      code: |
-        import os
-        files = [f for f in os.listdir(args.get("input_dir", "data"))
-                 if f.endswith(".txt")]
-        result = files
-
-  - name: process_files
-    task: batch
-    inputs:
-      items: "{{ steps.list_files.result.result }}"
-      max_workers: 4
-      task:
-        task: shell
-        inputs:
-          command: |
-            echo "Processing {{ batch.item }}..."
-            wc -l "{{ args.input_dir }}/{{ batch.item }}"
-
-  - name: summary
-    task: print_message
-    inputs:
-      message: "Processed {{ steps.list_files.result.result | length }} files"
 ```
 
 ## Workflow with Shared Imports
@@ -343,13 +288,13 @@ steps:
     task: shell
     inputs:
       command: echo "Processing JSON data"
-    condition: '{% if steps.detect.result.result.format == "json" %}True{% else %}False{% endif %}'
+    condition: '{% if steps.detect.result.format == "json" %}True{% else %}False{% endif %}'
 
   - name: process_csv
     task: shell
     inputs:
       command: echo "Processing CSV data"
-    condition: '{% if steps.detect.result.result.format == "csv" %}True{% else %}False{% endif %}'
+    condition: '{% if steps.detect.result.format == "csv" %}True{% else %}False{% endif %}'
 
   - name: done
     task: print_message
