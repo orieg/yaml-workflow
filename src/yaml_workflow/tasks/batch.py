@@ -88,8 +88,9 @@ def process_item(
         # if isinstance(result, dict) and len(result) == 1 and "result" in result:
         #     return result["result"]
         return result
-    except Exception as e:
-        # Centralized error handling for exceptions during item processing
+    except (
+        Exception
+    ) as e:  # noqa: BLE001 - broad catch required: runs arbitrary user task handlers
         err_context = ErrorContext(
             # Use the specific item step name generated above
             step_name=step["name"],
@@ -248,7 +249,9 @@ def batch_task(config: TaskConfig) -> Dict[str, Any]:
                         ordered_processed.append((index, item))
                         ordered_results.append((index, result))
                         state["stats"]["processed"] += 1
-                    except Exception as e:
+                    except (
+                        Exception
+                    ) as e:  # noqa: BLE001 - broad catch required: futures may propagate arbitrary user task errors
                         # Capture the error from process_item (already wrapped if needed)
                         error_info = {"item": item, "error": str(e)}
                         # If it's a TaskExecutionError, add more details if possible
@@ -276,7 +279,7 @@ def batch_task(config: TaskConfig) -> Dict[str, Any]:
 
         return state
 
-    except Exception as e:
+    except (TaskExecutionError, ValueError, TypeError) as e:
         # Centralized error handling for exceptions during batch setup/config
         err_context = ErrorContext(
             step_name=str(task_name),

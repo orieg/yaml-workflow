@@ -90,7 +90,7 @@ def run_workflow(
     try:
         with open(workflow_file, "r") as f:
             workflow_data = yaml.safe_load(f)
-    except Exception as e:
+    except (OSError, yaml.YAMLError) as e:
         logger.error(f"Error loading workflow file: {e}")
         return {
             "success": False,
@@ -189,6 +189,9 @@ def run_workflow(
                     # Keep final_status['success'] = True and original message
 
             except Exception as e:
+                # Broad catch is intentional: this is a top-level workflow entry point
+                # that must handle any exception from step execution (including
+                # user-provided task handlers) to report errors gracefully.
                 logger.error(f"Error executing step '{step_name}': {e}", exc_info=True)
                 step_error_status = step.handle_error(e, context)
                 if step_error_status["success"] is False:

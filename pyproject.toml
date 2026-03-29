@@ -97,6 +97,17 @@ Documentation = "https://orieg.github.io/yaml-workflow/"
 [project.scripts]
 yaml-workflow = "yaml_workflow.cli:main"
 
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/README.md",
+    "/LICENSE",
+    "/pyproject.toml",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yaml_workflow"]
+
 [tool.isort]
 profile = "black"
 multi_line_output = 3

@@ -9,6 +9,7 @@ from jinja2 import (
     FileSystemLoader,
     StrictUndefined,
     Template,
+    TemplateSyntaxError,
     UndefinedError,
 )
 
@@ -73,11 +74,13 @@ def render_template(config: TaskConfig) -> Dict[str, Any]:
         log_task_result(logger, str(output_path))
         return {"path": str(output_path)}
 
-    except Exception as e:
-        # Use a centralized error handler if available, otherwise raise TaskExecutionError
-        # Assuming handle_task_error exists (replace if necessary)
-        # handle_task_error(task_name, e, config)
-        # Fallback if no central handler:
+    except (
+        TaskExecutionError,
+        TemplateSyntaxError,
+        UndefinedError,
+        OSError,
+        ValueError,
+    ) as e:
         logger.error(f"Task '{task_name}' failed: {str(e)}", exc_info=True)
         raise TaskExecutionError(
             step_name=task_name, original_error=e, task_config=config.step

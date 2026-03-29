@@ -62,7 +62,9 @@ class Step:
                 f"Could not resolve condition for step '{self.name}': {e}. Skipping step."
             )
             return False
-        except Exception as e:
+        except (
+            Exception
+        ) as e:  # Condition errors should skip the step, not crash the workflow
             logger.warning(
                 f"Unexpected error evaluating condition for step '{self.name}': {e}. Skipping step."
             )
@@ -76,7 +78,7 @@ class Step:
         except TemplateError as e:
             logger.error(f"Template error rendering inputs for step '{self.name}': {e}")
             raise
-        except Exception as e:
+        except Exception as e:  # Wrap any rendering error as TemplateError
             logger.error(
                 f"Unexpected error rendering inputs for step '{self.name}': {e}"
             )
@@ -99,7 +101,7 @@ class Step:
                 final_message = self.template_engine.process_template(
                     message_template, error_context
                 )
-            except Exception as template_err:
+            except TemplateError as template_err:
                 logger.warning(
                     f"Failed to render custom error message for step '{self.name}': {template_err}"
                 )

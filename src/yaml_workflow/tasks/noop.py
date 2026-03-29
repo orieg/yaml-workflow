@@ -7,6 +7,7 @@ This task simply returns its inputs and some metadata about the task execution.
 from pathlib import Path
 from typing import Any, Dict
 
+from ..exceptions import TaskExecutionError, TemplateError
 from . import TaskConfig, register_task
 from .base import get_task_logger, log_task_execution, log_task_result
 from .error_handling import ErrorContext, handle_task_error
@@ -63,8 +64,7 @@ def noop_task(config: TaskConfig) -> Dict[str, Any]:
         log_task_result(logger, result)
         return result
 
-    except Exception as e:
-        # Catch any other unexpected errors during setup/input processing
+    except (TaskExecutionError, TemplateError, ValueError, TypeError, KeyError) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,

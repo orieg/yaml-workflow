@@ -156,7 +156,7 @@ def _execute_python_function(func: Callable, config: TaskConfig) -> Any:
         # Let TypeError from binding propagate up
         # Include function name in the error for clarity
         raise TypeError(f"Error binding arguments for {func.__name__}: {e}") from e
-    except Exception as e:
+    except Exception as e:  # User-provided code may raise any exception
         # Catch other errors during function execution
         logger.error(f"Error executing function {func.__name__}: {e}", exc_info=True)
         # Wrap in a generic exception or re-raise depending on desired handling
@@ -300,7 +300,7 @@ def _execute_code(
             # Default: return None if no result_variable specified and no 'result' variable exists
             return None
 
-    except Exception as e:
+    except Exception as e:  # User-provided code may raise any exception
         # Include captured stderr in the exception if available
         captured_stderr = stderr_capture.getvalue()
         if captured_stderr:
@@ -344,7 +344,7 @@ def python_function(config: TaskConfig) -> Dict[str, Any]:
         # Return the raw result_value, engine will wrap it
         return result_value
 
-    except Exception as e:
+    except Exception as e:  # User-provided code may raise any exception
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -408,7 +408,15 @@ def python_script(config: TaskConfig) -> Dict[str, Any]:
         log_task_result(logger, result)
         return result
 
-    except Exception as e:
+    except (
+        ValueError,
+        TypeError,
+        FileNotFoundError,
+        OSError,
+        TimeoutError,
+        subprocess.CalledProcessError,
+        TaskExecutionError,
+    ) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -475,7 +483,15 @@ def python_module(config: TaskConfig) -> Dict[str, Any]:
         log_task_result(logger, result)
         return result
 
-    except Exception as e:
+    except (
+        ValueError,
+        TypeError,
+        FileNotFoundError,
+        OSError,
+        TimeoutError,
+        subprocess.CalledProcessError,
+        TaskExecutionError,
+    ) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -513,7 +529,7 @@ def python_code(config: TaskConfig) -> Dict[str, Any]:
         log_task_result(logger, {"result_value_from_code": result_value})
         return result_value  # Return the raw value, engine will wrap it
 
-    except Exception as e:
+    except Exception as e:  # User-provided code may raise any exception
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,

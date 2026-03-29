@@ -209,7 +209,7 @@ class TemplateEngine:
 
         except TemplateSyntaxError as e:
             raise TemplateError(f"Template syntax error: {str(e)}")
-        except Exception as e:
+        except (TypeError, ValueError, KeyError, AttributeError) as e:
             raise TemplateError(f"Error processing template: {str(e)}")
 
     def process_value(self, value: Any, variables: Dict[str, Any]) -> Any:

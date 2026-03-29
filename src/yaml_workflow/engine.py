@@ -729,7 +729,9 @@ class WorkflowEngine:
                         final_error_message, original_error=root_cause
                     ) from root_cause
             except Exception as e:
-                # Catch unexpected errors during engine loop logic itself
+                # Broad catch is intentional: this is the engine's top-level run loop
+                # and must handle any unexpected error (e.g. KeyError, AttributeError,
+                # OSError) from engine internals to mark the step/workflow as failed.
                 self.logger.error(
                     f"Unexpected engine error during step '{step_name}': {e}",
                     exc_info=True,
@@ -861,8 +863,10 @@ class WorkflowEngine:
                 self.logger.debug(
                     f"Step '{step_name}' condition '{condition}' resolved to string '{resolved_condition_str}'. Should execute: {should_execute}"
                 )
-            except Exception as e:
-                # Treat condition resolution errors as skip, but log a warning
+            except (TemplateError, ValueError, TypeError) as e:
+                # Catch template resolution errors and type/value errors from
+                # condition evaluation. These are the expected failure modes when
+                # a condition string cannot be resolved or evaluated.
                 self.logger.warning(
                     f"Could not resolve condition '{condition}' for step '{step_name}': {e}. Skipping step."
                 )
@@ -889,27 +893,29 @@ class WorkflowEngine:
             result = handler(task_config)
             self.logger.debug(f"Step '{step_name}' completed successfully in handler.")
 
+        except TaskExecutionError as e:
+            # --- Catch task execution errors (already properly typed) ---
+            self.logger.warning(
+                f"Step '{step_name}' caught TaskExecutionError during execution: {e}"
+            )
+            step_failed = True
+            step_error = e
+
         except Exception as e:
-            # --- Catch ANY exception from the handler ---
+            # Broad catch is intentional: task handlers are user-provided code that
+            # can raise arbitrary exceptions. We must catch and wrap them all to
+            # ensure proper workflow error handling and state management.
             self.logger.warning(
                 f"Step '{step_name}' caught exception during execution: {e}"
             )
             step_failed = True
-            step_error = e  # Store the caught error
-
-            # Ensure it's a TaskExecutionError, wrapping if necessary
-            if not isinstance(step_error, TaskExecutionError):
-                self.logger.debug(
-                    f"Wrapping non-TaskExecutionError: {type(step_error).__name__}"
-                )
-                step_error = TaskExecutionError(
-                    step_name=step_name,
-                    original_error=step_error,
-                    # Pass the raw step dict as task_config for context
-                    task_config=task_config.step,
-                )
-            else:
-                self.logger.debug(f"Caught existing TaskExecutionError: {step_error}")
+            self.logger.debug(f"Wrapping non-TaskExecutionError: {type(e).__name__}")
+            step_error = TaskExecutionError(
+                step_name=step_name,
+                original_error=e,
+                # Pass the raw step dict as task_config for context
+                task_config=task_config.step,
+            )
 
         # --- Handle Successful Execution (if not failed) ---
         if not step_failed:
@@ -1009,7 +1015,7 @@ class WorkflowEngine:
                     formatted_message = self.resolve_template(error_message_template)
                     self.logger.error(f"Formatted error message: {formatted_message}")
                     final_error_message_for_state = formatted_message
-                except Exception as template_err:
+                except TemplateError as template_err:
                     self.logger.warning(
                         f"Failed to resolve on_error.message template: {template_err}"
                     )

@@ -1,11 +1,13 @@
 site_name: YAML Workflow Engine
-site_description: A lightweight, powerful, and flexible workflow engine that executes tasks defined in YAML configuration files
+site_url: https://orieg.github.io/yaml-workflow/
+site_description: A lightweight Python workflow engine that executes tasks from YAML configuration files, with parallel processing, batch operations, and state management.
 site_author: Nicolas Brousse
 repo_url: https://github.com/orieg/yaml-workflow
 repo_name: orieg/yaml-workflow
 
 theme:
   name: material
+  custom_dir: docs/overrides
   features:
     - navigation.tabs
     - navigation.sections
@@ -28,6 +30,21 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/orieg/yaml-workflow
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/yaml-workflow/
+  generator: false
+  copyright_extra: |
+    Built by <a href="https://orieg.github.io/">Nicolas Brousse</a> · <a href="https://orieg.github.io/">More projects</a>
+
+copyright: >
+  Copyright &copy; 2024-2026 Nicolas Brousse ·
+  <a href="https://opensource.org/licenses/MIT">MIT License</a> ·
+  <a href="https://orieg.github.io/">More projects</a>
 
 plugins:
   - search

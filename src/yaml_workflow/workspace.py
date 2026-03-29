@@ -257,7 +257,7 @@ class BatchState:
         try:
             state_data = json.loads(self.state_file.read_text())
             self.state.update(state_data)
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError, KeyError) as e:
             raise WorkflowError(f"Failed to load batch state: {e}")
 
     def save(self) -> None:

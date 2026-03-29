@@ -263,7 +263,7 @@ def write_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"path": result, "content": content}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (ValueError, OSError, TaskExecutionError, TemplateError) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -319,7 +319,13 @@ def read_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"path": file_path_input, "content": content}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (
+        ValueError,
+        OSError,
+        UnicodeDecodeError,
+        TaskExecutionError,
+        TemplateError,
+    ) as e:
         # Debug: Print detailed exception info
         logger.error(f"EXCEPTION: {type(e).__name__}: {str(e)}")
         import traceback
@@ -361,7 +367,13 @@ def append_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"path": result, "content": content}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (
+        ValueError,
+        OSError,
+        UnicodeEncodeError,
+        TaskExecutionError,
+        TemplateError,
+    ) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -394,7 +406,7 @@ def copy_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"source": source, "destination": result}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (ValueError, OSError, shutil.Error, TaskExecutionError, TemplateError) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -427,7 +439,7 @@ def move_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"source": source, "destination": result}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (ValueError, OSError, shutil.Error, TaskExecutionError, TemplateError) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -457,7 +469,7 @@ def delete_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"path": result}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (ValueError, OSError, TaskExecutionError, TemplateError) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -489,7 +501,13 @@ def read_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"data": result_data}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (
+        ValueError,
+        OSError,
+        json.JSONDecodeError,
+        TaskExecutionError,
+        TemplateError,
+    ) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -561,7 +579,7 @@ def write_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"path": result_path}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (ValueError, TypeError, OSError, TaskExecutionError, TemplateError) as e:
         # Debug: Print detailed exception info
         logger.error(f"EXCEPTION: {type(e).__name__}: {str(e)}")
         import traceback
@@ -599,7 +617,13 @@ def read_yaml_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"data": result_data}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (
+        ValueError,
+        OSError,
+        yaml.YAMLError,
+        TaskExecutionError,
+        TemplateError,
+    ) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,
@@ -639,7 +663,13 @@ def write_yaml_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
         output = {"path": result_path}
         log_task_result(logger, output)
         return output
-    except Exception as e:
+    except (
+        ValueError,
+        OSError,
+        yaml.YAMLError,
+        TaskExecutionError,
+        TemplateError,
+    ) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,

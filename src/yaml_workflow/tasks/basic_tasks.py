@@ -4,7 +4,7 @@ Basic task functions for demonstration and testing.
 
 from typing import Any, Dict
 
-from jinja2 import StrictUndefined, Template, UndefinedError
+from jinja2 import StrictUndefined, Template, TemplateSyntaxError, UndefinedError
 
 from ..exceptions import TemplateError
 from . import register_task
@@ -100,5 +100,5 @@ def create_greeting(name: str, context: Dict[str, Any]) -> str:
     try:
         template = Template("Hello {{ name }}!", undefined=StrictUndefined)
         return template.render(name=name, **context)
-    except Exception as e:
+    except (UndefinedError, TemplateSyntaxError, TypeError, ValueError) as e:
         raise TemplateError(f"Failed to create greeting: {str(e)}")

@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from jinja2 import StrictUndefined, Template, UndefinedError
+from jinja2 import StrictUndefined, Template, TemplateSyntaxError, UndefinedError
 
 from ..exceptions import TaskExecutionError, TemplateError
 from . import TaskConfig, register_task
@@ -161,7 +161,7 @@ def process_command(command: str, context: Dict[str, Any]) -> str:
         )
         handle_task_error(err_context)
         return ""  # Unreachable
-    except Exception as e:  # Catch other template processing errors
+    except (TemplateSyntaxError, TypeError, ValueError) as e:
         task_name = context.get("step_name", "shell_template")
         task_type = context.get("task_type", "shell")
         handle_task_error(
@@ -259,7 +259,15 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
         log_task_result(logger, result)
         return result
 
-    except Exception as e:
+    except (
+        TaskExecutionError,
+        TemplateError,
+        subprocess.CalledProcessError,
+        subprocess.TimeoutExpired,
+        OSError,
+        ValueError,
+        TypeError,
+    ) as e:
         context = ErrorContext(
             step_name=task_name,
             task_type=task_type,

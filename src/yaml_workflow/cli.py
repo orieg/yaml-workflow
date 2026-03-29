@@ -99,7 +99,7 @@ def run_workflow(args):
                         raise ValueError(
                             f"Cannot resume: Invalid metadata file format - {str(e)}"
                         )
-                    except Exception as e:
+                    except OSError as e:
                         raise ValueError(
                             f"Cannot resume: Failed to read metadata file - {str(e)}"
                         )
@@ -225,7 +225,7 @@ def run_workflow(args):
     except WorkflowError as e:
         print(f"Workflow error: {str(e)}", file=sys.stderr)
         sys.exit(1)
-    except Exception as e:
+    except Exception as e:  # Top-level catch-all for unexpected errors
         print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
@@ -262,7 +262,7 @@ def list_workflows(args):
                         print(f"  Description: {desc}")
                         found = True
 
-        except Exception:
+        except (yaml.YAMLError, OSError):
             # Skip files that can't be parsed as YAML
             continue
 
@@ -283,7 +283,7 @@ def validate_workflow(args):
         # Just try to create the engine, which will validate the workflow
         WorkflowEngine(args.workflow)
         print("Workflow validation successful")
-    except Exception as e:
+    except (WorkflowError, yaml.YAMLError, OSError) as e:
         print(f"Validation failed: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -311,7 +311,7 @@ def list_workspaces(args):
                         "files": info["files"],
                     }
                 )
-            except Exception as e:
+            except (OSError, KeyError, ValueError) as e:
                 print(f"Warning: Could not get info for {run_dir}: {e}")
 
     # Sort by creation time
@@ -350,7 +350,7 @@ def clean_workspaces(args):
                 created = datetime.fromisoformat(info["created_at"])
                 if created < cutoff:
                     to_delete.append((run_dir, info))
-            except Exception as e:
+            except (OSError, KeyError, ValueError) as e:
                 print(f"Warning: Could not process {run_dir}: {e}", file=sys.stderr)
 
     if not to_delete:
@@ -375,7 +375,7 @@ def clean_workspaces(args):
             try:
                 shutil.rmtree(run_dir)
                 print(f"Removed: {run_dir}")
-            except Exception as e:
+            except OSError as e:
                 print(f"Error removing {run_dir}: {e}")
     else:
         print("\nDry run - no files were deleted")
@@ -413,7 +413,7 @@ def remove_workspaces(args):
             print(f"- {run_dir.name}")
             print(f"  Size: {size_mb:.1f} MB")
             print(f"  Files: {info['files']}")
-        except Exception as e:
+        except (OSError, KeyError, ValueError) as e:
             print(f"Warning: Could not get info for {run_dir}: {e}")
 
     total_size_mb = total_size / (1024 * 1024)
@@ -429,7 +429,7 @@ def remove_workspaces(args):
         try:
             shutil.rmtree(run_dir)
             print(f"Removed: {run_dir}")
-        except Exception as e:
+        except OSError as e:
             print(f"Error removing {run_dir}: {e}")
 
 
@@ -495,7 +495,7 @@ def init_project(args):
             else:
                 print(f"Initialized project with examples in: {target_dir}")
 
-    except Exception as e:
+    except OSError as e:
         print(f"Error initializing project: {e}", file=sys.stderr)
         sys.exit(1)
 
@@ -646,7 +646,7 @@ Commands:
     except KeyboardInterrupt:
         print("\nOperation cancelled by user", file=sys.stderr)
         sys.exit(1)
-    except Exception as e:
+    except Exception as e:  # Top-level catch-all for unexpected errors
         print(f"Error: {str(e)}", file=sys.stderr)
         sys.exit(1)
 
