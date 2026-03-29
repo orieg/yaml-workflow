@@ -53,14 +53,14 @@ yaml-workflow visualize workflows/hello_world.yaml
   Workflow: Hello World
 
   ┌─────────────────┐
-  │ create_greeting  │
-  │     template     │
+  │ create_greeting │
+  │     template    │
   └─────────────────┘
            │
            ▼
   ┌─────────────────┐
-  │    show_info     │
-  │      shell       │
+  │    show_info    │
+  │      shell      │
   └─────────────────┘
 
   2 steps (0 conditional, 2 always-run)

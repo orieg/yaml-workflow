@@ -136,26 +136,26 @@ Regular steps render as boxes, conditional steps as diamonds:
   Workflow: Complex Flow and Error Handling Demo
 
   ┌─────────────────┐
-  │ setup_workspace  │
-  │      shell       │
+  │ setup_workspace │
+  │      shell      │
   └─────────────────┘
            │
            ▼
   ┌─────────────────┐
-  │  process_core_1  │
-  │       echo       │
+  │ process_core_1  │
+  │       echo      │
   └─────────────────┘
            │
            ▼
   ┌─────────────────┐
-  │    flaky_step    │
-  │      shell       │
+  │   flaky_step    │
+  │      shell      │
   └─────────────────┘  ──error─▶ [handle_flaky_error]
            │
            ▼
   ┌─────────────────┐
-  │     cleanup      │
-  │      shell       │
+  │     cleanup     │
+  │      shell      │
   └─────────────────┘
 
   4 steps (0 conditional, 4 always-run)
@@ -166,8 +166,8 @@ Conditional steps render as diamonds:
 
 ```
   ┌───────────────────┐
-  │  validate_input   │       always runs
-  │      shell        │
+  │  validate_input   │    always runs
+  │       shell       │
   └───────────────────┘
            │
            ▼

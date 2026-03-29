@@ -91,20 +91,20 @@ yaml-workflow visualize workflows/data_pipeline.yaml
   Workflow: Data Pipeline
 
   ┌─────────────────┐
-  │  detect_format   │
-  │   python_code    │
+  │  detect_format  │
+  │   python_code   │
   └─────────────────┘
            │
            ▼
-  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
-  │ process_json │  │ process_csv  │  │ process_xml  │  │handle_unknown│
-  │    shell     │  │    shell     │  │    shell     │  │    shell     │
-  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐
+  │  process_json  │  │  process_csv   │  │  process_xml   │  │ handle_unknown │
+  │     shell      │  │     shell      │  │     shell      │  │     shell      │
+  └────────────────┘  └────────────────┘  └────────────────┘  └────────────────┘
            │
            ▼
   ┌─────────────────┐
-  │ generate_report  │
-  │   python_code    │
+  │ generate_report │
+  │   python_code   │
   └─────────────────┘
 ```
 
