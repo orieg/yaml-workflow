@@ -111,12 +111,15 @@ nav:
           - Batch Tasks: guide/tasks/batch-tasks.md
           - Template Tasks: guide/tasks/template-tasks.md
       - Task Development: guide/task-development.md
+      - Plugin Authoring: guide/plugins.md
+      - Architecture: guide/architecture.md
       - Dependencies: dependencies.md
   - Examples:
       - Basic Workflow: examples/basic-workflow.md
       - Hello World: examples/hello-world.md
       - Advanced Hello World: examples/advanced-hello-world.md
       - Resume Testing: examples/test-resume.md
+      - Cookbook: examples/cookbook.md
   - API Reference: reference/SUMMARY.md
   - Contributing:
       - Development Guide: development.md

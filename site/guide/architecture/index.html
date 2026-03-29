@@ -12,13 +12,13 @@
         <meta name="author" content="Nicolas Brousse">
       
       
-        <link rel="canonical" href="https://orieg.github.io/yaml-workflow/examples/hello-world/">
+        <link rel="canonical" href="https://orieg.github.io/yaml-workflow/guide/architecture/">
       
       
-        <link rel="prev" href="../basic-workflow/">
+        <link rel="prev" href="../plugins/">
       
       
-        <link rel="next" href="../advanced-hello-world/">
+        <link rel="next" href="../../dependencies/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -26,7 +26,7 @@
     
     
       
-        <title>Hello World - YAML Workflow Engine</title>
+        <title>Architecture - YAML Workflow Engine</title>
       
     
     
@@ -63,14 +63,14 @@
     
   <!-- Open Graph -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Hello World - YAML Workflow Engine">
+  <meta property="og:title" content="Architecture - YAML Workflow Engine">
   <meta property="og:description" content="A lightweight Python workflow engine that executes tasks from YAML configuration files, with parallel processing, batch operations, and state management.">
-  <meta property="og:url" content="https://orieg.github.io/yaml-workflow/examples/hello-world/">
+  <meta property="og:url" content="https://orieg.github.io/yaml-workflow/guide/architecture/">
   <meta property="og:site_name" content="YAML Workflow Engine">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="Hello World - YAML Workflow Engine">
+  <meta name="twitter:title" content="Architecture - YAML Workflow Engine">
   <meta name="twitter:description" content="A lightweight Python workflow engine that executes tasks from YAML configuration files.">
 
   </head>
@@ -92,7 +92,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#hello-world-example" class="md-skip">
+        <a href="#architecture" class="md-skip">
           Skip to content
         </a>
       
@@ -126,7 +126,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Hello World
+              Architecture
             
           </span>
         </div>
@@ -256,11 +256,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../guide/getting-started/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../getting-started/" class="md-tabs__link">
           
   
   
@@ -276,13 +278,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../basic-workflow/" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../examples/basic-workflow/" class="md-tabs__link">
           
   
   
@@ -404,28 +404,31 @@
       
   
   
+    
   
   
+  
     
     
     
     
+      
+        
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
-        
-          
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -438,7 +441,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Guide
@@ -452,7 +455,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/getting-started/" class="md-nav__link">
+      <a href="../getting-started/" class="md-nav__link">
         
   
   
@@ -498,7 +501,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/concepts/" class="md-nav__link">
+      <a href="../concepts/" class="md-nav__link">
         
   
   
@@ -544,7 +547,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/configuration/" class="md-nav__link">
+      <a href="../configuration/" class="md-nav__link">
         
   
   
@@ -590,7 +593,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/templating/" class="md-nav__link">
+      <a href="../templating/" class="md-nav__link">
         
   
   
@@ -636,7 +639,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/flows/" class="md-nav__link">
+      <a href="../flows/" class="md-nav__link">
         
   
   
@@ -659,7 +662,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/error-handling/" class="md-nav__link">
+      <a href="../error-handling/" class="md-nav__link">
         
   
   
@@ -688,10 +691,13 @@
       
       
         
+          
+          
+        
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
@@ -700,7 +706,7 @@
         <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2_11" >
         
           
-          <label class="md-nav__link" for="__nav_2_11" id="__nav_2_11_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2_11" id="__nav_2_11_label" tabindex="">
             
   
   
@@ -750,7 +756,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/tasks/basic-tasks/" class="md-nav__link">
+      <a href="../tasks/basic-tasks/" class="md-nav__link">
         
   
   
@@ -773,7 +779,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/tasks/file-operations/" class="md-nav__link">
+      <a href="../tasks/file-operations/" class="md-nav__link">
         
   
   
@@ -796,7 +802,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/tasks/shell-tasks/" class="md-nav__link">
+      <a href="../tasks/shell-tasks/" class="md-nav__link">
         
   
   
@@ -819,7 +825,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/tasks/python-tasks/" class="md-nav__link">
+      <a href="../tasks/python-tasks/" class="md-nav__link">
         
   
   
@@ -842,7 +848,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/tasks/batch-tasks/" class="md-nav__link">
+      <a href="../tasks/batch-tasks/" class="md-nav__link">
         
   
   
@@ -865,7 +871,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/tasks/template-tasks/" class="md-nav__link">
+      <a href="../tasks/template-tasks/" class="md-nav__link">
         
   
   
@@ -896,7 +902,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/task-development/" class="md-nav__link">
+      <a href="../task-development/" class="md-nav__link">
         
   
   
@@ -919,7 +925,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../guide/plugins/" class="md-nav__link">
+      <a href="../plugins/" class="md-nav__link">
         
   
   
@@ -939,10 +945,32 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../guide/architecture/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Architecture
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -953,6 +981,140 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#execution-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Execution Flow
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Components
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowengine-enginepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      WorkflowEngine (engine.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-steppy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step (step.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#taskconfig-tasksconfigpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      TaskConfig (tasks/config.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-registry-tasks__init__py" class="md-nav__link">
+    <span class="md-ellipsis">
+      Task Registry (tasks/__init__.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#template-engine-templatepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Template Engine (template.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflow-state-statepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Workflow State (state.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workspace-workspacepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Workspace (workspace.py)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#variable-namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Variable Namespaces
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#plugin-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      Plugin System
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -992,31 +1154,28 @@
       
   
   
-    
   
   
-  
     
     
     
     
-      
-        
-        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
@@ -1029,7 +1188,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Examples
@@ -1043,7 +1202,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../basic-workflow/" class="md-nav__link">
+      <a href="../../examples/basic-workflow/" class="md-nav__link">
         
   
   
@@ -1063,32 +1222,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    Hello World
-    
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../examples/hello-world/" class="md-nav__link">
         
   
   
@@ -1099,62 +1236,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#workflow-file" class="md-nav__link">
-    <span class="md-ellipsis">
-      Workflow File
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#features-demonstrated" class="md-nav__link">
-    <span class="md-ellipsis">
-      Features Demonstrated
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
-    <span class="md-ellipsis">
-      Usage
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#expected-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      Expected Output
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1167,7 +1248,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../advanced-hello-world/" class="md-nav__link">
+      <a href="../../examples/advanced-hello-world/" class="md-nav__link">
         
   
   
@@ -1190,7 +1271,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../test-resume/" class="md-nav__link">
+      <a href="../../examples/test-resume/" class="md-nav__link">
         
   
   
@@ -1213,7 +1294,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cookbook/" class="md-nav__link">
+      <a href="../../examples/cookbook/" class="md-nav__link">
         
   
   
@@ -1429,36 +1510,114 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#workflow-file" class="md-nav__link">
+  <a href="#overview" class="md-nav__link">
     <span class="md-ellipsis">
-      Workflow File
+      Overview
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#features-demonstrated" class="md-nav__link">
+  <a href="#execution-flow" class="md-nav__link">
     <span class="md-ellipsis">
-      Features Demonstrated
+      Execution Flow
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#usage" class="md-nav__link">
+  <a href="#key-components" class="md-nav__link">
     <span class="md-ellipsis">
-      Usage
+      Key Components
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflowengine-enginepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      WorkflowEngine (engine.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-steppy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Step (step.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#taskconfig-tasksconfigpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      TaskConfig (tasks/config.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#task-registry-tasks__init__py" class="md-nav__link">
+    <span class="md-ellipsis">
+      Task Registry (tasks/__init__.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#template-engine-templatepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Template Engine (template.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workflow-state-statepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Workflow State (state.py)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#workspace-workspacepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      Workspace (workspace.py)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#variable-namespaces" class="md-nav__link">
+    <span class="md-ellipsis">
+      Variable Namespaces
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#expected-output" class="md-nav__link">
+  <a href="#plugin-system" class="md-nav__link">
     <span class="md-ellipsis">
-      Expected Output
+      Plugin System
     </span>
   </a>
   
@@ -1483,117 +1642,203 @@
   
 
 
-<h1 id="hello-world-example">Hello World Example<a class="headerlink" href="#hello-world-example" title="Permanent link">&para;</a></h1>
-<p>This example demonstrates the core features of YAML Workflow:
-- Template task for generating text with variable substitution
-- Shell task for running commands and displaying information
-- Built-in variables (run_number, workflow_name, timestamp, workspace)</p>
-<h2 id="workflow-file">Workflow File<a class="headerlink" href="#workflow-file" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># A minimal example workflow that demonstrates core features:</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># - Template task for generating text with variable substitution</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># - Shell task for running commands and displaying information</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># - Built-in variables (run_number, workflow_name, timestamp, workspace)</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1">#</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># Required parameters:</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># - name: The name to include in the greeting (e.g., name=World)</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Hello World</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">A simple workflow that creates a greeting</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nt">params</span><span class="p">:</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">  </span><span class="nt">name</span><span class="p">:</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">    </span><span class="nt">description</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">Name to include in the greeting</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="nt">default</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">World</span>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="nt">steps</span><span class="p">:</span>
-<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">create_greeting</span>
-<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">template</span>
-<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">    </span><span class="nt">template</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">      </span><span class="no">Hello, {{ name }}!</span>
-<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>
-<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">      </span><span class="no">This is run #{{ run_number }} of the {{ workflow_name }} workflow.</span>
-<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="w">      </span><span class="no">Created at: {{ timestamp }}</span>
-<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="w">      </span><span class="no">Workspace: {{ workspace }}</span>
-<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="w">    </span><span class="nt">output</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">greeting.txt</span>
-<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>
-<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">show_info</span>
-<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="w">    </span><span class="nt">task</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">shell</span>
-<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="w">    </span><span class="nt">command</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">|</span>
-<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a><span class="w">      </span><span class="no">echo &quot;Workflow run information:&quot;</span>
-<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a><span class="w">      </span><span class="no">echo &quot;------------------------&quot;</span>
-<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="w">      </span><span class="no">echo &quot;Run number: {{ run_number }}&quot;</span>
-<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="w">      </span><span class="no">echo &quot;Workflow: {{ workflow_name }}&quot;</span>
-<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="w">      </span><span class="no">echo &quot;Created: {{ timestamp }}&quot;</span>
-<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a><span class="w">      </span><span class="no">echo &quot;Workspace: {{ workspace }}&quot;</span>
-<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a><span class="w">      </span><span class="no">echo &quot;------------------------&quot;</span>
-<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a><span class="w">      </span><span class="no">echo &quot;Current directory: $(pwd)&quot;</span>
-<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="w">      </span><span class="no">cat greeting.txt</span>
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
+<p>This page describes the internal architecture of the YAML Workflow Engine.</p>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>                         +-----------+
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>                         |    CLI    |
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                         | (cli.py)  |
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>                         +-----+-----+
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>                               |
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>                    args, workflow path
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>                               |
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>                               v
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>                    +----------+-----------+
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>                    |   WorkflowEngine     |
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>                    |     (engine.py)      |
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                    |                      |
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                    |  - Load YAML         |
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>                    |  - Process imports   |
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>                    |  - Validate params   |
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>                    |  - Resolve flows     |
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>                    |  - Execute steps     |
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>                    +---+------+-------+---+
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>                        |      |       |
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>           +------------+      |       +------------+
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>           |                   |                    |
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>           v                   v                    v
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    +------+------+    +-------+-------+    +-------+-------+
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>    | TemplateEng |    | WorkflowState |    |   Workspace   |
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    | (template)  |    |  (state.py)   |    | (workspace.py)|
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    |             |    |               |    |               |
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>    | Jinja2      |    | Persistence   |    | Directories   |
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    | resolution  |    | Resume/retry  |    | Logging       |
+<a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>    +-------------+    +---------------+    +---------------+
+<a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>
+<a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>                    +----------+-----------+
+<a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>                    |     Step             |
+<a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>                    |    (step.py)         |
+<a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>                    |                      |
+<a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>                    |  - Condition eval    |
+<a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>                    |  - Input rendering   |
+<a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>                    |  - Error handling    |
+<a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>                    +----------+-----------+
+<a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>                               |
+<a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>                               v
+<a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>                    +----------+-----------+
+<a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>                    |    Task Registry     |
+<a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>                    |  (tasks/__init__.py) |
+<a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>                    |                      |
+<a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>                    |  @register_task()    |
+<a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>                    |  get_task_handler()  |
+<a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>                    |  Plugin discovery    |
+<a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>                    +---+--+--+--+--+--+--+
+<a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a>                        |  |  |  |  |  |
+<a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a>           +------+-----+  |  |  |  +-----+------+
+<a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>           |      |        |  |  |        |       |
+<a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>           v      v        v  v  v        v       v
+<a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>        shell   file    python  template  http   batch
+<a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>        tasks   tasks   tasks   tasks     tasks  tasks
 </code></pre></div>
-<h2 id="features-demonstrated">Features Demonstrated<a class="headerlink" href="#features-demonstrated" title="Permanent link">&para;</a></h2>
+<h2 id="execution-flow">Execution Flow<a class="headerlink" href="#execution-flow" title="Permanent link">&para;</a></h2>
+<p>When you run <code>yaml-workflow run workflow.yaml name=Alice</code>:</p>
 <ol>
-<li><strong>Parameter Definition</strong></li>
-<li>Defines a <code>name</code> parameter with a default value</li>
-<li>
-<p>Uses parameter validation and description</p>
+<li><strong>CLI</strong> (<code>cli.py</code>) parses arguments, extracts <code>name=Alice</code> as a parameter</li>
+<li><strong>WorkflowEngine</strong> (<code>engine.py</code>) initializes:<ul>
+<li>Loads the YAML file</li>
+<li>Processes <code>imports</code> (merges steps/params from imported files)</li>
+<li>Validates the workflow structure and parameters</li>
+<li>Creates a workspace directory for this run</li>
+<li>Sets up logging</li>
+<li>Initializes execution context with namespaces (<code>args</code>, <code>env</code>, <code>steps</code>)</li>
+</ul>
 </li>
-<li>
-<p><strong>Template Task</strong></p>
+<li><strong>Run loop</strong> iterates through steps:<ul>
+<li>For each step, creates a <strong>Step</strong> object</li>
+<li>Evaluates the <code>condition</code> (if any) via <strong>TemplateEngine</strong></li>
+<li>Resolves input templates (e.g., <code>{{ args.name }}</code> becomes <code>Alice</code>)</li>
+<li>Looks up the task handler via <strong>Task Registry</strong></li>
+<li>Executes the handler with a <strong>TaskConfig</strong> object</li>
+<li>Stores the result in <code>context["steps"][step_name]</code></li>
+<li>Updates <strong>WorkflowState</strong> (for resume capability)</li>
+</ul>
 </li>
-<li>Creates a greeting using template substitution</li>
-<li>Demonstrates variable interpolation</li>
-<li>
-<p>Shows output file creation</p>
-</li>
-<li>
-<p><strong>Shell Task</strong></p>
-</li>
-<li>Runs shell commands</li>
-<li>Shows environment information</li>
-<li>
-<p>Reads and displays files</p>
-</li>
-<li>
-<p><strong>Built-in Variables</strong></p>
-</li>
-<li><code>run_number</code>: Unique run identifier</li>
-<li><code>workflow_name</code>: Name of the workflow</li>
-<li><code>timestamp</code>: Current time</li>
-<li><code>workspace</code>: Working directory</li>
+<li><strong>On error</strong>: retries, skips, or jumps to error handler based on <code>on_error</code> config</li>
+<li><strong>On completion</strong>: marks workflow as completed, returns results</li>
 </ol>
-<h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link">&para;</a></h2>
-<ol>
-<li>
-<p>Save the workflow:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>mkdir<span class="w"> </span>-p<span class="w"> </span>workflows
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>cp<span class="w"> </span>examples/hello_world.yaml<span class="w"> </span>workflows/
-</code></pre></div></p>
-</li>
-<li>
-<p>Run with default parameter:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>yaml-workflow<span class="w"> </span>run<span class="w"> </span>workflows/hello_world.yaml
-</code></pre></div></p>
-</li>
-<li>
-<p>Run with custom name:
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>yaml-workflow<span class="w"> </span>run<span class="w"> </span>workflows/hello_world.yaml<span class="w"> </span><span class="nv">name</span><span class="o">=</span><span class="s2">&quot;Alice&quot;</span>
-</code></pre></div></p>
-</li>
-</ol>
-<h2 id="expected-output">Expected Output<a class="headerlink" href="#expected-output" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Workflow run information:
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>------------------------
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Run number: 1
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>Workflow: Hello World
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>Created: 2024-01-23T10:30:00Z
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>Workspace: /path/to/workspace
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>------------------------
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>Current directory: /path/to/workspace
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>Hello, Alice!
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>This is run #1 of the Hello World workflow.
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>Created at: 2024-01-23T10:30:00Z
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>Workspace: /path/to/workspace
+<h2 id="key-components">Key Components<a class="headerlink" href="#key-components" title="Permanent link">&para;</a></h2>
+<h3 id="workflowengine-enginepy">WorkflowEngine (<code>engine.py</code>)<a class="headerlink" href="#workflowengine-enginepy" title="Permanent link">&para;</a></h3>
+<p>The central orchestrator. Responsibilities:</p>
+<ul>
+<li>YAML loading and validation</li>
+<li>Import processing (merging steps/params from other files)</li>
+<li>Parameter validation (required, type, min/max length, allowed values)</li>
+<li>Flow resolution (determining which steps to execute in which order)</li>
+<li>Step execution loop with retry/error handling</li>
+<li>Dry-run mode (preview without executing)</li>
+<li>Context management (namespaces for variable access)</li>
+</ul>
+<h3 id="step-steppy">Step (<code>step.py</code>)<a class="headerlink" href="#step-steppy" title="Permanent link">&para;</a></h3>
+<p>Represents a single workflow step. Handles:</p>
+<ul>
+<li><strong>Condition evaluation</strong>: Jinja2 expression that must resolve to <code>"True"</code></li>
+<li><strong>Input rendering</strong>: Recursive template processing of all input values</li>
+<li><strong>Error handling</strong>: <code>on_error</code> configuration (fail, continue, retry, next)</li>
+</ul>
+<h3 id="taskconfig-tasksconfigpy">TaskConfig (<code>tasks/config.py</code>)<a class="headerlink" href="#taskconfig-tasksconfigpy" title="Permanent link">&para;</a></h3>
+<p>The interface between the engine and task handlers:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">class</span> <span class="nc">TaskConfig</span><span class="p">:</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>                    <span class="c1"># Step name</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="nb">type</span><span class="p">:</span> <span class="nb">str</span>                    <span class="c1"># Task type (e.g., &quot;shell&quot;)</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">inputs</span><span class="p">:</span> <span class="nb">dict</span>                 <span class="c1"># Raw inputs from YAML</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">workspace</span><span class="p">:</span> <span class="n">Path</span>              <span class="c1"># Workspace directory</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">context</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>      <span class="c1"># Read-only execution context</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">processed_inputs</span><span class="p">:</span> <span class="n">Dict</span>       <span class="c1"># Template-resolved inputs</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="k">def</span> <span class="nf">process_inputs</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span>  <span class="c1"># Resolve templates in inputs</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="k">def</span> <span class="nf">get_variable</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">namespace</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="k">def</span> <span class="nf">get_available_variables</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span>
 </code></pre></div>
+<h3 id="task-registry-tasks__init__py">Task Registry (<code>tasks/__init__.py</code>)<a class="headerlink" href="#task-registry-tasks__init__py" title="Permanent link">&para;</a></h3>
+<p>Manages task handler registration and lookup:</p>
+<ul>
+<li><code>@register_task("name")</code> decorator registers a function</li>
+<li><code>get_task_handler("name")</code> returns the handler</li>
+<li><code>_discover_plugins()</code> loads tasks from entry points at startup</li>
+</ul>
+<h3 id="template-engine-templatepy">Template Engine (<code>template.py</code>)<a class="headerlink" href="#template-engine-templatepy" title="Permanent link">&para;</a></h3>
+<p>Jinja2 wrapper with:</p>
+<ul>
+<li><code>StrictUndefined</code> mode (errors on undefined variables)</li>
+<li><code>AttrDict</code> for dot-notation access (e.g., <code>steps.my_step.result</code>)</li>
+<li>Recursive processing of nested dicts/lists</li>
+<li>Helpful error messages showing available variables</li>
+</ul>
+<h3 id="workflow-state-statepy">Workflow State (<code>state.py</code>)<a class="headerlink" href="#workflow-state-statepy" title="Permanent link">&para;</a></h3>
+<p>Manages execution persistence:</p>
+<ul>
+<li>Tracks completed/failed/skipped steps</li>
+<li>Stores step outputs for resume capability</li>
+<li>Manages retry counts per step</li>
+<li>Saves to <code>.workflow_metadata.json</code> in workspace</li>
+</ul>
+<h3 id="workspace-workspacepy">Workspace (<code>workspace.py</code>)<a class="headerlink" href="#workspace-workspacepy" title="Permanent link">&para;</a></h3>
+<p>File system management:</p>
+<ul>
+<li>Creates run-specific directories (<code>workflow_name_run_N/</code>)</li>
+<li>Manages logs directory</li>
+<li>Provides workspace info (size, file count, creation time)</li>
+</ul>
+<h2 id="variable-namespaces">Variable Namespaces<a class="headerlink" href="#variable-namespaces" title="Permanent link">&para;</a></h2>
+<p>The execution context provides these namespaces:</p>
+<table>
+<thead>
+<tr>
+<th>Namespace</th>
+<th>Access</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>args</code></td>
+<td><code>{{ args.name }}</code></td>
+<td>CLI parameters and workflow params</td>
+</tr>
+<tr>
+<td><code>env</code></td>
+<td><code>{{ env.PATH }}</code></td>
+<td>Environment variables</td>
+</tr>
+<tr>
+<td><code>steps</code></td>
+<td><code>{{ steps.step_name.result }}</code></td>
+<td>Results from completed steps</td>
+</tr>
+<tr>
+<td><code>batch</code></td>
+<td><code>{{ batch.item }}</code></td>
+<td>Current item in batch processing</td>
+</tr>
+<tr>
+<td><code>workflow</code></td>
+<td><code>{{ workflow.name }}</code></td>
+<td>Workflow metadata</td>
+</tr>
+<tr>
+<td><code>settings</code></td>
+<td><code>{{ settings.key }}</code></td>
+<td>Workflow settings</td>
+</tr>
+</tbody>
+</table>
+<h2 id="plugin-system">Plugin System<a class="headerlink" href="#plugin-system" title="Permanent link">&para;</a></h2>
+<p>External packages can register tasks via Python entry points:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># In plugin&#39;s pyproject.toml</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">[project.entry-points.&quot;yaml_workflow.tasks&quot;]</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">my_tasks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;my_plugin.tasks&quot;</span>
+</code></pre></div>
+<p>When <code>my_plugin.tasks</code> is imported, any <code>@register_task()</code> decorated functions are automatically registered. The engine discovers plugins at import time via <code>importlib.metadata.entry_points()</code>.</p>
 
 
 
