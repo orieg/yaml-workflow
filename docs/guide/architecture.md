@@ -167,9 +167,9 @@ The execution context provides these namespaces:
 | `args` | `{{ args.name }}` | CLI parameters and workflow params |
 | `env` | `{{ env.PATH }}` | Environment variables |
 | `steps` | `{{ steps.step_name.result }}` | Results from completed steps |
-| `batch` | `{{ batch.item }}` | Current item in batch processing |
 | `workflow` | `{{ workflow.name }}` | Workflow metadata |
 | `settings` | `{{ settings.key }}` | Workflow settings |
+| `batch` | `{{ batch.item }}` | Current item in batch processing (only available inside batch tasks) |
 
 ## Plugin System
 

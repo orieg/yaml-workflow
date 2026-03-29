@@ -1816,11 +1816,6 @@
 <td>Results from completed steps</td>
 </tr>
 <tr>
-<td><code>batch</code></td>
-<td><code>{{ batch.item }}</code></td>
-<td>Current item in batch processing</td>
-</tr>
-<tr>
 <td><code>workflow</code></td>
 <td><code>{{ workflow.name }}</code></td>
 <td>Workflow metadata</td>
@@ -1829,6 +1824,11 @@
 <td><code>settings</code></td>
 <td><code>{{ settings.key }}</code></td>
 <td>Workflow settings</td>
+</tr>
+<tr>
+<td><code>batch</code></td>
+<td><code>{{ batch.item }}</code></td>
+<td>Current item in batch processing (only available inside batch tasks)</td>
 </tr>
 </tbody>
 </table>
