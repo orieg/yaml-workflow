@@ -349,3 +349,332 @@ def test_workflow_flow_tracking(workflow_state):
     # Clear flow
     workflow_state.set_flow(None)
     assert workflow_state.get_flow() is None
+
+
+# ---- Tests for uncovered state.py lines ----
+
+
+def test_init_with_metadata_missing_retry_counts(temp_workspace):
+    """Test WorkflowState init with metadata that is missing retry_counts."""
+    metadata = {
+        "execution_state": {
+            "current_step_name": None,
+            "completed_steps": ["step1"],
+            "failed_step": None,
+            "step_outputs": {},
+            "last_updated": "2024-01-01T00:00:00",
+            "status": "in_progress",
+            "flow": None,
+            "completed_at": None,
+            # missing retry_counts and error_flow_target
+        },
+        "namespaces": {"args": {}, "env": {}, "steps": {}, "batch": {}},
+    }
+    state = WorkflowState(temp_workspace, metadata=metadata)
+    # Lines 81, 83: retry_counts and error_flow_target should be initialized
+    assert state.metadata["execution_state"]["retry_counts"] == {}
+    assert state.metadata["execution_state"]["error_flow_target"] is None
+
+
+def test_init_with_metadata_missing_namespaces(tmp_path):
+    """Test WorkflowState init with metadata that is missing namespaces."""
+    metadata = {
+        "execution_state": {
+            "current_step_name": None,
+            "completed_steps": [],
+            "failed_step": None,
+            "step_outputs": {},
+            "last_updated": "2024-01-01T00:00:00",
+            "status": "not_started",
+            "flow": None,
+            "retry_counts": {},
+            "completed_at": None,
+            "error_flow_target": None,
+        },
+        # missing namespaces key
+    }
+    state = WorkflowState(tmp_path, metadata=metadata)
+    # Line 85: namespaces should be initialized with defaults
+    ns = state.metadata["namespaces"]
+    assert "args" in ns
+    assert "env" in ns
+    assert "steps" in ns
+    assert "batch" in ns
+
+
+def test_load_state_from_existing_metadata_file(temp_workspace):
+    """Test _load_state loads from an existing metadata file on disk."""
+    # Write a metadata file to disk that has execution state but missing namespaces
+    metadata_path = temp_workspace / ".workflow_metadata.json"
+    saved_data = {
+        "execution_state": {
+            "current_step_name": "step2",
+            "completed_steps": ["step1"],
+            "failed_step": None,
+            "step_outputs": {"step1": {"status": "completed", "result": "done"}},
+            "last_updated": "2024-01-01T00:00:00",
+            "status": "in_progress",
+            "flow": "main",
+            "retry_counts": {"step2": 1},
+            "completed_at": None,
+            "error_flow_target": None,
+        }
+        # missing namespaces key intentionally to test line 115
+    }
+    metadata_path.write_text(json.dumps(saved_data))
+
+    # Creating without metadata triggers _load_state
+    state = WorkflowState(temp_workspace)
+    # It should have loaded the execution state from the file
+    assert state.metadata["execution_state"]["completed_steps"] == ["step1"]
+    assert state.metadata["execution_state"]["current_step_name"] == "step2"
+    assert state.metadata["execution_state"]["flow"] == "main"
+    # Line 115: namespaces should be initialized with defaults
+    ns = state.metadata["namespaces"]
+    assert "args" in ns
+    assert "env" in ns
+    assert "steps" in ns
+    assert "batch" in ns
+
+
+def test_load_state_from_file_missing_execution_state(temp_workspace):
+    """Test _load_state when file exists but has no execution_state key."""
+    metadata_path = temp_workspace / ".workflow_metadata.json"
+    # Write a file without execution_state to test line 99
+    saved_data = {"namespaces": {"args": {"x": 1}, "env": {}, "steps": {}, "batch": {}}}
+    metadata_path.write_text(json.dumps(saved_data))
+
+    state = WorkflowState(temp_workspace)
+    # Line 99: execution_state should be created fresh (the update replaces it)
+    # Since the update merges, and original init has execution_state, it should persist
+    assert state.metadata["execution_state"]["status"] == "not_started"
+    # Namespaces from file should be loaded
+    assert state.metadata["namespaces"]["args"]["x"] == 1
+
+
+def test_update_namespace_new_namespace(workflow_state):
+    """Test update_namespace with a namespace that doesn't exist yet."""
+    # Line 150: creates new namespace entry
+    workflow_state.update_namespace("custom", {"key": "val"})
+    assert workflow_state.metadata["namespaces"]["custom"]["key"] == "val"
+
+
+def test_get_namespace(workflow_state):
+    """Test get_namespace returns correct data and empty dict for missing."""
+    # Lines 163-164
+    workflow_state.update_namespace("args", {"foo": "bar"})
+    ns = workflow_state.get_namespace("args")
+    assert ns == {"foo": "bar"}
+
+    # Non-existent namespace returns empty dict
+    missing = workflow_state.get_namespace("nonexistent")
+    assert missing == {}
+
+
+def test_clear_namespace(workflow_state):
+    """Test clear_namespace empties the namespace."""
+    # Lines 185-188
+    workflow_state.update_namespace("args", {"key1": "val1", "key2": "val2"})
+    assert workflow_state.get_namespace("args") == {"key1": "val1", "key2": "val2"}
+
+    workflow_state.clear_namespace("args")
+    assert workflow_state.get_namespace("args") == {}
+
+
+def test_clear_namespace_nonexistent(workflow_state):
+    """Test clear_namespace on a namespace that doesn't exist is a no-op."""
+    # Should not raise any error
+    workflow_state.clear_namespace("nonexistent")
+
+
+def test_mark_step_success_clears_failed_step(workflow_state):
+    """Test that marking a previously failed step as success clears the failure."""
+    # Line 193->196: clearing failed_step when the same step succeeds
+    workflow_state.mark_step_failed("step1", "some error")
+    assert workflow_state.metadata["execution_state"]["failed_step"] is not None
+    assert (
+        workflow_state.metadata["execution_state"]["failed_step"]["step_name"]
+        == "step1"
+    )
+
+    workflow_state.mark_step_success("step1", {"output": "fixed"})
+    assert workflow_state.metadata["execution_state"]["failed_step"] is None
+    assert "step1" in workflow_state.metadata["execution_state"]["completed_steps"]
+    assert (
+        workflow_state.metadata["execution_state"]["step_outputs"]["step1"]["status"]
+        == "completed"
+    )
+
+
+def test_mark_step_skipped_removes_from_completed(workflow_state):
+    """Test that mark_step_skipped removes the step from completed_steps."""
+    # Line 231: remove step from completed_steps if it was there
+    workflow_state.mark_step_success("step1", {"output": "result"})
+    assert "step1" in workflow_state.metadata["execution_state"]["completed_steps"]
+
+    workflow_state.mark_step_skipped("step1", reason="no longer needed")
+    assert "step1" not in workflow_state.metadata["execution_state"]["completed_steps"]
+    assert (
+        workflow_state.metadata["execution_state"]["step_outputs"]["step1"]["status"]
+        == "skipped"
+    )
+    assert (
+        workflow_state.metadata["execution_state"]["step_outputs"]["step1"]["reason"]
+        == "no longer needed"
+    )
+
+
+def test_mark_step_skipped_clears_failed_step(workflow_state):
+    """Test that mark_step_skipped clears the failed_step if it matches."""
+    # Line 241: clear failed_step when the same step is skipped
+    workflow_state.mark_step_failed("step1", "error occurred")
+    assert workflow_state.metadata["execution_state"]["failed_step"] is not None
+
+    workflow_state.mark_step_skipped("step1", reason="skipping failed step")
+    assert workflow_state.metadata["execution_state"]["failed_step"] is None
+    assert (
+        workflow_state.metadata["execution_state"]["step_outputs"]["step1"]["status"]
+        == "skipped"
+    )
+
+
+def test_mark_workflow_completed(workflow_state):
+    """Test mark_workflow_completed sets status and completed_at."""
+    workflow_state.mark_step_success("step1", {"output": "done"})
+    workflow_state.mark_workflow_completed()
+
+    state = workflow_state.metadata["execution_state"]
+    assert state["status"] == "completed"
+    assert state["completed_at"] is not None
+    assert state["current_step_name"] is None
+
+
+def test_can_resume_from_step(workflow_state):
+    """Test can_resume_from_step logic."""
+    # Lines 265-276
+
+    # Initially, workflow is not failed -> can't resume
+    assert workflow_state.can_resume_from_step("step1") is False
+
+    # Mark step as failed
+    workflow_state.mark_step_failed("step1", "error")
+    assert workflow_state.metadata["execution_state"]["status"] == "failed"
+
+    # Now we can resume from the failed step
+    assert workflow_state.can_resume_from_step("step1") is True
+
+    # Can't resume from a different step
+    assert workflow_state.can_resume_from_step("step2") is False
+
+    # Can't resume if there's an active retry count for the step
+    workflow_state.increment_step_retry("step1")
+    assert workflow_state.can_resume_from_step("step1") is False
+
+
+def test_can_resume_not_failed_status(workflow_state):
+    """Test can_resume_from_step returns False when workflow is not failed."""
+    workflow_state.mark_step_success("step1", {"output": "done"})
+    assert workflow_state.can_resume_from_step("step1") is False
+
+
+def test_set_current_step_sets_in_progress(workflow_state):
+    """Test that set_current_step sets status to in_progress."""
+    # Lines 349->351
+    assert workflow_state.metadata["execution_state"]["status"] == "not_started"
+
+    workflow_state.set_current_step("step1")
+    assert workflow_state.metadata["execution_state"]["current_step_name"] == "step1"
+    assert workflow_state.metadata["execution_state"]["status"] == "in_progress"
+
+
+def test_set_current_step_none_does_not_change_status(workflow_state):
+    """Test that set_current_step(None) clears step name but doesn't change status."""
+    workflow_state.set_current_step("step1")
+    assert workflow_state.metadata["execution_state"]["status"] == "in_progress"
+
+    workflow_state.set_current_step(None)
+    assert workflow_state.metadata["execution_state"]["current_step_name"] is None
+    # Status stays in_progress because None doesn't trigger the status update
+    assert workflow_state.metadata["execution_state"]["status"] == "in_progress"
+
+
+def test_initialize_execution(workflow_state):
+    """Test initialize_execution resets execution state for a new run."""
+    workflow_state.mark_step_success("step1", {"output": "done"})
+    workflow_state.set_flow("main")
+    workflow_state.set_error_flow_target("handler")
+    workflow_state.increment_step_retry("step1")
+
+    workflow_state.initialize_execution()
+    state = workflow_state.metadata["execution_state"]
+    assert state["current_step_name"] is None
+    assert state["completed_steps"] == []
+    assert state["failed_step"] is None
+    assert state["step_outputs"] == {}
+    assert state["status"] == "not_started"
+    assert state["retry_counts"] == {}
+    assert state["completed_at"] is None
+    assert state["error_flow_target"] is None
+
+
+def test_error_flow_target_operations(workflow_state):
+    """Test set/get/clear error_flow_target."""
+    assert workflow_state.get_error_flow_target() is None
+
+    workflow_state.set_error_flow_target("error_handler")
+    assert workflow_state.get_error_flow_target() == "error_handler"
+
+    workflow_state.clear_error_flow_target()
+    assert workflow_state.get_error_flow_target() is None
+
+
+def test_get_state_returns_correct_structure(workflow_state):
+    """Test get_state returns all expected keys."""
+    workflow_state.mark_step_success("step1", {"output": "res1"})
+    workflow_state.mark_step_skipped("step2", reason="not needed")
+
+    state = workflow_state.get_state()
+    assert "execution_state" in state
+    assert "namespaces" in state
+    assert "steps" in state
+    assert state["steps"]["step1"]["status"] == "completed"
+    assert state["steps"]["step2"]["status"] == "skipped"
+
+
+def test_get_executed_steps(workflow_state):
+    """Test get_executed_steps returns completed step names."""
+    assert workflow_state.get_executed_steps() == []
+
+    workflow_state.mark_step_success("step1", {"output": "res"})
+    workflow_state.mark_step_success("step2", {"output": "res"})
+
+    assert workflow_state.get_executed_steps() == ["step1", "step2"]
+
+
+def test_mark_step_success_idempotent(workflow_state):
+    """Test that marking a step success twice doesn't duplicate in completed_steps."""
+    workflow_state.mark_step_success("step1", {"output": "first"})
+    workflow_state.mark_step_success("step1", {"output": "second"})
+
+    assert (
+        workflow_state.metadata["execution_state"]["completed_steps"].count("step1")
+        == 1
+    )
+    # Output should be updated to second call
+    assert (
+        workflow_state.metadata["execution_state"]["step_outputs"]["step1"]["output"]
+        == "second"
+    )
+
+
+def test_state_persistence_with_retry_counts(temp_workspace):
+    """Test that retry counts persist through save/load cycle."""
+    state = WorkflowState(temp_workspace)
+    state.increment_step_retry("step1")
+    state.increment_step_retry("step1")
+    state.increment_step_retry("step2")
+    state.save()
+
+    loaded = WorkflowState(temp_workspace)
+    assert loaded.get_step_retry_count("step1") == 2
+    assert loaded.get_step_retry_count("step2") == 1

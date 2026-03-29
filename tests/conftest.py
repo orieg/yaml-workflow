@@ -59,6 +59,9 @@ def temp_workspace():
         os.chdir(temp_dir)
         yield Path(temp_dir)
         os.chdir(old_cwd)
+        # Close log file handlers BEFORE TemporaryDirectory.__exit__
+        # tries to delete the dir — Windows can't delete open files
+        _close_all_log_handlers()
 
 
 @pytest.fixture

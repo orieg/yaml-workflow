@@ -219,3 +219,147 @@ def test_process_template_syntax_error_explicit(template_engine):
         template_engine.process_template(template, {})
     assert "Template syntax error:" in str(exc.value)
     assert "Encountered unknown tag 'bad'." in str(exc.value)  # Check Jinja's message
+
+
+# --- AttrDict edge case tests ---
+
+
+def test_attrdict_nested_dict_conversion():
+    """Test that nested dicts are automatically converted to AttrDict."""
+    data = {"outer": {"inner": {"deep": "value"}}}
+    ad = AttrDict(data)
+    assert isinstance(ad["outer"], AttrDict)
+    assert isinstance(ad["outer"]["inner"], AttrDict)
+    assert ad.outer.inner.deep == "value"
+
+
+def test_attrdict_tuple_with_dicts():
+    """Test that dicts inside tuples are converted to AttrDict."""
+    data = {"items": ({"name": "x"}, "plain")}
+    ad = AttrDict(data)
+    assert isinstance(ad["items"][0], AttrDict)
+    assert ad["items"][0].name == "x"
+    assert ad["items"][1] == "plain"
+
+
+def test_attrdict_items_override():
+    """Test that the items() override returns list of tuples."""
+    ad = AttrDict({"x": 10, "y": 20})
+    result = ad.items()
+    assert isinstance(result, list)
+    assert set(result) == {("x", 10), ("y", 20)}
+
+
+def test_attrdict_missing_key_raises_attribute_error():
+    """Test that accessing a completely missing key raises AttributeError (line 37-39)."""
+    ad = AttrDict({"a": 1})
+    with pytest.raises(AttributeError, match="nonexistent"):
+        _ = ad.nonexistent
+
+
+# --- Template variable extraction edge cases ---
+
+
+def test_extract_variable_path_is_undefined_message(template_engine):
+    """Test _extract_variable_path when error contains the 'is undefined' pattern (line 75)."""
+    # Directly test _extract_variable_path with a message containing "'is undefined'"
+    # The code checks for the literal substring "'is undefined'" in the error msg.
+    # When matched, it extracts the var name as error_msg.split("'")[1].
+    result = template_engine._extract_variable_path(
+        "{{ myvar }}", "'myvar'is undefined'"
+    )
+    # split("'") -> ['', 'myvar', 'is undefined', ''] -> [1] = 'myvar'
+    # Then 'myvar' is found in template match 'myvar', so return 'myvar'
+    assert result == "myvar"
+
+
+def test_extract_variable_path_attribute_error_short(template_engine):
+    """Test _extract_variable_path with error where var_parts < 2 (line 82)."""
+    # Test the private method directly with an error message that has fewer than 2 parts
+    # when split on single quotes.
+    result = template_engine._extract_variable_path("{{ x }}", "some error no quotes")
+    # split("'") produces ["some error no quotes"] - length 1, so var_name = "unknown"
+    # Then search for "unknown" in "{{ x }}" - "unknown" is NOT in "x", so return "unknown"
+    assert result == "unknown"
+
+
+def test_extract_variable_path_no_match_in_template(template_engine):
+    """Test _extract_variable_path when var_name is not found in template matches (line 90)."""
+    # The error message references a var name that is not in the template string
+    result = template_engine._extract_variable_path(
+        "{{ something }}", "'str object' has no attribute 'unrelated_var'"
+    )
+    # var_name = var_parts[-2] = "unrelated_var" (from the attribute error format)
+    # "unrelated_var" is NOT in "something", so return "unrelated_var"
+    assert result == "unrelated_var"
+
+
+# --- Process template error paths ---
+
+
+def test_process_template_root_undefined_with_available_vars(template_engine):
+    """Test root-level undefined variable with available variables (lines 203-208)."""
+    # This requires len(parts) == 0, which happens when var_path has no dots.
+    # But len(parts) > 0 always for a non-empty string. We need the namespace
+    # check to fail in a specific way. Let's test the actual code path:
+    # When parts[0] is not in vars_dict, we get the "Invalid namespace" error.
+    # Lines 203-208 are reached only when len(parts) == 0, which means var_path is empty.
+    # This is effectively unreachable in normal flow, but let's verify the namespace path.
+    template = "{{ unknown_var }}"
+    variables = {"known_var": 42, "other_var": "hello"}
+    with pytest.raises(TemplateError) as exc:
+        template_engine.process_template(template, variables)
+    error_msg = str(exc.value)
+    assert "Invalid namespace 'unknown_var'" in error_msg
+    assert "Available namespaces:" in error_msg
+
+
+def test_process_template_type_error(template_engine):
+    """Test TypeError catch during template processing (line 212-213)."""
+    # Trigger a TypeError by providing a value that causes issues in rendering
+    # One way: use a filter that gets a wrong type
+    template = "{{ items | join(',') }}"
+    variables = {"items": 42}  # join expects iterable, not int
+    with pytest.raises(TemplateError) as exc:
+        template_engine.process_template(template, variables)
+    error_msg = str(exc.value)
+    assert "Error processing template:" in error_msg or "Template error:" in error_msg
+
+
+def test_process_template_deep_nested_attribute_missing_key(template_engine):
+    """Test deep nested attribute access where intermediate key is missing (line 189-190)."""
+    template = "{{ ns.a.b.c }}"
+    variables = {"ns": {"a": {"x": 1}}}  # 'b' doesn't exist under 'a'
+    with pytest.raises(TemplateError) as exc:
+        template_engine.process_template(template, variables)
+    error_msg = str(exc.value)
+    # Should fall through the KeyError catch and give undefined variable message
+    assert "Undefined variable" in error_msg
+
+
+def test_process_template_searchpath(template_engine, tmp_path):
+    """Test process_template with searchpath parameter."""
+    # Create a template file in the searchpath
+    template_file = tmp_path / "partial.txt"
+    template_file.write_text("included content")
+
+    template = "Result: {% include 'partial.txt' %}"
+    result = template_engine.process_template(template, {}, searchpath=str(tmp_path))
+    assert "included content" in result
+
+
+def test_process_template_raw_value_with_dot_path(template_engine):
+    """Test that raw value is returned for simple variable reference with dot path."""
+    template = "{{ data.nested }}"
+    variables = {"data": {"nested": [1, 2, 3]}}
+    result = template_engine.process_template(template, variables)
+    assert result == [1, 2, 3]
+
+
+def test_process_template_raw_value_dot_path_none_intermediate(template_engine):
+    """Test dot path resolution when intermediate value is None."""
+    template = "{{ data.missing.deep }}"
+    variables = {"data": {"other": "val"}}
+    # This will fail because data.missing is None/missing
+    with pytest.raises(TemplateError):
+        template_engine.process_template(template, variables)

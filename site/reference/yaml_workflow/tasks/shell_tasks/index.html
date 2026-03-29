@@ -2447,7 +2447,8 @@
 <span class="normal"><a href="#__codelineno-0-275">275</a></span>
 <span class="normal"><a href="#__codelineno-0-276">276</a></span>
 <span class="normal"><a href="#__codelineno-0-277">277</a></span>
-<span class="normal"><a href="#__codelineno-0-278">278</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-179" name="__codelineno-0-179"></a><span class="nd">@register_task</span><span class="p">(</span><span class="s2">&quot;shell&quot;</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-278">278</a></span>
+<span class="normal"><a href="#__codelineno-0-279">279</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-179" name="__codelineno-0-179"></a><span class="nd">@register_task</span><span class="p">(</span><span class="s2">&quot;shell&quot;</span><span class="p">)</span>
 <a id="__codelineno-0-180" name="__codelineno-0-180"></a><span class="k">def</span> <span class="nf">shell_task</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">TaskConfig</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <a id="__codelineno-0-181" name="__codelineno-0-181"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <a id="__codelineno-0-182" name="__codelineno-0-182"></a><span class="sd">    Run a shell command with namespace support.</span>
@@ -2532,21 +2533,22 @@
 <a id="__codelineno-0-261" name="__codelineno-0-261"></a>
 <a id="__codelineno-0-262" name="__codelineno-0-262"></a>    <span class="k">except</span> <span class="p">(</span>
 <a id="__codelineno-0-263" name="__codelineno-0-263"></a>        <span class="n">TaskExecutionError</span><span class="p">,</span>
-<a id="__codelineno-0-264" name="__codelineno-0-264"></a>        <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span><span class="p">,</span>
-<a id="__codelineno-0-265" name="__codelineno-0-265"></a>        <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">,</span>
-<a id="__codelineno-0-266" name="__codelineno-0-266"></a>        <span class="ne">OSError</span><span class="p">,</span>
-<a id="__codelineno-0-267" name="__codelineno-0-267"></a>        <span class="ne">ValueError</span><span class="p">,</span>
-<a id="__codelineno-0-268" name="__codelineno-0-268"></a>        <span class="ne">TypeError</span><span class="p">,</span>
-<a id="__codelineno-0-269" name="__codelineno-0-269"></a>    <span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-<a id="__codelineno-0-270" name="__codelineno-0-270"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
-<a id="__codelineno-0-271" name="__codelineno-0-271"></a>            <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span>
-<a id="__codelineno-0-272" name="__codelineno-0-272"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
-<a id="__codelineno-0-273" name="__codelineno-0-273"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
-<a id="__codelineno-0-274" name="__codelineno-0-274"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
-<a id="__codelineno-0-275" name="__codelineno-0-275"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
-<a id="__codelineno-0-276" name="__codelineno-0-276"></a>        <span class="p">)</span>
-<a id="__codelineno-0-277" name="__codelineno-0-277"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
-<a id="__codelineno-0-278" name="__codelineno-0-278"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
+<a id="__codelineno-0-264" name="__codelineno-0-264"></a>        <span class="n">TemplateError</span><span class="p">,</span>
+<a id="__codelineno-0-265" name="__codelineno-0-265"></a>        <span class="n">subprocess</span><span class="o">.</span><span class="n">CalledProcessError</span><span class="p">,</span>
+<a id="__codelineno-0-266" name="__codelineno-0-266"></a>        <span class="n">subprocess</span><span class="o">.</span><span class="n">TimeoutExpired</span><span class="p">,</span>
+<a id="__codelineno-0-267" name="__codelineno-0-267"></a>        <span class="ne">OSError</span><span class="p">,</span>
+<a id="__codelineno-0-268" name="__codelineno-0-268"></a>        <span class="ne">ValueError</span><span class="p">,</span>
+<a id="__codelineno-0-269" name="__codelineno-0-269"></a>        <span class="ne">TypeError</span><span class="p">,</span>
+<a id="__codelineno-0-270" name="__codelineno-0-270"></a>    <span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+<a id="__codelineno-0-271" name="__codelineno-0-271"></a>        <span class="n">context</span> <span class="o">=</span> <span class="n">ErrorContext</span><span class="p">(</span>
+<a id="__codelineno-0-272" name="__codelineno-0-272"></a>            <span class="n">step_name</span><span class="o">=</span><span class="n">task_name</span><span class="p">,</span>
+<a id="__codelineno-0-273" name="__codelineno-0-273"></a>            <span class="n">task_type</span><span class="o">=</span><span class="n">task_type</span><span class="p">,</span>
+<a id="__codelineno-0-274" name="__codelineno-0-274"></a>            <span class="n">error</span><span class="o">=</span><span class="n">e</span><span class="p">,</span>
+<a id="__codelineno-0-275" name="__codelineno-0-275"></a>            <span class="n">task_config</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">step</span><span class="p">,</span>
+<a id="__codelineno-0-276" name="__codelineno-0-276"></a>            <span class="n">template_context</span><span class="o">=</span><span class="n">config</span><span class="o">.</span><span class="n">_context</span><span class="p">,</span>
+<a id="__codelineno-0-277" name="__codelineno-0-277"></a>        <span class="p">)</span>
+<a id="__codelineno-0-278" name="__codelineno-0-278"></a>        <span class="n">handle_task_error</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+<a id="__codelineno-0-279" name="__codelineno-0-279"></a>        <span class="k">return</span> <span class="p">{}</span>  <span class="c1"># Unreachable</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>

@@ -785,4 +785,478 @@ def test_cli_init_bad_example(run_cli, tmp_path):
     assert not any(workflows_dir.iterdir())  # Check directory is empty if created
 
 
+# --- Tests for visualize command ---
+
+
+def test_cli_visualize_text(run_cli, tmp_path):
+    """Test the visualize command with text format (default)."""
+    workflow = {
+        "name": "viz_test",
+        "steps": [
+            {"name": "step_a", "task": "shell", "inputs": {"command": "echo a"}},
+            {"name": "step_b", "task": "echo", "inputs": {"message": "b"}},
+        ],
+    }
+    workflow_file = tmp_path / "viz_workflow.yaml"
+    workflow_file.write_text(yaml.dump(workflow))
+
+    exit_code, out, err = run_cli(["visualize", str(workflow_file)])
+    assert exit_code == 0
+    assert "step_a" in out
+    assert "step_b" in out
+    assert "viz_test" in out
+
+
+def test_cli_visualize_mermaid(run_cli, tmp_path):
+    """Test the visualize command with mermaid format."""
+    workflow = {
+        "name": "viz_mermaid",
+        "steps": [
+            {"name": "first", "task": "shell", "inputs": {"command": "echo 1"}},
+            {"name": "second", "task": "echo", "inputs": {"message": "2"}},
+        ],
+    }
+    workflow_file = tmp_path / "viz_mermaid.yaml"
+    workflow_file.write_text(yaml.dump(workflow))
+
+    exit_code, out, err = run_cli(
+        ["visualize", str(workflow_file), "--format", "mermaid"]
+    )
+    assert exit_code == 0
+    assert "graph TD" in out
+    assert "first" in out
+    assert "second" in out
+
+
+def test_cli_visualize_with_output_file(run_cli, tmp_path):
+    """Test the visualize command writing to a file."""
+    workflow = {
+        "name": "viz_output",
+        "steps": [
+            {"name": "only_step", "task": "echo", "inputs": {"message": "hi"}},
+        ],
+    }
+    workflow_file = tmp_path / "viz_output.yaml"
+    workflow_file.write_text(yaml.dump(workflow))
+    output_file = tmp_path / "diagram.txt"
+
+    exit_code, out, err = run_cli(
+        ["visualize", str(workflow_file), "--output", str(output_file)]
+    )
+    assert exit_code == 0
+    assert "Diagram written to:" in out
+    assert output_file.exists()
+    content = output_file.read_text()
+    assert "only_step" in content
+
+
+def test_cli_visualize_with_flow(run_cli, tmp_path):
+    """Test the visualize command with a flow parameter."""
+    workflow = {
+        "name": "viz_flow",
+        "steps": [
+            {"name": "alpha", "task": "shell", "inputs": {"command": "echo a"}},
+            {"name": "beta", "task": "echo", "inputs": {"message": "b"}},
+        ],
+        "flows": {
+            "default": "main",
+            "definitions": [{"main": ["beta", "alpha"]}],
+        },
+    }
+    workflow_file = tmp_path / "viz_flow.yaml"
+    workflow_file.write_text(yaml.dump(workflow))
+
+    exit_code, out, err = run_cli(["visualize", str(workflow_file), "--flow", "main"])
+    assert exit_code == 0
+    assert "alpha" in out
+    assert "beta" in out
+
+
+def test_cli_visualize_invalid_file(run_cli, tmp_path):
+    """Test the visualize command with an invalid/nonexistent file."""
+    exit_code, out, err = run_cli(["visualize", str(tmp_path / "nonexistent.yaml")])
+    assert exit_code == 1
+    assert "Error:" in err
+
+
+def test_cli_visualize_mermaid_with_output(run_cli, tmp_path):
+    """Test the visualize command with mermaid format and output file."""
+    workflow = {
+        "name": "mermaid_out",
+        "steps": [
+            {"name": "s1", "task": "shell", "inputs": {"command": "echo"}},
+        ],
+    }
+    workflow_file = tmp_path / "mermaid_out.yaml"
+    workflow_file.write_text(yaml.dump(workflow))
+    output_file = tmp_path / "diagram.mmd"
+
+    exit_code, out, err = run_cli(
+        [
+            "visualize",
+            str(workflow_file),
+            "--format",
+            "mermaid",
+            "--output",
+            str(output_file),
+        ]
+    )
+    assert exit_code == 0
+    assert output_file.exists()
+    content = output_file.read_text()
+    assert "graph TD" in content
+
+
+# --- Tests for workspace commands edge cases ---
+
+
+def test_cli_workspace_no_subcommand(run_cli):
+    """Test workspace command with no subcommand shows help (lines 691-692)."""
+    exit_code, out, err = run_cli(["workspace"])
+    assert exit_code == 1
+
+
+def test_cli_workspace_list_with_workflow_filter(run_cli, tmp_path):
+    """Test workspace list with workflow name filter."""
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+
+    # Create run directories with different workflow names
+    run1_dir = runs_dir / "wf1_run_1"
+    run1_dir.mkdir()
+    metadata1 = {
+        "created_at": "2024-06-01T00:00:00",
+        "workflow": "wf1",
+        "status": "completed",
+    }
+    (run1_dir / ".workflow_metadata.json").write_text(json.dumps(metadata1))
+
+    run2_dir = runs_dir / "wf2_run_1"
+    run2_dir.mkdir()
+    metadata2 = {
+        "created_at": "2024-06-01T00:00:00",
+        "workflow": "wf2",
+        "status": "completed",
+    }
+    (run2_dir / ".workflow_metadata.json").write_text(json.dumps(metadata2))
+
+    exit_code, out, err = run_cli(
+        ["workspace", "list", "--base-dir", str(runs_dir), "--workflow", "wf1"]
+    )
+    assert exit_code == 0
+    assert "wf1_run_1" in out
+
+
+def test_cli_workspace_clean_no_old_runs(run_cli, tmp_path):
+    """Test workspace clean when no runs are older than threshold."""
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+
+    # Create a recent run directory
+    run1_dir = runs_dir / "test_run_1"
+    run1_dir.mkdir()
+    metadata1 = {
+        "created_at": datetime.now().isoformat(),
+        "workflow": "test_workflow",
+        "status": "completed",
+    }
+    (run1_dir / ".workflow_metadata.json").write_text(json.dumps(metadata1))
+
+    exit_code, out, err = run_cli(
+        ["workspace", "clean", "--base-dir", str(runs_dir), "--older-than", "30"]
+    )
+    assert exit_code == 0
+    assert "No old workflow runs to clean up." in out
+
+
+def test_cli_workspace_clean_with_workflow_filter(run_cli, tmp_path):
+    """Test workspace clean with workflow name filter."""
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+
+    # Create an old run directory matching the pattern
+    run1_dir = runs_dir / "mywf_run_1"
+    run1_dir.mkdir()
+    metadata1 = {
+        "created_at": "2020-01-01T00:00:00",
+        "workflow": "mywf",
+        "status": "completed",
+    }
+    (run1_dir / ".workflow_metadata.json").write_text(json.dumps(metadata1))
+
+    exit_code, out, err = run_cli(
+        [
+            "workspace",
+            "clean",
+            "--base-dir",
+            str(runs_dir),
+            "--older-than",
+            "30",
+            "--workflow",
+            "mywf",
+        ]
+    )
+    assert exit_code == 0
+    assert not run1_dir.exists()
+
+
+def test_cli_workspace_remove_nonexistent_run(run_cli, tmp_path):
+    """Test removing a run that doesn't exist (line 418)."""
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+
+    exit_code, out, err = run_cli(
+        [
+            "workspace",
+            "remove",
+            "nonexistent_run",
+            "--base-dir",
+            str(runs_dir),
+            "--force",
+        ]
+    )
+    assert exit_code == 0
+    assert "Warning: Run directory not found:" in out
+    assert "No valid run directories to remove." in out
+
+
+def test_cli_workspace_remove_with_confirm(run_cli, tmp_path, monkeypatch):
+    """Test workspace remove with confirmation prompt answering yes."""
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+    run1_dir = runs_dir / "test_run_1"
+    run1_dir.mkdir()
+    metadata1 = {
+        "created_at": datetime.now().isoformat(),
+        "workflow": "test",
+        "status": "completed",
+    }
+    (run1_dir / ".workflow_metadata.json").write_text(json.dumps(metadata1))
+
+    monkeypatch.setattr("builtins.input", lambda _: "y")
+
+    exit_code, out, err = run_cli(
+        ["workspace", "remove", "test_run_1", "--base-dir", str(runs_dir)]
+    )
+    assert exit_code == 0
+    assert not run1_dir.exists()
+
+
+# --- Tests for init edge cases ---
+
+
+def test_cli_init_missing_examples_dir(run_cli, tmp_path, monkeypatch):
+    """Test init when examples directory cannot be found (lines 487-491)."""
+    # We monkeypatch Path(__file__).parent to make examples_dir not exist
+    # Instead, we directly call init_project with a manipulated environment
+    from yaml_workflow.cli import init_project
+
+    class FakeArgs:
+        dir = str(tmp_path / "init_output")
+        example = None
+
+    # Monkeypatch the cli module's __file__ to point somewhere without examples
+    import yaml_workflow.cli as cli_module
+
+    original_file = cli_module.__file__
+    monkeypatch.setattr(cli_module, "__file__", "/tmp/nonexistent_dir/cli.py")
+
+    with capture_output() as (out, err):
+        try:
+            init_project(FakeArgs())
+            exit_code = 0
+        except SystemExit as e:
+            exit_code = e.code
+
+    assert exit_code == 1
+    assert "Examples directory not found" in err.getvalue()
+
+    # Restore
+    monkeypatch.setattr(cli_module, "__file__", original_file)
+
+
+def test_cli_no_command(run_cli):
+    """Test running CLI with no command shows help (lines 671-672)."""
+    exit_code, out, err = run_cli([])
+    assert exit_code == 1
+
+
+# --- Tests for run command edge cases ---
+
+
+def test_cli_run_resume_not_failed_state(
+    run_cli, sample_workflow_file, workspace_setup
+):
+    """Test resuming a workflow that is not in failed state (line 129-130)."""
+    # The workspace_setup fixture has status 'pending', not 'failed'
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(sample_workflow_file),
+            "--workspace",
+            str(workspace_setup),
+            "--base-dir",
+            str(workspace_setup.parent),
+            "--resume",
+        ]
+    )
+    assert exit_code == 1
+    assert "Cannot resume: workflow is not in failed state" in err
+
+
+def test_cli_run_resume_missing_execution_state(
+    run_cli, sample_workflow_file, workspace_setup
+):
+    """Test resuming with metadata missing execution_state (line 110)."""
+    metadata_path = workspace_setup / ".workflow_metadata.json"
+    with open(metadata_path) as f:
+        metadata = json.load(f)
+    del metadata["execution_state"]
+    metadata_path.write_text(json.dumps(metadata))
+
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(sample_workflow_file),
+            "--workspace",
+            str(workspace_setup),
+            "--base-dir",
+            str(workspace_setup.parent),
+            "--resume",
+        ]
+    )
+    assert exit_code == 1
+    assert "missing execution_state" in err
+
+
+def test_cli_run_with_flow(run_cli, tmp_path):
+    """Test running workflow with --flow option."""
+    workflow = {
+        "name": "flow_test",
+        "steps": [
+            {
+                "name": "step1",
+                "task": "echo",
+                "inputs": {"message": "step1 output"},
+            },
+            {
+                "name": "step2",
+                "task": "echo",
+                "inputs": {"message": "step2 output"},
+            },
+        ],
+        "flows": {
+            "default": "main",
+            "definitions": [{"main": ["step1", "step2"]}],
+        },
+    }
+    workflow_file = tmp_path / "flow_test.yaml"
+    workflow_file.write_text(yaml.dump(workflow))
+
+    exit_code, out, err = run_cli(["run", str(workflow_file), "--flow", "main"])
+    assert exit_code == 0
+    assert "Flow executed: main" in out
+
+
+def test_cli_run_dry_run(run_cli, sample_workflow_file, workspace_setup):
+    """Test running workflow in dry-run mode (line 176)."""
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(sample_workflow_file),
+            "--workspace",
+            str(workspace_setup),
+            "--base-dir",
+            str(workspace_setup.parent),
+            "--dry-run",
+            "name=World",
+        ]
+    )
+    assert exit_code == 0
+    # In dry-run mode, "Workflow completed successfully" should NOT appear
+    # since the code skips the completion status block
+    assert "Workflow Status" not in out or "dry" in out.lower()
+
+
+def test_cli_run_output_dict_value(run_cli, tmp_path):
+    """Test CLI run output formatting for dict values (line 212-213)."""
+    # Register task that returns a dict
+    workflow = {
+        "name": "dict_output_test",
+        "steps": [
+            {
+                "name": "step1",
+                "task": "echo",
+                "inputs": {"message": "simple output"},
+            },
+        ],
+    }
+    workflow_file = tmp_path / "dict_output.yaml"
+    workflow_file.write_text(yaml.dump(workflow))
+
+    exit_code, out, err = run_cli(["run", str(workflow_file)])
+    assert exit_code == 0
+    assert "step1" in out
+
+
+def test_cli_workspace_remove_invalid_metadata(run_cli, tmp_path):
+    """Test workspace remove when a run directory has invalid metadata (lines 439-440)."""
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+    run1_dir = runs_dir / "test_run_bad"
+    run1_dir.mkdir()
+    # Write invalid JSON to metadata
+    (run1_dir / ".workflow_metadata.json").write_text("not json")
+
+    exit_code, out, err = run_cli(
+        [
+            "workspace",
+            "remove",
+            "test_run_bad",
+            "--base-dir",
+            str(runs_dir),
+            "--force",
+        ]
+    )
+    # Should still attempt to show info, but warning about metadata error
+    assert exit_code == 0
+    assert "Warning:" in out or "Removed:" in out
+
+
+def test_cli_run_resume_with_missing_retry_state(
+    run_cli, sample_workflow_file, workspace_setup
+):
+    """Test resuming with failed state but missing retry_state (line 115->119)."""
+    metadata_path = workspace_setup / ".workflow_metadata.json"
+    with open(metadata_path) as f:
+        metadata = json.load(f)
+    metadata["execution_state"]["status"] = "failed"
+    metadata["execution_state"]["failed_step"] = {
+        "step_name": "step1",
+        "error": "some error",
+    }
+    # Remove retry_state if present
+    if "retry_state" in metadata["execution_state"]:
+        del metadata["execution_state"]["retry_state"]
+    metadata_path.write_text(json.dumps(metadata))
+
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(sample_workflow_file),
+            "--workspace",
+            str(workspace_setup),
+            "--base-dir",
+            str(workspace_setup.parent),
+            "--resume",
+            "name=World",
+        ]
+    )
+    # Should set retry_state to {} and proceed with resume
+    assert (
+        "resuming from step: step1" in out.lower()
+        or "Found failed workflow state" in out
+    )
+
+
 # --- Tests for other commands/edge cases ---

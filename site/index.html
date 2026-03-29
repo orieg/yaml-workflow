@@ -457,6 +457,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example output
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1379,6 +1394,21 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Quick Start">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#example-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example output
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1412,21 +1442,25 @@
 <h1 id="yaml-workflow-engine">YAML Workflow Engine<a class="headerlink" href="#yaml-workflow-engine" title="Permanent link">&para;</a></h1>
 <p>A lightweight, powerful, and flexible workflow engine that executes tasks defined in YAML configuration files.</p>
 <h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p><strong>YAML Workflow</strong> is a streamlined task automation tool designed for developers. It excels at:
-- Running local development workflows
-- Automating repetitive tasks
-- Generating daily/weekly reports
-- Processing data in a structured way</p>
-<p>Define powerful workflows through simple YAML files with advanced features like error handling, dependencies, and conditional execution. The engine runs locally without requiring external databases or infrastructure.</p>
+<p><strong>YAML Workflow</strong> is a streamlined task automation tool designed for developers. It excels at:</p>
+<ul>
+<li>Running local development workflows</li>
+<li>Automating repetitive tasks</li>
+<li>Building data processing pipelines</li>
+<li>Scripting with better error handling than shell scripts</li>
+</ul>
+<p>Define powerful workflows through simple YAML files with advanced features like error handling, retry mechanisms, conditional execution, and state persistence. The engine runs locally without requiring external databases or infrastructure.</p>
 <h2 id="key-features">Key Features<a class="headerlink" href="#key-features" title="Permanent link">&para;</a></h2>
 <ul>
-<li>Simple YAML-based workflow definitions</li>
-<li>Flexible task execution system</li>
-<li>Built-in error handling and recovery</li>
-<li>Modular workflow composition</li>
-<li>Extensive templating support</li>
-<li>Rich parameter handling</li>
-<li>Flow control and conditional execution</li>
+<li><strong>YAML-driven</strong> workflow definitions with Jinja2 templating</li>
+<li><strong>Multiple task types</strong>: shell, Python, file, template, HTTP, batch</li>
+<li><strong>Dry-run mode</strong> to preview execution without side effects</li>
+<li><strong>Workflow visualization</strong> as ASCII diagrams or Mermaid charts</li>
+<li><strong>State persistence</strong> with resume from failures</li>
+<li><strong>Parallel execution</strong> with configurable worker pools</li>
+<li><strong>Retry mechanisms</strong> with configurable strategies</li>
+<li><strong>Flow control</strong> with custom step sequences and conditions</li>
+<li><strong>Extensible</strong> task system via <code>@register_task</code> decorator</li>
 </ul>
 <h2 id="quick-start">Quick Start<a class="headerlink" href="#quick-start" title="Permanent link">&para;</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Install the package</span>
@@ -1437,13 +1471,35 @@
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Run the example workflow</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>yaml-workflow<span class="w"> </span>run<span class="w"> </span>workflows/hello_world.yaml<span class="w"> </span><span class="nv">name</span><span class="o">=</span>World
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Preview without executing</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>yaml-workflow<span class="w"> </span>run<span class="w"> </span>workflows/hello_world.yaml<span class="w"> </span><span class="nv">name</span><span class="o">=</span>World<span class="w"> </span>--dry-run
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># Visualize the workflow</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>yaml-workflow<span class="w"> </span>visualize<span class="w"> </span>workflows/hello_world.yaml
+</code></pre></div>
+<h3 id="example-output">Example output<a class="headerlink" href="#example-output" title="Permanent link">&para;</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>  Workflow: Hello World
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  ┌─────────────────┐
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  │ create_greeting  │
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  │     template     │
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  └─────────────────┘
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>           │
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>           ▼
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  ┌─────────────────┐
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  │    show_info     │
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  │      shell       │
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>  └─────────────────┘
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>  2 steps (0 conditional, 2 always-run)
 </code></pre></div>
 <h2 id="documentation-structure">Documentation Structure<a class="headerlink" href="#documentation-structure" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong><a href="guide/getting-started/">Guide</a>:</strong> Tutorials, core concepts, features, and usage guides.</li>
 <li><strong><a href="examples/basic-workflow/">Examples</a>:</strong> Practical workflow examples.</li>
 <li><strong><a href="reference/SUMMARY/">API Reference</a>:</strong> Detailed API documentation for modules and classes.</li>
-<li><strong><a href="development/">Contributing</a>:</strong> Guidelines for contributing to the project. </li>
+<li><strong><a href="development/">Contributing</a>:</strong> Guidelines for contributing to the project.</li>
 </ul>
 
 

@@ -5,6 +5,7 @@ This module handles the persistence and management of workflow execution state,
 including step completion, outputs, and retry mechanisms.
 """
 
+import copy
 import json
 from datetime import datetime
 from pathlib import Path
@@ -66,7 +67,7 @@ class WorkflowState:
                     "error_flow_target": None,
                 },
             ),
-            "namespaces": DEFAULT_NAMESPACES.copy(),
+            "namespaces": copy.deepcopy(DEFAULT_NAMESPACES),
         }
 
         if metadata is not None:
@@ -82,7 +83,7 @@ class WorkflowState:
             if "error_flow_target" not in self.metadata["execution_state"]:
                 self.metadata["execution_state"]["error_flow_target"] = None
             if "namespaces" not in self.metadata:
-                self.metadata["namespaces"] = DEFAULT_NAMESPACES.copy()
+                self.metadata["namespaces"] = copy.deepcopy(DEFAULT_NAMESPACES)
             self.save()
         else:
             self._load_state()
@@ -112,7 +113,7 @@ class WorkflowState:
                 },
             )
         if "namespaces" not in self.metadata:
-            self.metadata["namespaces"] = DEFAULT_NAMESPACES.copy()
+            self.metadata["namespaces"] = copy.deepcopy(DEFAULT_NAMESPACES)
         self.save()
 
     def save(self) -> None:

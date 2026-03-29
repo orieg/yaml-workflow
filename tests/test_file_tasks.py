@@ -17,8 +17,10 @@ from yaml_workflow.tasks.file_tasks import (
     copy_file_task,
     delete_file_direct,
     delete_file_task,
+    ensure_directory,
     move_file_direct,
     move_file_task,
+    process_templates,
     read_file_direct,
     read_file_task,
     read_json,
@@ -673,3 +675,491 @@ def test_file_tasks_with_absolute_paths(temp_workspace):
     assert not absolute_file.exists()  # Original should be gone
     assert move_dest.exists()
     assert move_dest.read_text() == content
+
+
+# ─── ensure_directory error path (lines 34-35) ───
+
+
+def test_ensure_directory_oserror(tmp_path):
+    """Test ensure_directory raises TaskExecutionError on OSError."""
+    # Use a path under a file (not a dir) so mkdir fails
+    blocker = tmp_path / "blocker"
+    blocker.write_text("I am a file")
+    bad_path = blocker / "subdir" / "file.txt"
+    with pytest.raises(TaskExecutionError):
+        ensure_directory(bad_path, "test_step")
+
+
+# ─── write_file_direct error path (lines 69-70) ───
+
+
+def test_write_file_direct_encoding_error(tmp_path):
+    """Test write_file_direct raises TaskExecutionError on UnicodeEncodeError."""
+    file_path = tmp_path / "bad_encode.txt"
+    # A string with a surrogate that cannot encode to ascii
+    content = "Hello \ud800 World"
+    with pytest.raises(TaskExecutionError):
+        write_file_direct(str(file_path), content, tmp_path, encoding="ascii")
+
+
+def test_write_file_direct_io_error(tmp_path):
+    """Test write_file_direct raises TaskExecutionError on IOError."""
+    # Try writing to a path that is actually a directory
+    dir_path = tmp_path / "adir"
+    dir_path.mkdir()
+    with pytest.raises(TaskExecutionError):
+        write_file_direct(str(dir_path), "content", tmp_path)
+
+
+# ─── read_file_direct with logger debug paths (lines 111-125) ───
+
+
+def test_read_file_direct_with_logger_file_not_found(tmp_path):
+    """Test read_file_direct with a logger when the file does not exist."""
+    import logging
+
+    logger = logging.getLogger("test_read_direct_logger")
+    with pytest.raises(TaskExecutionError):
+        read_file_direct("nonexistent.txt", tmp_path, logger=logger)
+
+
+def test_read_file_direct_with_logger_success(tmp_path):
+    """Test read_file_direct with a logger on a successful read."""
+    import logging
+
+    logger = logging.getLogger("test_read_direct_logger_ok")
+    file_path = tmp_path / "readable.txt"
+    file_path.write_text("hello")
+    result = read_file_direct(str(file_path), tmp_path, logger=logger)
+    assert result == "hello"
+
+
+def test_read_file_direct_decode_error(tmp_path):
+    """Test read_file_direct raises TaskExecutionError on UnicodeDecodeError."""
+    import logging
+
+    logger = logging.getLogger("test_read_decode_err")
+    file_path = tmp_path / "binary.bin"
+    file_path.write_bytes(b"\x80\x81\x82\xff")
+    with pytest.raises(TaskExecutionError):
+        read_file_direct(str(file_path), tmp_path, encoding="ascii", logger=logger)
+
+
+def test_read_file_direct_parent_exists_listing(tmp_path):
+    """Test read_file_direct debug path listing parent dir contents when file missing."""
+    import logging
+
+    logger = logging.getLogger("test_read_parent_listing")
+    # Create a file in the dir so there is something to list
+    (tmp_path / "other.txt").write_text("x")
+    with pytest.raises(TaskExecutionError):
+        read_file_direct("missing_file.txt", tmp_path, logger=logger)
+
+
+# ─── append_file_direct error path (lines 156-157) ───
+
+
+def test_append_file_direct_io_error(tmp_path):
+    """Test append_file_direct raises TaskExecutionError on IOError."""
+    dir_path = tmp_path / "adir"
+    dir_path.mkdir()
+    with pytest.raises(TaskExecutionError):
+        append_file_direct(str(dir_path), "content", tmp_path)
+
+
+# ─── delete_file_direct error path (lines 235-236) ───
+
+
+def test_delete_file_direct_io_error(tmp_path):
+    """Test delete_file_direct raises TaskExecutionError on IOError."""
+    # Deleting a directory with unlink should fail
+    dir_path = tmp_path / "a_directory"
+    dir_path.mkdir()
+    # Put a file inside so it's not empty (unlink on dir fails)
+    (dir_path / "child.txt").write_text("x")
+    with pytest.raises((TaskExecutionError, IsADirectoryError, PermissionError)):
+        delete_file_direct(str(dir_path), tmp_path)
+
+
+# ─── read_json_task missing inputs and error paths (lines 498, 504-519) ───
+
+
+def test_read_json_task_missing_file(temp_workspace):
+    """Test read_json_task raises error when file param is missing."""
+    step = {"name": "rj1", "task": "read_json", "inputs": {}}
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError) as exc:
+        read_json_task(config)
+    assert "No file path provided" in str(exc.value.original_error)
+
+
+def test_read_json_task_invalid_json(temp_workspace):
+    """Test read_json_task raises error when file contains invalid JSON."""
+    bad_json = temp_workspace / "bad.json"
+    bad_json.write_text("not valid json {{{")
+    step = {"name": "rj2", "task": "read_json", "inputs": {"file": "bad.json"}}
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError):
+        read_json_task(config)
+
+
+def test_read_json_task_file_not_found(temp_workspace):
+    """Test read_json_task raises error when file does not exist."""
+    step = {
+        "name": "rj3",
+        "task": "read_json",
+        "inputs": {"file": "nonexistent.json"},
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError):
+        read_json_task(config)
+
+
+# ─── write_json_task missing inputs and error paths (lines 545-551, 554-562, 582-597) ───
+
+
+def test_write_json_task_missing_file(temp_workspace):
+    """Test write_json_task raises error when file param is missing."""
+    step = {
+        "name": "wj1",
+        "task": "write_json",
+        "inputs": {"data": {"key": "val"}},
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError) as exc:
+        write_json_task(config)
+    assert "No file path provided" in str(exc.value.original_error)
+
+
+def test_write_json_task_missing_data(temp_workspace):
+    """Test write_json_task raises error when data param is missing."""
+    step = {
+        "name": "wj2",
+        "task": "write_json",
+        "inputs": {"file": "output/out.json"},
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError) as exc:
+        write_json_task(config)
+    assert "No data provided" in str(exc.value.original_error)
+
+
+def test_write_json_task_output_dir_creation(temp_workspace):
+    """Test write_json_task creates output/ directory when file path contains it."""
+    step = {
+        "name": "wj3",
+        "task": "write_json",
+        "inputs": {"file": "output/test.json", "data": {"hello": "world"}},
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    result = write_json_task(config)
+    assert result is not None
+    assert (temp_workspace / "output").is_dir()
+    output_file = Path(result["path"])
+    assert output_file.exists()
+    with open(output_file) as f:
+        assert json.load(f) == {"hello": "world"}
+
+
+# ─── read_yaml_task missing inputs and error paths (lines 614, 620-635) ───
+
+
+def test_read_yaml_task_missing_file(temp_workspace):
+    """Test read_yaml_task raises error when file param is missing."""
+    step = {"name": "ry1", "task": "read_yaml", "inputs": {}}
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError) as exc:
+        read_yaml_task(config)
+    assert "No file path provided" in str(exc.value.original_error)
+
+
+def test_read_yaml_task_file_not_found(temp_workspace):
+    """Test read_yaml_task raises error when file does not exist."""
+    step = {
+        "name": "ry2",
+        "task": "read_yaml",
+        "inputs": {"file": "nonexistent.yaml"},
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError):
+        read_yaml_task(config)
+
+
+def test_read_yaml_task_invalid_yaml(temp_workspace):
+    """Test read_yaml_task raises error when file contains invalid YAML."""
+    bad_yaml = temp_workspace / "bad.yaml"
+    bad_yaml.write_text(":\n  :\n  - :\n    invalid: [")
+    step = {"name": "ry3", "task": "read_yaml", "inputs": {"file": "bad.yaml"}}
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError):
+        read_yaml_task(config)
+
+
+# ─── write_yaml_task missing inputs and error paths (lines 652, 654, 666-681) ───
+
+
+def test_write_yaml_task_missing_file(temp_workspace):
+    """Test write_yaml_task raises error when file param is missing."""
+    step = {
+        "name": "wy1",
+        "task": "write_yaml",
+        "inputs": {"data": {"key": "val"}},
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError) as exc:
+        write_yaml_task(config)
+    assert "No file path provided" in str(exc.value.original_error)
+
+
+def test_write_yaml_task_missing_data(temp_workspace):
+    """Test write_yaml_task raises error when data param is missing."""
+    step = {
+        "name": "wy2",
+        "task": "write_yaml",
+        "inputs": {"file": "out.yaml"},
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError) as exc:
+        write_yaml_task(config)
+    assert "No data provided" in str(exc.value.original_error)
+
+
+# ─── process_templates (lines 697-715) ───
+
+
+def test_process_templates_string():
+    """Test process_templates resolves a simple string template."""
+    context = {"args": {"name": "Alice"}}
+    result = process_templates("Hello {{ args.name }}", context)
+    assert result == "Hello Alice"
+
+
+def test_process_templates_dict():
+    """Test process_templates resolves templates in a dict."""
+    context = {"args": {"x": "1", "y": "2"}}
+    data = {"a": "{{ args.x }}", "b": "{{ args.y }}"}
+    result = process_templates(data, context)
+    assert result == {"a": "1", "b": "2"}
+
+
+def test_process_templates_list():
+    """Test process_templates resolves templates in a list."""
+    context = {"args": {"v": "val"}}
+    data = ["{{ args.v }}", "literal"]
+    result = process_templates(data, context)
+    assert result == ["val", "literal"]
+
+
+def test_process_templates_non_string():
+    """Test process_templates passes through non-string, non-container types."""
+    result = process_templates(42, {})
+    assert result == 42
+    result2 = process_templates(True, {})
+    assert result2 is True
+    result3 = process_templates(None, {})
+    assert result3 is None
+
+
+def test_process_templates_undefined_variable():
+    """Test process_templates raises TemplateError for undefined variables."""
+    context = {"args": {"name": "Alice"}, "env": {}, "steps": {}}
+    with pytest.raises(TemplateError, match="Failed to resolve variable"):
+        process_templates("{{ args.missing_var }}", context)
+
+
+def test_process_templates_undefined_no_args():
+    """Test process_templates raises TemplateError when context keys are missing."""
+    context = {}
+    with pytest.raises(TemplateError, match="Failed to resolve variable"):
+        process_templates("{{ args.missing }}", context)
+
+
+# ─── read_json decode error (lines 737-738) ───
+
+
+def test_read_json_invalid_content(tmp_path):
+    """Test read_json raises TaskExecutionError on invalid JSON content."""
+    bad_file = tmp_path / "bad.json"
+    bad_file.write_text("this is not json")
+    with pytest.raises(TaskExecutionError):
+        read_json(str(bad_file), tmp_path)
+
+
+# ─── write_json_direct error path (lines 796-802) ───
+
+
+def test_write_json_direct_type_error(tmp_path):
+    """Test write_json_direct raises TemplateError on non-serializable data."""
+    file_path = tmp_path / "bad.json"
+    with pytest.raises(TemplateError, match="Failed to write JSON"):
+        write_json_direct(str(file_path), {1, 2, 3}, workspace=tmp_path)
+
+
+def test_write_json_direct_io_error(tmp_path):
+    """Test write_json_direct raises TemplateError on IOError."""
+    # Try to write to a directory path
+    dir_path = tmp_path / "adir"
+    dir_path.mkdir()
+    with pytest.raises(TemplateError, match="Failed to write JSON"):
+        write_json_direct(str(dir_path), {"a": 1}, workspace=tmp_path)
+
+
+def test_write_json_direct_with_logger(tmp_path):
+    """Test write_json_direct with a logger for debug output."""
+    import logging
+
+    logger = logging.getLogger("test_write_json_logger")
+    file_path = tmp_path / "logged.json"
+    result = write_json_direct(
+        str(file_path), {"key": "value"}, workspace=tmp_path, logger=logger
+    )
+    assert Path(result).exists()
+    with open(result) as f:
+        assert json.load(f) == {"key": "value"}
+
+
+def test_write_json_direct_error_with_logger(tmp_path):
+    """Test write_json_direct error path with logger present."""
+    import logging
+
+    logger = logging.getLogger("test_write_json_err_logger")
+    file_path = tmp_path / "bad.json"
+    with pytest.raises(TemplateError, match="Failed to write JSON"):
+        write_json_direct(str(file_path), {1, 2, 3}, workspace=tmp_path, logger=logger)
+
+
+# ─── read_yaml parse error (lines 824-825) ───
+
+
+def test_read_yaml_invalid_content(tmp_path):
+    """Test read_yaml raises TaskExecutionError on invalid YAML content."""
+    bad_file = tmp_path / "bad.yaml"
+    bad_file.write_text(":\n  - : [invalid")
+    with pytest.raises(TaskExecutionError):
+        read_yaml(str(bad_file), tmp_path)
+
+
+# ─── write_yaml_direct error path (lines 858-859) ───
+
+
+def test_write_yaml_direct_io_error(tmp_path):
+    """Test write_yaml_direct raises TemplateError on IOError."""
+    dir_path = tmp_path / "adir"
+    dir_path.mkdir()
+    with pytest.raises(TemplateError, match="Failed to write YAML"):
+        write_yaml_direct(str(dir_path), {"a": 1}, workspace=tmp_path)
+
+
+# ─── copy/move/delete direct with missing source (error paths) ───
+
+
+def test_copy_file_direct_missing_source(tmp_path):
+    """Test copy_file_direct raises TaskExecutionError when source is missing."""
+    with pytest.raises(TaskExecutionError):
+        copy_file_direct(
+            str(tmp_path / "no_such_file.txt"),
+            str(tmp_path / "dest.txt"),
+            tmp_path,
+        )
+
+
+def test_move_file_direct_missing_source(tmp_path):
+    """Test move_file_direct raises TaskExecutionError when source is missing."""
+    with pytest.raises(TaskExecutionError):
+        move_file_direct(
+            str(tmp_path / "no_such_file.txt"),
+            str(tmp_path / "dest.txt"),
+            tmp_path,
+        )
+
+
+# ─── delete_file_task missing file param (line 481) ───
+
+
+def test_delete_file_task_missing_file_param(temp_workspace):
+    """Test delete_file_task raises error when file param is missing."""
+    step = {"name": "df1", "task": "delete_file", "inputs": {}}
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError) as exc:
+        delete_file_task(config)
+    assert "No file path provided" in str(exc.value.original_error)
+
+
+# ─── append_file_task error paths (line 385) ───
+
+
+def test_append_file_task_missing_file(temp_workspace):
+    """Test append_file_task raises error when file param is missing."""
+    step = {
+        "name": "af1",
+        "task": "append_file",
+        "inputs": {"content": "c"},
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError) as exc:
+        append_file_task(config)
+    assert "No file path provided" in str(exc.value.original_error)
+
+
+def test_append_file_task_missing_content(temp_workspace):
+    """Test append_file_task raises error when content param is missing."""
+    step = {
+        "name": "af2",
+        "task": "append_file",
+        "inputs": {"file": "f.txt"},
+    }
+    config = TaskConfig(step, {}, temp_workspace)
+    with pytest.raises(TaskExecutionError) as exc:
+        append_file_task(config)
+    assert "No content provided" in str(exc.value.original_error)
+
+
+# ─── write_json_direct without workspace (line 772->783 branch) ───
+
+
+def test_write_json_direct_no_workspace(tmp_path):
+    """Test write_json_direct when workspace is None."""
+    file_path = str(tmp_path / "no_ws.json")
+    result = write_json_direct(file_path, {"test": True}, workspace=None)
+    assert result == file_path
+    with open(file_path) as f:
+        assert json.load(f) == {"test": True}
+
+
+def test_write_yaml_direct_no_workspace(tmp_path):
+    """Test write_yaml_direct when workspace is None."""
+    file_path = str(tmp_path / "no_ws.yaml")
+    result = write_yaml_direct(file_path, {"test": True}, workspace=None)
+    assert result == file_path
+    with open(file_path) as f:
+        assert yaml.safe_load(f) == {"test": True}
+
+
+# ─── read_file_direct without logger (error path, line 120->125) ───
+
+
+def test_read_file_direct_error_without_logger(tmp_path):
+    """Test read_file_direct error path without logger."""
+    with pytest.raises(TaskExecutionError):
+        read_file_direct("nonexistent.txt", tmp_path, logger=None)
+
+
+# ─── append_file_direct creates directory (new file) ───
+
+
+def test_append_file_direct_creates_new_file(tmp_path):
+    """Test append_file_direct creates file and parent dirs if they don't exist."""
+    file_path = tmp_path / "subdir" / "new_append.txt"
+    result = append_file_direct(str(file_path), "new content", tmp_path)
+    assert result == str(file_path)
+    assert file_path.read_text() == "new content"
+
+
+# ─── delete_file_direct on non-existent file ───
+
+
+def test_delete_file_direct_nonexistent(tmp_path):
+    """Test delete_file_direct succeeds silently when file does not exist."""
+    file_path = tmp_path / "does_not_exist.txt"
+    result = delete_file_direct(str(file_path), tmp_path)
+    assert result == str(file_path)

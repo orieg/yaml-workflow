@@ -1255,3 +1255,779 @@ def test_complex_template_resolution_and_validation(tmp_path):
 
     # Check that variable was accessed correctly
     assert result["outputs"]["access_var"]["result"] == "Value is: 42"
+
+
+# ---- Tests for uncovered engine.py lines ----
+
+
+def test_workflow_invalid_yaml_format_not_dict(tmp_path):
+    """Test that a YAML file whose root is not a mapping raises WorkflowError (line 132)."""
+    yaml_file = tmp_path / "bad_root.yaml"
+    yaml_file.write_text("- item1\n- item2\n")
+    with pytest.raises(WorkflowError, match="root must be a mapping"):
+        WorkflowEngine(str(yaml_file))
+
+
+def test_dry_run_mode_basic(tmp_path):
+    """Test dry-run mode creates temp workspace and suppresses console output (lines 167, 179-183)."""
+    workflow = {
+        "name": "dry-run-test",
+        "steps": [
+            {
+                "name": "step1",
+                "task": "echo",
+                "inputs": {"message": "hello"},
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, dry_run=True)
+    # dry_run workspace is a temp directory
+    assert "yaml_workflow_dryrun_" in str(engine.workspace)
+    assert engine.dry_run is True
+
+
+def test_dry_run_execution(tmp_path):
+    """Test dry-run mode previews steps without executing tasks (lines 662-666, 929-942, 806-816)."""
+    workflow = {
+        "name": "dry-run-exec",
+        "steps": [
+            {
+                "name": "step1",
+                "task": "echo",
+                "inputs": {"message": "hello world"},
+            },
+            {
+                "name": "step2",
+                "task": "shell",
+                "inputs": {"command": "echo 'should not run'"},
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, dry_run=True)
+    result = engine.run()
+    # Should complete (dry-run marks steps as success without running)
+    assert result["status"] == "completed"
+
+
+def test_dry_run_with_flow(tmp_path):
+    """Test dry-run mode with a specific flow (lines 664-665)."""
+    workflow = {
+        "name": "dry-run-flow",
+        "steps": [
+            {"name": "step1", "task": "echo", "inputs": {"message": "a"}},
+            {"name": "step2", "task": "echo", "inputs": {"message": "b"}},
+        ],
+        "flows": {
+            "definitions": [{"flow1": ["step1"]}],
+            "default": "flow1",
+        },
+    }
+    engine = WorkflowEngine(workflow, dry_run=True)
+    result = engine.run(flow="flow1")
+    assert result["status"] == "completed"
+
+
+def test_dry_run_skipped_condition(tmp_path):
+    """Test dry-run mode with a step whose condition is false (line 916, 923->925)."""
+    workflow = {
+        "name": "dry-run-cond",
+        "steps": [
+            {
+                "name": "step1",
+                "task": "python_code",
+                "inputs": {"code": "result = {'flag': False}"},
+            },
+            {
+                "name": "step2",
+                "task": "echo",
+                "inputs": {"message": "should skip"},
+                "condition": "{{ steps.step1.result.flag == true }}",
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, dry_run=True)
+    result = engine.run()
+    assert result["status"] == "completed"
+
+
+def test_step_dict_invalid_value_not_dict(tmp_path):
+    """Test that a step definition that is not a dict raises ConfigurationError (line 191)."""
+    workflow = {
+        "name": "bad-step-value",
+        "steps": {
+            "step1": "not_a_dict",
+        },
+    }
+    with pytest.raises(ConfigurationError, match="must be a dictionary"):
+        WorkflowEngine(workflow, base_dir=tmp_path)
+
+
+def test_step_dict_name_mismatch_warning(tmp_path):
+    """Test that a step dict key differs from 'name' field produces a warning (lines 197-198)."""
+    workflow = {
+        "name": "name-mismatch",
+        "steps": {
+            "dict_key": {
+                "name": "different_name",
+                "task": "echo",
+                "inputs": {"message": "test"},
+            },
+        },
+    }
+    # Should not raise, but the step should use 'different_name'
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    # The step should be accessible by its name field
+    step_names = [s["name"] for s in engine.workflow["steps"]]
+    assert "different_name" in step_names
+
+
+def test_steps_invalid_type_not_list_or_dict(tmp_path):
+    """Test that steps being neither list nor dict raises ConfigurationError (line 205)."""
+    workflow = {
+        "name": "bad-steps-type",
+        "steps": "not_a_list_or_dict",
+    }
+    with pytest.raises(ConfigurationError, match="must be a list or a dictionary"):
+        WorkflowEngine(workflow, base_dir=tmp_path)
+
+
+def test_step_list_missing_name(tmp_path):
+    """Test that a step in list format missing 'name' raises ConfigurationError (line 210)."""
+    workflow = {
+        "name": "missing-name",
+        "steps": [
+            {"task": "echo", "inputs": {"message": "no name"}},
+        ],
+    }
+    with pytest.raises(ConfigurationError, match="missing a 'name'"):
+        WorkflowEngine(workflow, base_dir=tmp_path)
+
+
+def test_resolve_value_non_template_types(tmp_path):
+    """Test resolve_value with non-string/dict/list types returns value unchanged (line 327)."""
+    workflow = {
+        "name": "resolve-test",
+        "steps": [{"name": "s1", "task": "echo", "inputs": {"message": "x"}}],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+
+    # Integer
+    assert engine.resolve_value(42) == 42
+    # Float
+    assert engine.resolve_value(3.14) == 3.14
+    # Boolean
+    assert engine.resolve_value(True) is True
+    # None
+    assert engine.resolve_value(None) is None
+    # List
+    assert engine.resolve_value([1, 2, "{{ workflow.name }}"]) == [
+        1,
+        2,
+        "resolve-test",
+    ]
+    # Dict
+    assert engine.resolve_value({"key": "{{ workflow.name }}"}) == {
+        "key": "resolve-test"
+    }
+
+
+def test_validate_params_allowed_values_not_list(tmp_path):
+    """Test _validate_params raises for non-list allowedValues (lines 369-373)."""
+    workflow = {
+        "name": "bad-allowed-values",
+        "params": {
+            "choice": {
+                "allowedValues": "not_a_list",
+            },
+        },
+        "steps": [{"name": "s1", "task": "echo", "inputs": {"message": "x"}}],
+    }
+    with pytest.raises(ConfigurationError, match="'allowedValues' must be a list"):
+        WorkflowEngine(workflow, base_dir=tmp_path)
+
+
+def test_validate_params_default_not_in_allowed_values(tmp_path):
+    """Test _validate_params raises when default is not in allowedValues (lines 375-379)."""
+    workflow = {
+        "name": "bad-default",
+        "params": {
+            "choice": {
+                "allowedValues": ["A", "B", "C"],
+                "default": "Z",
+            },
+        },
+        "steps": [{"name": "s1", "task": "echo", "inputs": {"message": "x"}}],
+    }
+    with pytest.raises(ConfigurationError, match="Invalid default value 'Z'"):
+        WorkflowEngine(workflow, base_dir=tmp_path)
+
+
+def test_validate_params_min_length_invalid(tmp_path):
+    """Test _validate_params raises for invalid minLength (lines 384-387)."""
+    workflow = {
+        "name": "bad-minlength",
+        "params": {
+            "name_param": {
+                "type": "string",
+                "minLength": -1,
+            },
+        },
+        "steps": [{"name": "s1", "task": "echo", "inputs": {"message": "x"}}],
+    }
+    with pytest.raises(
+        ConfigurationError, match="'minLength' must be a non-negative integer"
+    ):
+        WorkflowEngine(workflow, base_dir=tmp_path)
+
+
+def test_validate_params_default_shorter_than_min_length(tmp_path):
+    """Test _validate_params raises when default is shorter than minLength (lines 389-393)."""
+    workflow = {
+        "name": "short-default",
+        "params": {
+            "name_param": {
+                "type": "string",
+                "minLength": 5,
+                "default": "ab",
+            },
+        },
+        "steps": [{"name": "s1", "task": "echo", "inputs": {"message": "x"}}],
+    }
+    with pytest.raises(ConfigurationError, match="shorter than minimum length 5"):
+        WorkflowEngine(workflow, base_dir=tmp_path)
+
+
+def test_validate_flows_missing_definitions(tmp_path):
+    """Test _validate_flows raises when flows has no definitions (line 408)."""
+    workflow = {
+        "name": "no-defs",
+        "steps": [{"name": "s1", "task": "echo", "inputs": {"message": "x"}}],
+        "flows": {"default": "flow1"},
+    }
+    with pytest.raises(InvalidFlowDefinitionError, match="missing 'definitions'"):
+        WorkflowEngine(workflow, base_dir=tmp_path)
+
+
+def test_get_flow_steps_no_steps(tmp_path):
+    """Test _get_flow_steps raises when no steps defined (line 447)."""
+    workflow = {
+        "name": "no-steps",
+        "steps": [],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError, match="No steps defined"):
+        engine._get_flow_steps()
+
+
+def test_get_flow_steps_flow_all(tmp_path):
+    """Test _get_flow_steps returns all steps when flow is 'all' (line 457)."""
+    workflow = {
+        "name": "all-flow",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+            {"name": "s2", "task": "echo", "inputs": {"message": "b"}},
+        ],
+        "flows": {
+            "definitions": [{"flow1": ["s1"]}],
+            "default": "all",
+        },
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    steps = engine._get_flow_steps("all")
+    assert len(steps) == 2
+
+
+def test_get_flow_steps_flow_not_found(tmp_path):
+    """Test _get_flow_steps raises FlowNotFoundError (line 470)."""
+    workflow = {
+        "name": "flow-not-found",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+        ],
+        "flows": {
+            "definitions": [{"flow1": ["s1"]}],
+        },
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(FlowNotFoundError):
+        engine._get_flow_steps("nonexistent_flow")
+
+
+def test_get_flow_steps_step_not_in_flow(tmp_path):
+    """Test _get_flow_steps raises StepNotInFlowError for missing step (line 477)."""
+    workflow = {
+        "name": "step-not-in-flow",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+        ],
+        "flows": {
+            "definitions": [{"flow1": ["s1", "s2"]}],
+        },
+    }
+    # This should raise during init validation (StepNotInFlowError)
+    with pytest.raises(StepNotInFlowError):
+        WorkflowEngine(workflow, base_dir=tmp_path)
+
+
+def test_run_required_param_min_length_validation(tmp_path):
+    """Test run-time minLength validation on required params (lines 538-545)."""
+    workflow = {
+        "name": "param-minlen",
+        "params": {
+            "shorty": {
+                "required": True,
+                "minLength": 5,
+            },
+        },
+        "steps": [
+            {
+                "name": "s1",
+                "task": "echo",
+                "inputs": {"message": "{{ args.shorty }}"},
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError, match="at least 5 characters long"):
+        engine.run(params={"shorty": "ab"})
+
+
+def test_resume_with_different_flow(tmp_path):
+    """Test resume_from with a different flow raises error (line 555)."""
+    workflow = {
+        "name": "resume-flow-diff",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+            {"name": "s2", "task": "fail", "inputs": {"message": "fail"}},
+        ],
+        "flows": {
+            "definitions": [
+                {"flow1": ["s1", "s2"]},
+                {"flow2": ["s1"]},
+            ],
+            "default": "flow1",
+        },
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError):
+        engine.run(flow="flow1")
+
+    # Try to resume from step2 but with a different flow
+    with pytest.raises(WorkflowError, match="Cannot resume with different flow"):
+        engine.run(resume_from="s2", flow="flow2")
+
+
+def test_run_flow_not_found_at_runtime(tmp_path):
+    """Test run raises FlowNotFoundError for non-existent flow (line 573)."""
+    workflow = {
+        "name": "flow-not-found-run",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+        ],
+        "flows": {
+            "definitions": [{"flow1": ["s1"]}],
+        },
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(FlowNotFoundError):
+        engine.run(flow="nonexistent_flow")
+
+
+def test_resume_not_failed_state(tmp_path):
+    """Test resume_from when workflow is not in failed state (line 596)."""
+    workflow = {
+        "name": "resume-not-failed",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    # Run successfully first
+    engine.run()
+    # Try to resume from s1
+    with pytest.raises(WorkflowError, match="Cannot resume"):
+        engine.run(resume_from="s1")
+
+
+def test_resume_step_not_found(tmp_path):
+    """Test resume_from with non-existent step (line 598)."""
+    workflow = {
+        "name": "resume-missing-step",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+            {"name": "s2", "task": "fail", "inputs": {"message": "fail"}},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError):
+        engine.run()
+    with pytest.raises(WorkflowError, match="not found"):
+        engine.run(resume_from="nonexistent_step")
+
+
+def test_resume_step_not_in_flow(tmp_path):
+    """Test resume_from when step is not in the current flow (line 633)."""
+    workflow = {
+        "name": "resume-not-in-flow",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+            {"name": "s2", "task": "fail", "inputs": {"message": "fail"}},
+            {"name": "s3", "task": "echo", "inputs": {"message": "c"}},
+        ],
+        "flows": {
+            "definitions": [
+                {"flow1": ["s1", "s2"]},
+            ],
+            "default": "flow1",
+        },
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError):
+        engine.run(flow="flow1")
+    # s3 is not in flow1 — resume checks step existence in flow steps first
+    with pytest.raises(WorkflowError, match="not found in workflow"):
+        engine.run(resume_from="s3", flow="flow1")
+
+
+def test_start_from_step(tmp_path):
+    """Test start_from skips prior steps."""
+    workflow = {
+        "name": "start-from",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+            {"name": "s2", "task": "echo", "inputs": {"message": "b"}},
+            {"name": "s3", "task": "echo", "inputs": {"message": "c"}},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run(start_from="s2")
+    assert result["status"] == "completed"
+    state = engine.state.get_state()
+    # s1 should not have been executed
+    assert "s1" not in state["steps"] or state["steps"]["s1"]["status"] == "skipped"
+    assert state["steps"]["s2"]["status"] == "completed"
+    assert state["steps"]["s3"]["status"] == "completed"
+
+
+def test_start_from_not_in_flow(tmp_path):
+    """Test start_from with step not in the flow (line 644)."""
+    workflow = {
+        "name": "start-from-not-in-flow",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+            {"name": "s2", "task": "echo", "inputs": {"message": "b"}},
+        ],
+        "flows": {
+            "definitions": [{"flow1": ["s1"]}],
+            "default": "flow1",
+        },
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(StepNotInFlowError):
+        engine.run(start_from="s2")
+
+
+def test_skip_steps(tmp_path):
+    """Test skip_steps parameter."""
+    workflow = {
+        "name": "skip-steps",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+            {"name": "s2", "task": "echo", "inputs": {"message": "b"}},
+            {"name": "s3", "task": "echo", "inputs": {"message": "c"}},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run(skip_steps=["s2"])
+    assert result["status"] == "completed"
+    state = engine.state.get_state()
+    assert state["steps"]["s1"]["status"] == "completed"
+    assert state["steps"]["s2"]["status"] == "skipped"
+    assert state["steps"]["s3"]["status"] == "completed"
+
+
+def test_skip_already_executed_step(tmp_path):
+    """Test that already-executed steps are skipped on resume (lines 677-679)."""
+    workflow = {
+        "name": "skip-executed",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "a"}},
+            {"name": "s2", "task": "fail", "inputs": {"message": "fail"}},
+            {"name": "s3", "task": "echo", "inputs": {"message": "c"}},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError):
+        engine.run()
+
+    # s1 was already completed; resuming from s2 should skip s1
+    engine.workflow["steps"][1]["task"] = "echo"  # Fix step2
+    result = engine.run(resume_from="s2")
+    assert result["status"] == "completed"
+
+
+def test_condition_evaluation_error_skips_step(tmp_path):
+    """Test that a condition evaluation error skips the step (lines 902-909)."""
+    workflow = {
+        "name": "condition-error",
+        "steps": [
+            {
+                "name": "s1",
+                "task": "echo",
+                "inputs": {"message": "a"},
+                # References undefined variable which will cause template error
+                "condition": "{{ undefined_var.foo == 'bar' }}",
+            },
+            {
+                "name": "s2",
+                "task": "echo",
+                "inputs": {"message": "b"},
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run()
+    assert result["status"] == "completed"
+    state = engine.state.get_state()
+    # s1 should be skipped due to condition evaluation error
+    assert state["steps"]["s1"]["status"] == "skipped"
+    assert state["steps"]["s2"]["status"] == "completed"
+
+
+def test_step_missing_task_type(tmp_path):
+    """Test that a step with no task type raises StepExecutionError (line 876)."""
+    workflow = {
+        "name": "no-task",
+        "steps": [
+            {"name": "s1", "inputs": {"message": "x"}},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(StepExecutionError, match="missing 'task' definition"):
+        engine.run()
+
+
+def test_step_unknown_task_type(tmp_path):
+    """Test that an unknown task type raises StepExecutionError (line 883)."""
+    workflow = {
+        "name": "unknown-task",
+        "steps": [
+            {"name": "s1", "task": "totally_unknown_task_xyz_123"},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(StepExecutionError, match="Unknown task type"):
+        engine.run()
+
+
+def test_on_error_invalid_shorthand_string(tmp_path):
+    """Test that an invalid on_error string defaults to fail (lines 1011-1014)."""
+    workflow = {
+        "name": "bad-on-error-str",
+        "steps": [
+            {
+                "name": "s1",
+                "task": "fail",
+                "inputs": {"message": "test failure"},
+                "on_error": "invalid_string",
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError, match="Workflow halted"):
+        engine.run()
+    state = engine.state.get_state()
+    assert state["execution_state"]["status"] == "failed"
+
+
+def test_on_error_invalid_type(tmp_path):
+    """Test that an invalid on_error type defaults to fail (lines 1019-1022)."""
+    workflow = {
+        "name": "bad-on-error-type",
+        "steps": [
+            {
+                "name": "s1",
+                "task": "fail",
+                "inputs": {"message": "test failure"},
+                "on_error": 12345,
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError, match="Workflow halted"):
+        engine.run()
+    state = engine.state.get_state()
+    assert state["execution_state"]["status"] == "failed"
+
+
+def test_on_error_invalid_retry_value(tmp_path):
+    """Test that an invalid retry value falls back to global default (lines 1027-1031)."""
+    workflow = {
+        "name": "bad-retry-value",
+        "steps": [
+            {
+                "name": "s1",
+                "task": "fail",
+                "inputs": {"message": "test failure"},
+                "on_error": {
+                    "retry": "not_a_number",
+                },
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    # Should still fail eventually (using global max_retries=3)
+    with pytest.raises(WorkflowError, match="Workflow halted"):
+        engine.run(max_retries=0)
+    state = engine.state.get_state()
+    assert state["execution_state"]["status"] == "failed"
+
+
+def test_on_error_negative_retry_value(tmp_path):
+    """Test that a negative retry value is treated as 0 retries (lines 1035-1038)."""
+    workflow = {
+        "name": "neg-retry",
+        "steps": [
+            {
+                "name": "s1",
+                "task": "fail",
+                "inputs": {"message": "test failure"},
+                "on_error": {
+                    "retry": -5,
+                },
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError, match="Workflow halted"):
+        engine.run()
+    state = engine.state.get_state()
+    assert state["execution_state"]["status"] == "failed"
+
+
+def test_resume_from_parameter_validation_failure(tmp_path):
+    """Test resume after parameter validation failure resets state (lines 514-524)."""
+    workflow = {
+        "name": "param-val-resume",
+        "params": {
+            "required_input": {
+                "required": True,
+            },
+        },
+        "steps": [
+            {
+                "name": "s1",
+                "task": "echo",
+                "inputs": {"message": "{{ args.required_input }}"},
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+
+    # First run without required param -> fails at parameter_validation
+    with pytest.raises(WorkflowError, match="Required parameter"):
+        engine.run()
+
+    # Now try to resume with resume_from (from the parameter_validation failure)
+    # This should reset state and run fresh
+    result = engine.run(
+        params={"required_input": "hello"}, resume_from="parameter_validation"
+    )
+    assert result["status"] == "completed"
+
+
+def test_workflow_name_unnamed(tmp_path):
+    """Test workflow name defaults to 'Unnamed Workflow' when no name and no file."""
+    workflow = {
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "test"}},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    assert engine.name == "Unnamed Workflow"
+
+
+def test_workflow_name_from_dict(tmp_path):
+    """Test workflow name comes from workflow definition."""
+    workflow = {
+        "name": "my-workflow",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "test"}},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    assert engine.name == "my-workflow"
+
+
+def test_unexpected_engine_error_in_run_loop(tmp_path):
+    """Test broad exception catch in run loop (lines 753-777)."""
+
+    @register_task("engine_error_task")
+    def engine_error_task(config: TaskConfig):
+        # Raise a non-TaskExecutionError type
+        raise MemoryError("Out of memory simulation")
+
+    workflow = {
+        "name": "engine-error",
+        "steps": [
+            {
+                "name": "s1",
+                "task": "engine_error_task",
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    # The MemoryError gets wrapped in TaskExecutionError by execute_step,
+    # then caught as TaskExecutionError in the run loop
+    with pytest.raises(WorkflowError):
+        engine.run()
+    state = engine.state.get_state()
+    assert state["execution_state"]["status"] == "failed"
+
+
+def test_step_missing_name_in_execute(tmp_path):
+    """Test execute_step with a step missing 'name' (line 856)."""
+    workflow = {
+        "name": "missing-name-exec",
+        "steps": [
+            {"name": "s1", "task": "echo", "inputs": {"message": "test"}},
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    # Call execute_step directly with a step missing name
+    with pytest.raises(StepExecutionError, match="missing required 'name'"):
+        engine.execute_step({"task": "echo", "inputs": {"message": "x"}}, 3)
+
+
+def test_run_no_steps_to_execute(tmp_path):
+    """Test run raises when no steps to execute after filtering."""
+    workflow = {
+        "name": "no-exec-steps",
+        "steps": [],
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    with pytest.raises(WorkflowError, match="No steps"):
+        engine.run()
+
+
+def test_steps_dict_format_normalization(tmp_path):
+    """Test that steps defined as dict are normalized to list format."""
+    workflow = {
+        "name": "dict-steps",
+        "steps": {
+            "step_one": {
+                "task": "echo",
+                "inputs": {"message": "hello"},
+            },
+            "step_two": {
+                "task": "echo",
+                "inputs": {"message": "world"},
+            },
+        },
+    }
+    engine = WorkflowEngine(workflow, base_dir=tmp_path)
+    result = engine.run()
+    assert result["status"] == "completed"
+    state = engine.state.get_state()
+    assert state["steps"]["step_one"]["status"] == "completed"
+    assert state["steps"]["step_two"]["status"] == "completed"
