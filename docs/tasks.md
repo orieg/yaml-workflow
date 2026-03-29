@@ -235,6 +235,57 @@ Tasks for executing shell commands with full namespace support:
     timeout: 300  # Optional timeout in seconds
 ```
 
+## HTTP Tasks
+
+Make HTTP requests to APIs and web services. Uses Python's built-in `urllib` with zero external dependencies.
+
+```yaml
+# Simple GET request
+- name: fetch_data
+  task: http.request
+  inputs:
+    url: "https://api.example.com/data"
+
+# POST with JSON body and headers
+- name: create_resource
+  task: http.request
+  inputs:
+    url: "https://api.example.com/resources"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ env.API_KEY }}"
+      Content-Type: application/json
+    body:
+      name: "{{ args.name }}"
+      value: "{{ steps.calculate.result }}"
+    timeout: 30
+
+# Access response data in subsequent steps
+- name: use_response
+  task: shell
+  inputs:
+    command: |
+      echo "Status: {{ steps.fetch_data.result.status_code }}"
+      echo "Body: {{ steps.fetch_data.result.body }}"
+```
+
+**Inputs:**
+
+- `url` (str, required): The URL to request
+- `method` (str, optional): HTTP method - `GET`, `POST`, `PUT`, `DELETE` (default: `GET`)
+- `headers` (dict, optional): HTTP headers to send
+- `body` (str or dict, optional): Request body. Dicts are automatically JSON-encoded with `Content-Type: application/json`
+- `timeout` (int, optional): Request timeout in seconds (default: 30)
+
+**Result:**
+
+Returns a dictionary with:
+
+- `status_code` (int): HTTP response status code
+- `headers` (dict): Response headers
+- `body` (str): Response body as text
+- `json` (dict or null): Parsed JSON body, or null if not valid JSON
+
 ## Python Tasks
 
 YAML Workflow provides several tasks for integrating Python logic into your workflows. These tasks allow you to execute Python code snippets, call functions from modules, run external scripts, or execute Python modules directly.

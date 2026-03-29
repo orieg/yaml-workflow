@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `--dry-run` / `-n` mode to preview workflow execution without side effects
+- `http.request` task for HTTP GET/POST/PUT using stdlib urllib (zero new dependencies)
+- `yaml-workflow visualize` command with ASCII text (default) and Mermaid output formats
+- Unicode box-drawing for regular steps, diamond shapes for conditional steps in ASCII output
+- Codecov configuration and coverage settings in pyproject.toml
+
+### Changed
+- Rewrote CLI documentation to match actual implemented commands and flags
+- Updated docs landing page and tasks reference with new features
+- README now includes visualize and dry-run example output
+
 ## [0.4.1] - 2026-03-28
 
 ### Added

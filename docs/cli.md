@@ -1,6 +1,6 @@
 # Command Line Interface
 
-The YAML Workflow CLI provides several commands to manage and execute workflows.
+The YAML Workflow CLI provides commands to run, validate, visualize, and manage workflows.
 
 ## Installation
 
@@ -10,11 +10,11 @@ The CLI is automatically installed with the package:
 pip install yaml-workflow
 ```
 
-## Basic Commands
+## Commands
 
-### Initialize Workflows
+### `init` - Initialize a Project
 
-Create new workflow directories with examples:
+Create a workflows directory with example files:
 
 ```bash
 # Create workflows directory with all examples
@@ -23,152 +23,207 @@ yaml-workflow init
 # Specify custom directory
 yaml-workflow init --dir my-workflows
 
-# Initialize with specific examples
+# Initialize with a specific example only
 yaml-workflow init --example hello_world
-yaml-workflow init --example data_processing
 ```
 
-### List Workflows
+### `run` - Execute a Workflow
 
-Display available workflows in the current directory:
-
-```bash
-# List all workflows
-yaml-workflow list
-
-# List workflows in specific directory
-yaml-workflow list --dir my-workflows
-
-# Show detailed information
-yaml-workflow list --verbose
-```
-
-### Validate Workflows
-
-Check workflow configuration for errors:
-
-```bash
-# Validate a specific workflow
-yaml-workflow validate workflows/hello_world.yaml
-
-# Validate all workflows in directory
-yaml-workflow validate --dir workflows/
-
-# Show detailed validation output
-yaml-workflow validate --verbose workflows/hello_world.yaml
-```
-
-### Run Workflows
-
-Execute workflow files:
+Run a workflow file with optional parameters:
 
 ```bash
 # Run with input parameters
-yaml-workflow run workflows/hello_world.yaml name=Alice age=25
+yaml-workflow run workflows/hello_world.yaml name=Alice
 
-# Run with environment variables
-yaml-workflow run --env-file .env workflows/process.yaml
+# Run a specific flow
+yaml-workflow run workflows/multi_flow.yaml --flow data_collection
 
-# Run specific flow
-yaml-workflow run --flow data_collection workflows/multi_flow.yaml
+# Resume from last failed step
+yaml-workflow run workflows/hello_world.yaml --resume
 
-# Resume failed workflow
-yaml-workflow run --resume workflows/long_process.yaml
+# Start from a specific step
+yaml-workflow run workflows/pipeline.yaml --start-from process_data
 
-# Run with parallel execution
-yaml-workflow run --parallel --max-workers 4 workflows/batch_process.yaml
+# Skip specific steps
+yaml-workflow run workflows/pipeline.yaml --skip-steps "cleanup,notify"
+
+# Custom workspace directory
+yaml-workflow run workflows/hello_world.yaml --workspace ./my-run
+
+# Custom base directory for runs
+yaml-workflow run workflows/hello_world.yaml --base-dir ./output
 ```
 
-## Advanced Usage
+#### Dry-run mode
 
-### Environment Variables
-
-The CLI respects the following environment variables:
-
-- `YAML_WORKFLOW_DIR`: Default workflows directory
-- `YAML_WORKFLOW_CONFIG`: Path to global configuration
-- `YAML_WORKFLOW_LOG_LEVEL`: Logging level (DEBUG, INFO, WARNING, ERROR)
-- `YAML_WORKFLOW_PARALLEL`: Enable parallel execution by default
-- `YAML_WORKFLOW_MAX_WORKERS`: Default number of parallel workers
-
-### Configuration File
-
-Global configuration can be set in `~/.yaml-workflow/config.yaml`:
-
-```yaml
-default_dir: ~/workflows
-log_level: INFO
-parallel: false
-max_workers: 4
-env_files:
-  - ~/.env
-  - .env.local
-```
-
-### Exit Codes
-
-The CLI uses the following exit codes:
-
-- `0`: Success
-- `1`: General error
-- `2`: Invalid configuration
-- `3`: Workflow execution error
-- `4`: Permission error
-- `5`: Resource not found
-
-### Logging
-
-Control log output with the following flags:
+Preview what a workflow would do without executing any tasks, creating files, or modifying state:
 
 ```bash
-# Enable debug logging
-yaml-workflow --debug run workflow.yaml
-
-# Quiet mode (errors only)
-yaml-workflow --quiet run workflow.yaml
-
-# Output logs to file
-yaml-workflow --log-file workflow.log run workflow.yaml
-
-# JSON format logging
-yaml-workflow --log-format json run workflow.yaml
+yaml-workflow run workflows/hello_world.yaml name=Alice --dry-run
 ```
 
-## Examples
+Output:
 
-### Basic Workflow Execution
+```
+[DRY-RUN] Workflow: Hello World
+[DRY-RUN] Steps: 2 to execute
 
-```bash
-# Run a simple greeting workflow
-yaml-workflow run workflows/hello.yaml name=World
+  [DRY-RUN] Step 'create_greeting' — task: template — WOULD EXECUTE
+    template: Hello, Alice!
+    output_file: greeting.txt
+  [DRY-RUN] Step 'show_greeting' — task: shell — WOULD EXECUTE
+    command: cat greeting.txt
 
-# Expected output:
-# Starting workflow: hello
-# Step 1/1: Greeting
-# Hello, World!
-# Workflow completed successfully
+[DRY-RUN] Complete. 2 step(s) would execute, 0 would be skipped.
+[DRY-RUN] No files were written. No tasks were executed.
 ```
 
-### Parallel Batch Processing
+Dry-run still evaluates conditions and resolves template variables, so you can see exactly which steps would run and what inputs they would receive.
+
+### `list` - List Available Workflows
+
+Display workflows found in a directory:
 
 ```bash
-# Process multiple files in parallel
-yaml-workflow run workflows/batch.yaml \
-  --parallel \
-  --max-workers 4 \
-  input_dir=data \
-  output_dir=processed
+# List workflows in default directory
+yaml-workflow list
+
+# List workflows in specific directory
+yaml-workflow list --base-dir my-workflows
 ```
 
-### Error Handling
+### `validate` - Validate a Workflow
+
+Check a workflow file for configuration errors without running it:
 
 ```bash
-# Run with automatic retry on failure
-yaml-workflow run workflows/api_calls.yaml \
-  --retry-count 3 \
-  --retry-delay 5 \
-  api_key=$API_KEY
+yaml-workflow validate workflows/hello_world.yaml
+```
 
-# Resume from last successful step
-yaml-workflow run --resume workflows/long_process.yaml
-``` 
+### `visualize` - Visualize a Workflow
+
+Display the workflow step graph as an ASCII diagram or Mermaid chart:
+
+```bash
+# ASCII output (default) — displays directly in terminal
+yaml-workflow visualize workflows/hello_world.yaml
+
+# Mermaid format — for docs, GitHub markdown, or mermaid.live
+yaml-workflow visualize workflows/hello_world.yaml --format mermaid
+
+# Visualize a specific flow
+yaml-workflow visualize workflows/multi_flow.yaml --flow core_only
+
+# Save to file
+yaml-workflow visualize workflows/pipeline.yaml -f mermaid -o pipeline.md
+```
+
+#### ASCII output
+
+Regular steps render as boxes, conditional steps as diamonds:
+
+```
+  Workflow: Complex Flow and Error Handling Demo
+
+  ┌─────────────────┐
+  │ setup_workspace  │
+  │      shell       │
+  └─────────────────┘
+           │
+           ▼
+  ┌─────────────────┐
+  │  process_core_1  │
+  │       echo       │
+  └─────────────────┘
+           │
+           ▼
+  ┌─────────────────┐
+  │    flaky_step    │
+  │      shell       │
+  └─────────────────┘  ──error─▶ [handle_flaky_error]
+           │
+           ▼
+  ┌─────────────────┐
+  │     cleanup      │
+  │      shell       │
+  └─────────────────┘
+
+  4 steps (0 conditional, 4 always-run)
+  1 error path(s): flaky_step → handle_flaky_error
+```
+
+Conditional steps render as diamonds:
+
+```
+  ┌───────────────────┐
+  │  validate_input   │       always runs
+  │      shell        │
+  └───────────────────┘
+           │
+           ▼
+           ◇
+   ╱   get_timestamp  ╲      runs only if condition is True
+  ◁        shell        ▷
+   ╲                   ╱
+           ◇
+```
+
+#### Mermaid output
+
+The `--format mermaid` output can be pasted into [mermaid.live](https://mermaid.live), GitHub markdown fenced blocks, or any Mermaid-compatible renderer:
+
+````
+```mermaid
+graph TD
+    create_greeting["create_greeting<br/><small>template</small>"]
+    show_greeting["show_greeting<br/><small>shell</small>"]
+    create_greeting --> show_greeting
+```
+````
+
+### `workspace` - Manage Workflow Runs
+
+Manage workspace directories created by workflow runs:
+
+```bash
+# List all workflow runs
+yaml-workflow workspace list
+
+# List runs for a specific workflow
+yaml-workflow workspace list --workflow hello_world
+
+# Clean up runs older than 30 days
+yaml-workflow workspace clean --older-than 30
+
+# Dry-run cleanup (show what would be deleted)
+yaml-workflow workspace clean --older-than 7 --dry-run
+
+# Remove specific runs
+yaml-workflow workspace remove hello_world_run_1 hello_world_run_2
+
+# Force remove without confirmation
+yaml-workflow workspace remove hello_world_run_1 --force
+```
+
+## All Options
+
+| Command | Flag | Description |
+|---------|------|-------------|
+| `run` | `workflow` | Path to workflow YAML file (required) |
+| `run` | `params` | Parameters as `name=value` pairs |
+| `run` | `--workspace` | Custom workspace directory |
+| `run` | `--base-dir` | Base directory for runs (default: `runs`) |
+| `run` | `--resume` | Resume from last failed step |
+| `run` | `--start-from` | Start from a specific step |
+| `run` | `--skip-steps` | Comma-separated steps to skip |
+| `run` | `--flow` | Flow name to execute |
+| `run` | `--dry-run`, `-n` | Preview without executing |
+| `list` | `--base-dir` | Directory containing workflows |
+| `validate` | `workflow` | Path to workflow file |
+| `visualize` | `workflow` | Path to workflow file |
+| `visualize` | `--format`, `-f` | `text` (default) or `mermaid` |
+| `visualize` | `--flow` | Flow to visualize |
+| `visualize` | `--output`, `-o` | Output file (default: stdout) |
+| `init` | `--dir` | Target directory (default: `workflows`) |
+| `init` | `--example` | Specific example to copy |
+| `--version` | | Show version and exit |

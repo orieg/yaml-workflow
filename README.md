@@ -31,9 +31,11 @@ Most workflow tools (Airflow, Prefect, Dagster) are designed for distributed clo
 ## Features
 
 - YAML-driven workflow definition with Jinja2 templating
-- Multiple task types: shell commands, Python functions, file operations, templates, batch processing
+- Multiple task types: shell, Python, file, template, HTTP, batch
 - Parallel execution with configurable worker pools
 - State persistence and resume capability
+- Dry-run mode to preview without executing
+- Workflow visualization (ASCII and Mermaid)
 - Retry mechanisms with configurable strategies
 - Namespaced variables (`args`, `env`, `steps`, `batch`)
 - Flow control with custom step sequences and conditions
@@ -74,6 +76,53 @@ steps:
     task: shell
     inputs:
       command: cat greeting.txt
+```
+
+### Visualize workflows
+
+```bash
+yaml-workflow visualize workflows/hello_world.yaml
+```
+
+```
+  Workflow: Hello World
+
+  ┌─────────────────┐
+  │ create_greeting  │
+  │     template     │
+  └─────────────────┘
+           │
+           ▼
+  ┌─────────────────┐
+  │  show_greeting   │
+  │      shell       │
+  └─────────────────┘
+
+  2 steps (0 conditional, 2 always-run)
+```
+
+Use `--format mermaid` to export for documentation or GitHub rendering.
+
+### Dry-run mode
+
+Preview what a workflow would do without executing anything:
+
+```bash
+yaml-workflow run workflows/hello_world.yaml name=Alice --dry-run
+```
+
+```
+[DRY-RUN] Workflow: Hello World
+[DRY-RUN] Steps: 2 to execute
+
+  [DRY-RUN] Step 'create_greeting' — task: template — WOULD EXECUTE
+    template: Hello, Alice!
+    output_file: greeting.txt
+  [DRY-RUN] Step 'show_greeting' — task: shell — WOULD EXECUTE
+    command: cat greeting.txt
+
+[DRY-RUN] Complete. 2 step(s) would execute, 0 would be skipped.
+[DRY-RUN] No files were written. No tasks were executed.
 ```
 
 ### More commands
