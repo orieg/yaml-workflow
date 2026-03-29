@@ -34,6 +34,20 @@ class TaskConfig:
         self._processed_inputs: Dict[str, Any] = {}
         self._template_engine = TemplateEngine()
 
+    @property
+    def context(self) -> Dict[str, Any]:
+        """Read-only access to the execution context."""
+        return self._context
+
+    @property
+    def processed_inputs(self) -> Dict[str, Any]:
+        """Access to processed (template-resolved) inputs."""
+        return self._processed_inputs
+
+    @processed_inputs.setter
+    def processed_inputs(self, value: Dict[str, Any]) -> None:
+        self._processed_inputs = value
+
     def get_variable(self, name: str, namespace: Optional[str] = None) -> Any:
         """
         Get a variable with namespace support.

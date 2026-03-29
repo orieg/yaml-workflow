@@ -211,3 +211,20 @@ class ConfigurationError(WorkflowError):
     """Raised when workflow configuration is invalid or inconsistent."""
 
     pass  # Simple inheritance is often sufficient
+
+
+class WorkflowImportError(WorkflowError):
+    """Raised when a workflow import fails."""
+
+    def __init__(self, import_path: str, reason: str):
+        super().__init__(f"Import error for '{import_path}': {reason}")
+        self.import_path = import_path
+
+
+class CircularImportError(WorkflowError):
+    """Raised when circular workflow imports are detected."""
+
+    def __init__(self, import_chain: list):
+        chain_str = " -> ".join(str(p) for p in import_chain)
+        super().__init__(f"Circular import detected: {chain_str}")
+        self.import_chain = import_chain

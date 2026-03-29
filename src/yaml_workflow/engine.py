@@ -17,6 +17,7 @@ import yaml
 from jinja2 import StrictUndefined, Template
 
 from .exceptions import (
+    CircularImportError,
     ConfigurationError,
     FlowError,
     FlowNotFoundError,
@@ -27,6 +28,7 @@ from .exceptions import (
     TaskExecutionError,
     TemplateError,
     WorkflowError,
+    WorkflowImportError,
 )
 from .state import ExecutionState, WorkflowState
 from .tasks import TaskConfig, get_task_handler
@@ -137,6 +139,7 @@ class WorkflowEngine:
             "steps",
             "flows",
             "settings",
+            "imports",
         }
         for key in self.workflow:
             if key not in allowed_keys:
@@ -145,6 +148,19 @@ class WorkflowEngine:
                     f"Allowed keys are: {', '.join(sorted(allowed_keys))}. "
                     f"Use the 'params' section for workflow inputs."
                 )
+
+        # --- Process Imports ---
+        self.imported_files: List[Path] = []
+        if self.workflow.get("imports"):
+            if not self.workflow_file:
+                raise WorkflowImportError(
+                    "<dict>",
+                    "imports are only supported in file-based workflows",
+                )
+            self.workflow, self.imported_files = self._process_imports(
+                self.workflow, self.workflow_file
+            )
+
         if "steps" not in self.workflow and "flows" not in self.workflow:
             raise WorkflowError(
                 "Invalid workflow file: missing both 'steps' and 'flows' sections"
@@ -291,6 +307,120 @@ class WorkflowEngine:
                 self.logger.info(f"  {name}: {value}")
 
         self.current_step = None  # Track current step for error handling
+
+    def _process_imports(
+        self,
+        workflow: Dict[str, Any],
+        workflow_file: Path,
+        _import_stack: Optional[Set[str]] = None,
+    ) -> tuple:
+        """Process the 'imports' section, merging steps and params from imported files.
+
+        Args:
+            workflow: The workflow definition dict.
+            workflow_file: Path to the current workflow file.
+            _import_stack: Set of visited file paths for circular import detection.
+
+        Returns:
+            Tuple of (merged_workflow, list_of_imported_file_paths).
+
+        Raises:
+            WorkflowImportError: If an imported file cannot be found or parsed.
+            CircularImportError: If a circular import is detected.
+        """
+        imports = workflow.get("imports", [])
+        if not imports:
+            return workflow, []
+
+        if _import_stack is None:
+            _import_stack = set()
+
+        current_path = str(workflow_file.resolve())
+        if current_path in _import_stack:
+            raise CircularImportError(list(_import_stack) + [current_path])
+        _import_stack.add(current_path)
+
+        imported_steps: List[Dict[str, Any]] = []
+        imported_params: Dict[str, Any] = {}
+        all_imported_files: List[Path] = []
+
+        for import_entry in imports:
+            # Support both string and dict format
+            if isinstance(import_entry, str):
+                import_path = import_entry
+            elif isinstance(import_entry, dict):
+                import_path = import_entry.get("path", "")
+            else:
+                continue
+
+            if not import_path:
+                continue
+
+            # Resolve relative to the workflow file's directory
+            resolved = (workflow_file.parent / import_path).resolve()
+            if not resolved.exists():
+                raise WorkflowImportError(import_path, f"File not found: {resolved}")
+
+            all_imported_files.append(resolved)
+
+            try:
+                with open(resolved) as f:
+                    imported_workflow = yaml.load(f, Loader=get_safe_loader())
+            except yaml.YAMLError as e:
+                raise WorkflowImportError(import_path, f"Invalid YAML: {e}")
+
+            if not isinstance(imported_workflow, dict):
+                raise WorkflowImportError(import_path, "Root must be a mapping")
+
+            # Recursively process imports in the imported file
+            if imported_workflow.get("imports"):
+                imported_workflow, sub_files = self._process_imports(
+                    imported_workflow, resolved, _import_stack.copy()
+                )
+                all_imported_files.extend(sub_files)
+
+            # Merge steps (imported steps come first)
+            if "steps" in imported_workflow:
+                imp_steps = imported_workflow["steps"]
+                if isinstance(imp_steps, list):
+                    imported_steps.extend(imp_steps)
+                elif isinstance(imp_steps, dict):
+                    for step_name, step_config in imp_steps.items():
+                        if isinstance(step_config, dict) and "name" not in step_config:
+                            step_config["name"] = step_name
+                        imported_steps.append(step_config)
+
+            # Merge params (imported params provide defaults, main overrides)
+            if "params" in imported_workflow:
+                for param_name, param_config in imported_workflow["params"].items():
+                    if param_name not in imported_params:
+                        imported_params[param_name] = param_config
+
+        # Merge into the main workflow
+        # Imported steps come before main steps
+        main_steps = workflow.get("steps", [])
+        if isinstance(main_steps, list):
+            workflow["steps"] = imported_steps + main_steps
+        elif isinstance(main_steps, dict):
+            # Convert imported steps to dict format and merge
+            merged = {}
+            for step in imported_steps:
+                if isinstance(step, dict) and "name" in step:
+                    merged[step["name"]] = step
+            merged.update(main_steps)
+            workflow["steps"] = merged
+
+        # Merge params (main workflow takes precedence)
+        main_params = workflow.get("params", {})
+        merged_params = {**imported_params, **main_params}
+        if merged_params:
+            workflow["params"] = merged_params
+
+        # Remove the imports key
+        workflow.pop("imports", None)
+
+        _import_stack.discard(current_path)
+        return workflow, all_imported_files
 
     # Re-adding template resolution methods that were removed during refactoring
     def resolve_template(self, template_str: str) -> str:

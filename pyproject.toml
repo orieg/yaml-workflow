@@ -67,6 +67,7 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest>=7.0,<10.0",
+    "pytest-benchmark>=4.0,<6.0",
     "pytest-cov>=4.0,<8.0",
     "pytest-ordering",
     "mypy>=1.0,<2.0",
@@ -96,6 +97,10 @@ Documentation = "https://orieg.github.io/yaml-workflow/"
 
 [project.scripts]
 yaml-workflow = "yaml_workflow.cli:main"
+
+[project.entry-points."yaml_workflow.tasks"]
+# External plugins register here. Example:
+# my_tasks = "my_plugin_package.tasks"
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -143,5 +148,6 @@ exclude_lines = [
 
 [tool.pytest.ini_options]
 markers = [
+    "benchmark: mark test as a performance benchmark",
     "last: mark test to run last",
 ]

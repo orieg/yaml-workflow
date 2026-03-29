@@ -31,10 +31,10 @@ def http_request_task(config: TaskConfig) -> Dict[str, Any]:
     logger = get_task_logger(config.workspace, task_name)
 
     try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
+        log_task_execution(logger, config.step, config.context, config.workspace)
 
         processed = config.process_inputs()
-        config._processed_inputs = processed
+        config.processed_inputs = processed
 
         # Validate required inputs
         if "url" not in processed:
@@ -109,7 +109,7 @@ def http_request_task(config: TaskConfig) -> Dict[str, Any]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return {}  # Unreachable

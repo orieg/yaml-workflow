@@ -231,7 +231,7 @@ def batch_task(config: TaskConfig) -> Dict[str, Any]:
                         process_item,
                         item,  # item: Any
                         sub_task_config_for_item,  # task_config: Dict[str, Any]
-                        config._context,  # context: Dict[str, Any]
+                        config.context,  # context: Dict[str, Any]
                         config.workspace,  # workspace: Path
                         arg_name,  # arg_name: str
                         chunk_index,  # chunk_index: int
@@ -286,7 +286,7 @@ def batch_task(config: TaskConfig) -> Dict[str, Any]:
             task_type=str(task_type),
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(err_context)
         # handle_task_error always raises, so return is unreachable but satisfies type checker

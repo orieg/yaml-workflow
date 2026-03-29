@@ -245,7 +245,7 @@ def write_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "write_file")
     task_type = config.type or "write_file"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
     try:
         processed = config.process_inputs()
         file_path = processed.get("file")
@@ -269,7 +269,7 @@ def write_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None
@@ -281,7 +281,7 @@ def read_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "read_file")
     task_type = config.type or "read_file"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
     try:
         processed = config.process_inputs()
         file_path_input = processed.get("file")
@@ -337,7 +337,7 @@ def read_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None
@@ -349,7 +349,7 @@ def append_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "append_file")
     task_type = config.type or "append_file"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
     try:
         processed = config.process_inputs()
         file_path = processed.get("file")
@@ -379,7 +379,7 @@ def append_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None
@@ -391,7 +391,7 @@ def copy_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "copy_file")
     task_type = config.type or "copy_file"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
     try:
         processed = config.process_inputs()
         source = processed.get("source")
@@ -412,7 +412,7 @@ def copy_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None
@@ -424,7 +424,7 @@ def move_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "move_file")
     task_type = config.type or "move_file"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
     try:
         processed = config.process_inputs()
         source = processed.get("source")
@@ -445,7 +445,7 @@ def move_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None
@@ -457,7 +457,7 @@ def delete_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "delete_file")
     task_type = config.type or "delete_file"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
     try:
         processed = config.process_inputs()
         file_path = processed.get("file")
@@ -475,7 +475,7 @@ def delete_file_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None
@@ -487,7 +487,7 @@ def read_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "read_json")
     task_type = config.type or "read_json"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
 
     try:
         processed = config.process_inputs()
@@ -513,7 +513,7 @@ def read_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None
@@ -525,7 +525,7 @@ def write_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "write_json")
     task_type = config.type or "write_json"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
     try:
         processed = config.process_inputs()
         file_path = processed.get("file")
@@ -591,7 +591,7 @@ def write_json_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None
@@ -603,7 +603,7 @@ def read_yaml_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "read_yaml")
     task_type = config.type or "read_yaml"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
 
     try:
         processed = config.process_inputs()
@@ -629,7 +629,7 @@ def read_yaml_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None
@@ -641,7 +641,7 @@ def write_yaml_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
     task_name = str(config.name or "write_yaml")
     task_type = config.type or "write_yaml"
     logger = get_task_logger(config.workspace, task_name)
-    log_task_execution(logger, config.step, config._context, config.workspace)
+    log_task_execution(logger, config.step, config.context, config.workspace)
     try:
         processed = config.process_inputs()
         file_path = processed.get("file")
@@ -675,7 +675,7 @@ def write_yaml_task(config: TaskConfig) -> Optional[Dict[str, Any]]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return None

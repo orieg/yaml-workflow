@@ -5,6 +5,7 @@ This package contains various task modules that can be used in workflows.
 Each module provides specific functionality that can be referenced in workflow YAML files.
 """
 
+import importlib.metadata
 import inspect
 import logging
 from functools import wraps
@@ -120,7 +121,7 @@ def register_task(
             if context_param_name:
                 # Access the protected context member
                 kwargs[context_param_name] = (
-                    config._context
+                    config.context
                 )  # Pass the full context dict
 
             # Call the function
@@ -152,6 +153,17 @@ def get_task_handler(name: str) -> Optional[TaskHandler]:
     # print(f"--- get_task_handler requested: '{name}', found: {handler} ---") # DEBUG
     logging.debug(f"Retrieved handler for task '{name}': {handler}")
     return handler
+
+
+def _discover_plugins() -> None:
+    """Discover and load task plugins registered via entry points."""
+    eps = importlib.metadata.entry_points(group="yaml_workflow.tasks")
+    for ep in eps:
+        try:
+            ep.load()
+            logging.debug(f"Loaded task plugin: {ep.name}")
+        except Exception as e:
+            logging.warning(f"Failed to load task plugin '{ep.name}': {e}")
 
 
 from .basic_tasks import (
@@ -194,6 +206,9 @@ register_task("batch")(batch_task)
 
 # Removed redundant register_task calls for basic_tasks (echo, fail, etc.)
 # They are now registered by decorators within basic_tasks.py via the import above.
+
+# Discover external plugins via entry points
+_discover_plugins()
 
 __all__ = [
     "TaskConfig",

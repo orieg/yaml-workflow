@@ -3,6 +3,8 @@ Shell operation tasks for executing commands and managing processes.
 """
 
 import os
+import platform
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -13,6 +15,25 @@ from ..exceptions import TaskExecutionError, TemplateError
 from . import TaskConfig, register_task
 from .base import get_task_logger, log_task_error, log_task_execution, log_task_result
 from .error_handling import ErrorContext, handle_task_error
+
+
+def _get_shell_executable() -> Optional[str]:
+    """Get the appropriate shell executable for the current platform.
+
+    On Windows, prefers PowerShell (pwsh or powershell) for better
+    compatibility with common shell patterns. On Unix, returns None
+    to use the system default shell.
+
+    Returns:
+        Path to shell executable, or None for system default.
+    """
+    if platform.system() == "Windows":
+        # Prefer PowerShell Core (pwsh) over Windows PowerShell
+        for shell_name in ("pwsh", "powershell"):
+            path = shutil.which(shell_name)
+            if path:
+                return path
+    return None
 
 
 def run_command(
@@ -35,8 +56,12 @@ def run_command(
     Returns:
         Tuple[int, str, str]: Return code, stdout, and stderr
     """
+    executable = None
     if isinstance(command, str) and not shell:
         command = command.split()
+
+    if shell and platform.system() == "Windows":
+        executable = _get_shell_executable()
 
     result = subprocess.run(
         command,
@@ -46,6 +71,7 @@ def run_command(
         capture_output=True,
         text=True,
         timeout=timeout,
+        executable=executable,
     )
 
     return result.returncode, result.stdout, result.stderr
@@ -195,10 +221,10 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
     logger = get_task_logger(config.workspace, task_name)
 
     try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
+        log_task_execution(logger, config.step, config.context, config.workspace)
 
         processed = config.process_inputs()
-        config._processed_inputs = processed
+        config.processed_inputs = processed
 
         if "command" not in processed:
             missing_cmd_error = ValueError("command parameter is required")
@@ -226,7 +252,7 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
         if isinstance(command, str):
             # Pass necessary context for error reporting within process_command
             command_context = {
-                **config._context,
+                **config.context,
                 "step_name": task_name,
                 "task_type": task_type,
                 "task_config": config.step,
@@ -273,7 +299,7 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return {}  # Unreachable

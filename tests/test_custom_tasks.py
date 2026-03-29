@@ -28,7 +28,7 @@ def custom_task_module():
         log_task_execution(
             logger,
             {"name": config.name, "type": config.type},
-            config._context,
+            config.context,
             config.workspace,
         )
 
@@ -126,7 +126,7 @@ def test_custom_task_with_progress(temp_workspace):
         total = processed.get("total", 100)
         for i in range(total):
             progress = (i + 1) / total
-            config._context.get("progress_callback", lambda x: None)(progress)
+            config.context.get("progress_callback", lambda x: None)(progress)
         return {"success": True, "output": "Progress task completed"}
 
     step = {

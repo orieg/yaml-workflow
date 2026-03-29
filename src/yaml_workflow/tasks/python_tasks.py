@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 def print_vars_task(config: TaskConfig) -> dict:
     """Prints selected variables from the context for debugging."""
     inputs = config.process_inputs()
-    context = config._context
+    context = config.context
     message = inputs.get("message", "Current Context Variables:")
 
     print(f"\n--- {message} ---")  # Prints directly to runner's stdout
@@ -73,7 +73,7 @@ def print_vars_task(config: TaskConfig) -> dict:
 def print_message_task(config: TaskConfig) -> dict:
     """Prints a templated message to the console."""
     inputs = config.process_inputs()  # Render inputs using context
-    context = config._context
+    context = config.context
     message = inputs.get("message", "")
 
     if not message:
@@ -109,7 +109,7 @@ def _load_function(module_name: str, function_name: str) -> Callable:
 
 def _execute_python_function(func: Callable, config: TaskConfig) -> Any:
     """Execute the loaded Python function with processed inputs."""
-    processed = config._processed_inputs
+    processed = config.processed_inputs
     sig = inspect.signature(func)
     params = sig.parameters
 
@@ -262,14 +262,14 @@ def _execute_code(
     # Prepare execution context, including processed inputs
     exec_context = {
         "config": config,
-        "context": config._context,
-        "args": config._context.get("args", {}),
-        "env": config._context.get("env", {}),
-        "steps": config._context.get("steps", {}),
-        "batch": config._context.get("batch", {}),
+        "context": config.context,
+        "args": config.context.get("args", {}),
+        "env": config.context.get("env", {}),
+        "steps": config.context.get("steps", {}),
+        "batch": config.context.get("batch", {}),
     }
     # Add processed inputs directly to the execution context
-    exec_context.update(config._processed_inputs)
+    exec_context.update(config.processed_inputs)
 
     # Redirect stdout/stderr to capture prints within the code
     stdout_capture = io.StringIO()
@@ -322,9 +322,9 @@ def python_function(config: TaskConfig) -> Dict[str, Any]:
     logger = get_task_logger(config.workspace, task_name)
 
     try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
+        log_task_execution(logger, config.step, config.context, config.workspace)
         processed = config.process_inputs()
-        config._processed_inputs = processed  # Store for helpers
+        config.processed_inputs = processed  # Store for helpers
 
         # Get module/function from processed inputs
         module_name = processed.get("module")
@@ -350,7 +350,7 @@ def python_function(config: TaskConfig) -> Dict[str, Any]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return {}  # Unreachable
@@ -364,9 +364,9 @@ def python_script(config: TaskConfig) -> Dict[str, Any]:
     logger = get_task_logger(config.workspace, task_name)
 
     try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
+        log_task_execution(logger, config.step, config.context, config.workspace)
         processed = config.process_inputs()
-        config._processed_inputs = processed
+        config.processed_inputs = processed
 
         script_path_in = processed.get("script_path")
         args = processed.get("args")  # Should be list or None
@@ -422,7 +422,7 @@ def python_script(config: TaskConfig) -> Dict[str, Any]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return {}  # Unreachable
@@ -436,9 +436,9 @@ def python_module(config: TaskConfig) -> Dict[str, Any]:
     logger = get_task_logger(config.workspace, task_name)
 
     try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
+        log_task_execution(logger, config.step, config.context, config.workspace)
         processed = config.process_inputs()
-        config._processed_inputs = processed
+        config.processed_inputs = processed
 
         module_name = processed.get("module")
         args = processed.get("args")
@@ -497,7 +497,7 @@ def python_module(config: TaskConfig) -> Dict[str, Any]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return {}  # Unreachable
@@ -511,9 +511,9 @@ def python_code(config: TaskConfig) -> Dict[str, Any]:
     logger = get_task_logger(config.workspace, task_name)
 
     try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
+        log_task_execution(logger, config.step, config.context, config.workspace)
         processed = config.process_inputs()
-        config._processed_inputs = processed
+        config.processed_inputs = processed
 
         code = processed.get("code")
         result_variable = processed.get("result_variable")
@@ -535,7 +535,7 @@ def python_code(config: TaskConfig) -> Dict[str, Any]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return {}  # Unreachable

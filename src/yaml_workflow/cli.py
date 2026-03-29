@@ -76,8 +76,86 @@ def parse_params(args_list: List[str]) -> Dict[str, str]:
     return result
 
 
+def _get_watch_files(workflow_path: str) -> List[Path]:
+    """Get the list of files to watch: workflow file plus any imports."""
+    files = [Path(workflow_path).resolve()]
+    try:
+        with open(workflow_path) as f:
+            workflow = yaml.safe_load(f)
+        if isinstance(workflow, dict):
+            for imp in workflow.get("imports", []):
+                if isinstance(imp, str):
+                    imp_path = imp
+                elif isinstance(imp, dict):
+                    imp_path = imp.get("path", "")
+                else:
+                    continue
+                if imp_path:
+                    resolved = (Path(workflow_path).parent / imp_path).resolve()
+                    if resolved.exists():
+                        files.append(resolved)
+    except (yaml.YAMLError, OSError):
+        pass
+    return files
+
+
+def _get_mtimes(files: List[Path]) -> Dict[str, float]:
+    """Get modification times for a list of files."""
+    mtimes = {}
+    for f in files:
+        try:
+            mtimes[str(f)] = f.stat().st_mtime
+        except OSError:
+            pass
+    return mtimes
+
+
+def _run_with_watch(args) -> None:
+    """Run a workflow in watch mode, re-executing on file changes."""
+    watch_files = _get_watch_files(args.workflow)
+    mtimes = _get_mtimes(watch_files)
+
+    print(f"Watching {len(watch_files)} file(s) for changes. Press Ctrl+C to stop.\n")
+
+    # First run
+    try:
+        _run_workflow_impl(args)
+    except SystemExit:
+        pass  # Don't exit on workflow errors in watch mode
+
+    try:
+        while True:
+            time.sleep(1.5)
+            new_mtimes = _get_mtimes(watch_files)
+            if new_mtimes != mtimes:
+                mtimes = new_mtimes
+                # Re-scan imports (they may have changed)
+                watch_files = _get_watch_files(args.workflow)
+                mtimes = _get_mtimes(watch_files)
+
+                now = datetime.now().strftime("%H:%M:%S")
+                print(f"\n{'=' * 60}")
+                print(f"  Re-running at {now} (file changed)")
+                print(f"{'=' * 60}\n")
+
+                try:
+                    _run_workflow_impl(args)
+                except SystemExit:
+                    pass  # Don't exit on workflow errors in watch mode
+    except KeyboardInterrupt:
+        print("\nWatch mode stopped.")
+
+
 def run_workflow(args):
     """Run a workflow."""
+    if getattr(args, "watch", False):
+        return _run_with_watch(args)
+
+    _run_workflow_impl(args)
+
+
+def _run_workflow_impl(args):
+    """Run a workflow once (implementation used by both normal and watch mode)."""
     try:
         try:
             param_dict = parse_params(args.params)
@@ -571,6 +649,12 @@ Commands:
         "-n",
         action="store_true",
         help="Validate and preview workflow without executing tasks",
+    )
+    run_parser.add_argument(
+        "--watch",
+        "-w",
+        action="store_true",
+        help="Watch workflow file for changes and re-run automatically",
     )
     run_parser.add_argument(
         "params", nargs="*", help="Parameters in the format name=value or --name=value"

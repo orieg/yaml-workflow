@@ -36,7 +36,7 @@ def noop_task(config: TaskConfig) -> Dict[str, Any]:
     logger = get_task_logger(config.workspace, task_name)
 
     try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
+        log_task_execution(logger, config.step, config.context, config.workspace)
 
         processed = config.process_inputs()
 
@@ -48,7 +48,7 @@ def noop_task(config: TaskConfig) -> Dict[str, Any]:
                 task_type=task_type,
                 error=error,
                 task_config=config.step,
-                template_context=config._context,
+                template_context=config.context,
             )
             handle_task_error(context)
             # handle_task_error always raises, so this is unreachable
@@ -70,7 +70,7 @@ def noop_task(config: TaskConfig) -> Dict[str, Any]:
             task_type=task_type,
             error=e,
             task_config=config.step,
-            template_context=config._context,
+            template_context=config.context,
         )
         handle_task_error(context)
         return {}  # Unreachable

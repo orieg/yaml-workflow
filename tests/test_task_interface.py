@@ -65,9 +65,9 @@ def test_task_config_initialization(basic_step, context_with_namespaces, workspa
     assert config.type == "test_task"
     assert config.inputs == basic_step["inputs"]
     assert config.workspace == workspace
-    assert config._context == context_with_namespaces
-    assert isinstance(config._processed_inputs, dict)
-    assert len(config._processed_inputs) == 0
+    assert config.context == context_with_namespaces
+    assert isinstance(config.processed_inputs, dict)
+    assert len(config.processed_inputs) == 0
 
 
 def test_get_variable_with_namespace(basic_step, context_with_namespaces, workspace):
@@ -116,7 +116,7 @@ def test_process_inputs_caching(basic_step, context_with_namespaces, workspace):
 
     first_result = config.process_inputs()
     # Modify context (shouldn't affect cached result)
-    config._context["args"]["name"] = "Changed"
+    config.context["args"]["name"] = "Changed"
     second_result = config.process_inputs()
 
     assert first_result is second_result

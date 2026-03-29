@@ -40,7 +40,7 @@ def render_template(config: TaskConfig) -> Dict[str, Any]:
     logger = get_task_logger(config.workspace, task_name)
 
     try:
-        log_task_execution(logger, config.step, config._context, config.workspace)
+        log_task_execution(logger, config.step, config.context, config.workspace)
 
         # Get raw inputs directly, do not process them here
         raw_inputs = config.step.get("inputs", {})
@@ -63,7 +63,7 @@ def render_template(config: TaskConfig) -> Dict[str, Any]:
         # Pass workspace as searchpath to allow includes
         resolved_content = config._template_engine.process_template(
             template_str,
-            config._context,
+            config.context,
             searchpath=str(config.workspace),  # Pass workspace for includes
         )
 

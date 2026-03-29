@@ -366,14 +366,14 @@ def mock_task_config():
     config.workspace = "/fake/workspace"
     config.inputs = {"retry": {"attempts": 3}}
     # Simulate the internal context structure
-    config._context = {
+    config.context = {
         "args": {"arg1": "val1"},
         "env": {"var1": "env_val1"},
         "steps": {"prev_step": {"result": "prev_result"}},
         "engine": Mock(),  # Mock the engine object if needed
     }
     # Mock the get_variable method if BatchContext uses it
-    config.get_variable = MagicMock(return_value=config._context.get("engine"))
+    config.get_variable = MagicMock(return_value=config.context.get("engine"))
     return config
 
 
@@ -386,7 +386,7 @@ def test_batch_context_init(mock_task_config):
     assert batch_ctx.name == "my_batch_task"
     assert batch_ctx.workspace == "/fake/workspace"
     assert batch_ctx.retry_config == {"attempts": 3}
-    assert batch_ctx._context == mock_task_config._context
+    assert batch_ctx._context == mock_task_config.context
     assert batch_ctx.engine is not None  # Check if engine was retrieved
 
 
@@ -409,11 +409,11 @@ def test_batch_context_create_item_context(mock_task_config):
     assert item_context["batch"]["name"] == "my_batch_task"
 
     # Ensure original context wasn't modified (though create_item_context doesn't modify)
-    assert mock_task_config._context == {
+    assert mock_task_config.context == {
         "args": {"arg1": "val1"},
         "env": {"var1": "env_val1"},
         "steps": {"prev_step": {"result": "prev_result"}},
-        "engine": mock_task_config._context["engine"],
+        "engine": mock_task_config.context["engine"],
     }
 
 

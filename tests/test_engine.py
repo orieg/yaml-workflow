@@ -485,7 +485,7 @@ def test_on_error_notify(tmp_path):
     @register_task("notify")
     def notify_task(config: TaskConfig):
         # Ensure error context exists before accessing
-        error_context = config._context.get("error")
+        error_context = config.context.get("error")
         assert error_context is not None, "Error context should exist in notify task"
         notifications.append(error_context)
         return {"notified": True}

@@ -19,7 +19,7 @@ class BatchContext:
         self.engine = config.get_variable("engine")
         self.workspace = config.workspace
         self.retry_config = config.inputs.get("retry", {})
-        self._context = config._context
+        self._context = config.context
 
     def create_item_context(self, item: Any, index: int) -> Dict[str, Any]:
         """Create context for a batch item while preserving namespaces.
