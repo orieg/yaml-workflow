@@ -68,7 +68,7 @@ def generate_text(workflow: dict, flow: Optional[str] = None) -> str:
     """Generate an ASCII DAG representation of a workflow.
 
     Uses unicode box-drawing for regular steps and diamond shapes for
-    conditional steps, with proper connectors and error path annotations.
+    conditional steps. Adjacent conditional steps are grouped as branches.
 
     Args:
         workflow: Parsed workflow dictionary containing 'steps' and optionally 'flows'.
@@ -95,6 +95,9 @@ def generate_text(workflow: dict, flow: Optional[str] = None) -> str:
             if isinstance(on_error, dict) and on_error.get("next"):
                 error_edges.append((name, on_error["next"]))
 
+    # Group steps into segments: sequential steps and branch groups
+    segments = _group_into_segments(ordered_names, step_map)
+
     # Calculate widths
     max_name = max((len(n) for n in ordered_names), default=8)
     max_task = max(
@@ -108,22 +111,22 @@ def generate_text(workflow: dict, flow: Optional[str] = None) -> str:
         lines.append(f"  Flow: {flow}")
     lines.append("")
 
-    for i, name in enumerate(ordered_names):
-        step = step_map.get(name)
-        if not step:
-            continue
-        task_type = step.get("task", "unknown")
-        has_condition = "condition" in step
-        step_errors = [target for src, target in error_edges if src == name]
+    mid = box_w // 2 + 4
 
-        if has_condition:
-            _render_diamond(lines, name, task_type, box_w, step_errors)
-        else:
+    for seg_i, segment in enumerate(segments):
+        if segment["type"] == "step":
+            name = segment["name"]
+            step = step_map.get(name)
+            if not step:
+                continue
+            task_type = step.get("task", "unknown")
+            step_errors = [target for src, target in error_edges if src == name]
             _render_box(lines, name, task_type, box_w, step_errors)
+        elif segment["type"] == "branch":
+            _render_branch_group(lines, segment["steps"], step_map, error_edges, box_w)
 
-        # Draw connector to next step
-        if i < len(ordered_names) - 1:
-            mid = box_w // 2 + 4
+        # Draw connector to next segment
+        if seg_i < len(segments) - 1:
             lines.append(" " * mid + "\u2502")
             lines.append(" " * mid + "\u25bc")
 
@@ -141,6 +144,128 @@ def generate_text(workflow: dict, flow: Optional[str] = None) -> str:
         )
 
     return "\n".join(lines)
+
+
+def _group_into_segments(
+    ordered_names: List[str], step_map: Dict[str, dict]
+) -> List[dict]:
+    """Group steps into segments: individual steps and branch groups.
+
+    Adjacent conditional steps (2+) are grouped into a single branch segment.
+    Single conditional steps stay as individual diamond nodes.
+    """
+    segments: List[dict] = []
+    i = 0
+    while i < len(ordered_names):
+        name = ordered_names[i]
+        step = step_map.get(name, {})
+
+        if "condition" in step:
+            # Collect consecutive conditional steps
+            branch_names = []
+            while i < len(ordered_names) and "condition" in step_map.get(
+                ordered_names[i], {}
+            ):
+                branch_names.append(ordered_names[i])
+                i += 1
+
+            if len(branch_names) >= 2:
+                # Multiple adjacent conditionals = branch group
+                segments.append({"type": "branch", "steps": branch_names})
+            else:
+                # Single conditional = render as diamond inline
+                segments.append({"type": "branch", "steps": branch_names})
+        else:
+            segments.append({"type": "step", "name": name})
+            i += 1
+
+    return segments
+
+
+def _render_branch_group(
+    lines: List[str],
+    branch_names: List[str],
+    step_map: Dict[str, dict],
+    error_edges: List[tuple],
+    box_w: int,
+) -> None:
+    """Render a group of conditional steps as side-by-side branches."""
+    col_w = max(
+        max((len(n) for n in branch_names), default=8),
+        max(
+            (len(step_map.get(n, {}).get("task", "")) for n in branch_names), default=4
+        ),
+        10,
+    )
+    cell_w = col_w + 4  # padding + borders
+    n_branches = len(branch_names)
+    total_w = cell_w * n_branches + (n_branches - 1) * 2  # 2-char gap between
+    mid = box_w // 2 + 4
+
+    # Fan-out line
+    fan_left = mid - total_w // 2
+    if fan_left < 2:
+        fan_left = 2
+    fan_right = fan_left + total_w - 1
+    fan_line = list(" " * (fan_right + 2))
+    fan_line[mid] = "\u252c"  # ┬
+    for b in range(n_branches):
+        pos = fan_left + b * (cell_w + 2) + cell_w // 2
+        if pos < len(fan_line):
+            fan_line[pos] = "\u252c"  # ┬
+    # Draw horizontal line between first and last branch point
+    first_pos = fan_left + cell_w // 2
+    last_pos = fan_left + (n_branches - 1) * (cell_w + 2) + cell_w // 2
+    for p in range(first_pos, last_pos + 1):
+        if p < len(fan_line) and fan_line[p] == " ":
+            fan_line[p] = "\u2500"  # ─
+
+    lines.append("".join(fan_line).rstrip())
+
+    # Down arrows
+    arrow_line = list(" " * (fan_right + 2))
+    for b in range(n_branches):
+        pos = fan_left + b * (cell_w + 2) + cell_w // 2
+        if pos < len(arrow_line):
+            arrow_line[pos] = "\u25bc"  # ▼
+    lines.append("".join(arrow_line).rstrip())
+
+    # Render each branch box (compact format for side-by-side)
+    # Line 1: top borders
+    top_parts = []
+    for name in branch_names:
+        top_parts.append("\u250c" + "\u2500" * (col_w + 2) + "\u2510")
+    lines.append((" " * fan_left) + "  ".join(top_parts))
+
+    # Line 2: step names
+    name_parts = []
+    for name in branch_names:
+        name_parts.append("\u2502" + name.center(col_w + 2) + "\u2502")
+    lines.append((" " * fan_left) + "  ".join(name_parts))
+
+    # Line 3: task types
+    task_parts = []
+    for name in branch_names:
+        task = step_map.get(name, {}).get("task", "?")
+        task_parts.append("\u2502" + task.center(col_w + 2) + "\u2502")
+    lines.append((" " * fan_left) + "  ".join(task_parts))
+
+    # Line 4: bottom borders (with error annotations if any)
+    bot_parts = []
+    for name in branch_names:
+        bot_parts.append("\u2514" + "\u2500" * (col_w + 2) + "\u2518")
+    lines.append((" " * fan_left) + "  ".join(bot_parts))
+
+    # Fan-in line
+    fan_in = list(" " * (fan_right + 2))
+    for b in range(n_branches):
+        pos = fan_left + b * (cell_w + 2) + cell_w // 2
+        if pos < len(fan_in):
+            fan_in[pos] = "\u2534"  # ┴
+    for p in range(first_pos, last_pos + 1):
+        if p < len(fan_in) and fan_in[p] == " ":
+            fan_in[p] = "\u2500"  # ─
+    lines.append("".join(fan_in).rstrip())
 
 
 def _render_box(

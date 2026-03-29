@@ -81,27 +81,31 @@ steps:
 ### Visualize workflows
 
 ```bash
-yaml-workflow visualize workflows/hello_world.yaml
+yaml-workflow visualize workflows/data_pipeline.yaml
 ```
 
 ```
-  Workflow: Hello World
+  Workflow: Data Pipeline
 
   ┌─────────────────┐
-  │ create_greeting  │
-  │     template     │
+  │  detect_format   │
+  │   python_code    │
   └─────────────────┘
            │
            ▼
+  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+  │ process_json │  │ process_csv  │  │ process_xml  │  │handle_unknown│
+  │    shell     │  │    shell     │  │    shell     │  │    shell     │
+  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘
+           │
+           ▼
   ┌─────────────────┐
-  │  show_greeting   │
-  │      shell       │
+  │ generate_report  │
+  │   python_code    │
   └─────────────────┘
-
-  2 steps (0 conditional, 2 always-run)
 ```
 
-Use `--format mermaid` to export for documentation or GitHub rendering.
+Adjacent conditional steps are automatically grouped as branches. Use `--format mermaid` to export for docs or GitHub rendering.
 
 ### Dry-run mode
 

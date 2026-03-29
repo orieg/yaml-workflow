@@ -205,11 +205,11 @@ class TestTextSimpleWorkflow:
 
 
 class TestTextConditionalStep:
-    def test_conditional_diamond_shape(self):
+    def test_conditional_rendered_as_branch(self):
         result = generate_text(_conditional_workflow())
-        # Diamond nodes use unicode diamond and slash characters
-        assert "\u25c7" in result  # diamond
-        assert "\u2571" in result  # forward slash
+        # Conditional steps are rendered in branch groups with fan-out/fan-in
+        assert "\u252c" in result or "\u2534" in result  # ┬ or ┴ (fan lines)
+        assert "check_condition" in result
 
     def test_summary_counts(self):
         result = generate_text(_conditional_workflow())

@@ -1,0 +1,93 @@
+# Data Pipeline with Branching
+#
+# Demonstrates conditional branching: different steps run
+# depending on the data format detected in the first step.
+#
+# Usage:
+#   yaml-workflow run data_pipeline.yaml format=json
+#   yaml-workflow run data_pipeline.yaml format=csv
+#   yaml-workflow run data_pipeline.yaml format=xml
+#
+# Visualize:
+#   yaml-workflow visualize data_pipeline.yaml
+
+name: Data Pipeline
+description: A data pipeline that branches based on input format
+
+params:
+  format:
+    description: Input data format (json, csv, or xml)
+    type: string
+    default: json
+  input_file:
+    description: Path to input data
+    type: string
+    default: data.txt
+
+steps:
+  # Step 1: Detect and validate the input format
+  - name: detect_format
+    task: python_code
+    inputs:
+      code: |
+        fmt = args.get("format", "unknown").lower()
+        if fmt not in ("json", "csv", "xml"):
+            fmt = "unknown"
+        result = {"format": fmt, "input_file": args.get("input_file", "data.txt")}
+
+  # Step 2a: Process JSON data (only if format is json)
+  - name: process_json
+    task: shell
+    inputs:
+      command: |
+        echo "Processing JSON data from {{ args.input_file }}"
+        echo '{"status": "processed", "format": "json", "records": 42}'
+    condition: '{% if steps.detect_format.result.result.format == "json" %}True{% else %}False{% endif %}'
+
+  # Step 2b: Process CSV data (only if format is csv)
+  - name: process_csv
+    task: shell
+    inputs:
+      command: |
+        echo "Processing CSV data from {{ args.input_file }}"
+        echo "Parsed 156 rows, 8 columns"
+    condition: '{% if steps.detect_format.result.result.format == "csv" %}True{% else %}False{% endif %}'
+
+  # Step 2c: Process XML data (only if format is xml)
+  - name: process_xml
+    task: shell
+    inputs:
+      command: |
+        echo "Processing XML data from {{ args.input_file }}"
+        echo "Parsed 23 elements"
+    condition: '{% if steps.detect_format.result.result.format == "xml" %}True{% else %}False{% endif %}'
+
+  # Step 2d: Handle unknown format
+  - name: handle_unknown
+    task: shell
+    inputs:
+      command: |
+        echo "ERROR: Unknown format '{{ args.format }}'" >&2
+        exit 1
+    condition: '{% if steps.detect_format.result.result.format == "unknown" %}True{% else %}False{% endif %}'
+
+  # Step 3: Generate report (always runs)
+  - name: generate_report
+    task: python_code
+    inputs:
+      code: |
+        fmt = steps["detect_format"]["result"]["result"]["format"]
+        result = {
+            "format": fmt,
+            "status": "complete",
+            "message": f"Pipeline finished processing {fmt} data"
+        }
+
+  # Step 4: Notify completion (always runs)
+  - name: notify
+    task: print_message
+    inputs:
+      message: |
+        Pipeline complete!
+        Format: {{ steps.detect_format.result.result.format }}
+        Report: {{ steps.generate_report.result.result.message }}
