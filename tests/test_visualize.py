@@ -189,13 +189,14 @@ class TestTextSimpleWorkflow:
 
     def test_box_borders(self):
         result = generate_text(_simple_workflow())
-        assert "+" in result
-        assert "-" in result
+        # Uses unicode box-drawing characters
+        assert "\u250c" in result  # top-left corner
+        assert "\u2518" in result  # bottom-right corner
 
     def test_connectors(self):
         result = generate_text(_simple_workflow())
-        assert "|" in result
-        assert "v" in result
+        assert "\u2502" in result  # vertical line
+        assert "\u25bc" in result  # down arrow
 
     def test_summary_line(self):
         result = generate_text(_simple_workflow())
@@ -204,10 +205,11 @@ class TestTextSimpleWorkflow:
 
 
 class TestTextConditionalStep:
-    def test_conditional_marker(self):
+    def test_conditional_diamond_shape(self):
         result = generate_text(_conditional_workflow())
-        # Conditional steps have a ? marker
-        assert "?" in result
+        # Diamond nodes use unicode diamond and slash characters
+        assert "\u25c7" in result  # diamond
+        assert "\u2571" in result  # forward slash
 
     def test_summary_counts(self):
         result = generate_text(_conditional_workflow())
@@ -218,13 +220,13 @@ class TestTextConditionalStep:
 class TestTextErrorHandling:
     def test_error_edge_annotation(self):
         result = generate_text(_error_handling_workflow())
-        assert "--error-->" in result
+        assert "error" in result
         assert "error_handler" in result
 
     def test_error_summary(self):
         result = generate_text(_error_handling_workflow())
         assert "1 error path(s)" in result
-        assert "risky_step -> error_handler" in result
+        assert "risky_step \u2192 error_handler" in result
 
 
 class TestTextFlowOrdering:
