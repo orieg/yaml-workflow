@@ -3,7 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/yaml-workflow.svg)](https://pypi.org/project/yaml-workflow/)
 [![Python versions](https://img.shields.io/pypi/pyversions/yaml-workflow.svg)](https://pypi.org/project/yaml-workflow/)
 [![CI](https://github.com/orieg/yaml-workflow/actions/workflows/ci.yml/badge.svg)](https://github.com/orieg/yaml-workflow/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/orieg/yaml-workflow/branch/main/graph/badge.svg)](https://codecov.io/gh/orieg/yaml-workflow)
+[![codecov](https://codecov.io/gh/orieg/yaml-workflow/graph/badge.svg)](https://codecov.io/gh/orieg/yaml-workflow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 A lightweight, powerful, and flexible workflow engine that executes tasks defined in YAML configuration files. Create modular, reusable workflows by connecting tasks through YAML definitions, with support for parallel processing, batch operations, and state management.

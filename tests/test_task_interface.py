@@ -170,7 +170,9 @@ def test_get_undefined_namespace(basic_step, context_with_namespaces, workspace)
 def test_complex_template_resolution(basic_step, context_with_namespaces, workspace):
     """Test processing complex templates with multiple variables."""
     config = TaskConfig(basic_step, context_with_namespaces, workspace)
-    config.inputs["complex"] = """
+    config.inputs[
+        "complex"
+    ] = """
         Name: {{ args.name }}
         Count: {{ args.count }}
         Debug: {{ env.DEBUG }}

@@ -7,6 +7,7 @@ import inspect
 import logging
 import logging.handlers
 import os
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -96,6 +97,7 @@ class WorkflowEngine:
         workspace: Optional[str] = None,
         base_dir: str = "runs",
         metadata: Optional[Dict[str, Any]] = None,
+        dry_run: bool = False,
     ):
         """
         Initialize the workflow engine.
@@ -105,10 +107,12 @@ class WorkflowEngine:
             workspace: Optional custom workspace directory
             base_dir: Base directory for workflow runs
             metadata: Optional pre-loaded metadata for resuming workflows
+            dry_run: If True, validate and preview without executing tasks
 
         Raises:
             WorkflowError: If workflow file not found or invalid
         """
+        self.dry_run = dry_run
         # --- 1. Load Workflow Definition ---
         if isinstance(workflow, dict):
             self.workflow = workflow
@@ -159,14 +163,24 @@ class WorkflowEngine:
         # --- Setup Logging EARLY --- (Moved up)
         # Need logger before step normalization
         # Requires workspace to be created first
-        temp_workspace = create_workspace(
-            workflow_name=workflow_name_final,  # Use determined name
-            custom_dir=workspace,
-            base_dir=base_dir,
-        )
+        if self.dry_run:
+            temp_workspace = Path(tempfile.mkdtemp(prefix="yaml_workflow_dryrun_"))
+        else:
+            temp_workspace = create_workspace(
+                workflow_name=workflow_name_final,
+                custom_dir=workspace,
+                base_dir=base_dir,
+            )
         self.logger = setup_logging(
             temp_workspace, workflow_name_final
         )  # Use determined name
+        if self.dry_run:
+            # Suppress console output in dry-run; keep file logging
+            for handler in logging.getLogger().handlers[:]:
+                if isinstance(handler, logging.StreamHandler) and not isinstance(
+                    handler, logging.FileHandler
+                ):
+                    handler.setLevel(logging.WARNING)
 
         # --- 3. Normalize Steps (Convert dict to list if necessary) ---
         if "steps" in self.workflow and isinstance(self.workflow["steps"], dict):
@@ -643,6 +657,14 @@ class WorkflowEngine:
             if step["name"] not in initial_skip_set
         ]
 
+        # Dry-run header
+        if self.dry_run:
+            print(f"\n[DRY-RUN] Workflow: {self.name}")
+            print(f"[DRY-RUN] Steps: {len(steps_to_execute)} to execute")
+            if flow and flow != "all":
+                print(f"[DRY-RUN] Flow: {flow}")
+            print()
+
         # Main execution loop
         current_index = 0
         executed_step_names: Set[str] = set(self.state.get_executed_steps())
@@ -779,6 +801,20 @@ class WorkflowEngine:
             # No need to save state here, mark_workflow_completed and mark_step_skipped already do
             # self.state.save()
 
+        # Dry-run summary
+        if self.dry_run:
+            step_states = self.state.get_state().get("steps", {})
+            executed = sum(
+                1 for s in step_states.values() if s.get("status") == "completed"
+            )
+            skipped = sum(
+                1 for s in step_states.values() if s.get("status") == "skipped"
+            )
+            print(
+                f"\n[DRY-RUN] Complete. {executed} step(s) would execute, {skipped} would be skipped."
+            )
+            print("[DRY-RUN] No files were written. No tasks were executed.\n")
+
         # Return the final status and the complete final context
         final_status = self.state.get_state()["execution_state"]["status"]
         final_step_states = self.state.get_state()["steps"]
@@ -876,11 +912,33 @@ class WorkflowEngine:
             self.logger.info(
                 f"Skipping step '{step_name}' due to condition: {condition}"
             )
+            if self.dry_run:
+                print(
+                    f"  [DRY-RUN] Step '{step_name}' — task: {task_type} — WOULD SKIP (condition not met)"
+                )
             # Mark step as skipped in state
             self.state.mark_step_skipped(
                 step_name, reason=f"Condition '{condition}' not met"
             )
-            self.state.save()  # Save state after marking skipped
+            if not self.dry_run:
+                self.state.save()  # Save state after marking skipped
+            return
+
+        # --- Dry-run: preview without executing ---
+        if self.dry_run:
+            try:
+                processed = task_config.process_inputs()
+            except Exception:
+                processed = task_config.inputs  # Fall back to raw inputs
+            print(f"  [DRY-RUN] Step '{step_name}' — task: {task_type} — WOULD EXECUTE")
+            if processed:
+                # Show a compact representation of inputs
+                for key, value in processed.items():
+                    val_str = str(value)
+                    if len(val_str) > 80:
+                        val_str = val_str[:77] + "..."
+                    print(f"    {key}: {val_str}")
+            self.state.mark_step_success(step_name, {})
             return
 
         # --- Refactored Execution and Error Handling ---

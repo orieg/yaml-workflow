@@ -176,12 +176,14 @@ def test_shell_with_complex_command(workspace, basic_context):
     step = {
         "name": "test_shell_complex",
         "task": "shell",
-        "inputs": {"command": """
+        "inputs": {
+            "command": """
             mkdir -p testdir
             cd testdir
             echo 'test' > file.txt
             cat file.txt
-            """},
+            """
+        },
     }
 
     config = TaskConfig(step, basic_context, workspace)

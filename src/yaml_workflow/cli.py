@@ -18,6 +18,7 @@ import yaml
 from . import __version__  # Import version
 from .engine import WorkflowEngine
 from .exceptions import WorkflowError
+from .visualize import generate_mermaid
 from .workspace import get_workspace_info
 
 
@@ -139,10 +140,11 @@ def run_workflow(args):
             workspace=args.workspace,
             base_dir=args.base_dir,
             metadata=metadata,  # Pass loaded metadata to engine
+            dry_run=getattr(args, "dry_run", False),
         )
 
         # Update parameters
-        if param_dict:
+        if param_dict and not getattr(args, "dry_run", False):
             print("Parameters provided:")
             for name, value in param_dict.items():
                 print(f"  {name}: {value}")
@@ -170,57 +172,54 @@ def run_workflow(args):
             flow=args.flow,
         )
 
-        # Print completion status
-        print("\n=== Workflow Status ===")
-        if resume_from:
-            print(f"✓ Workflow resumed from '{resume_from}' and completed successfully")
-        elif start_from_step:
-            print(
-                f"✓ Workflow started from '{start_from_step}' and completed successfully"
-            )
-        else:
-            print("✓ Workflow completed successfully")
+        # In dry-run mode, the engine already printed the summary
+        if not getattr(args, "dry_run", False):
+            # Print completion status
+            print("\n=== Workflow Status ===")
+            if resume_from:
+                print(
+                    f"✓ Workflow resumed from '{resume_from}' and completed successfully"
+                )
+            elif start_from_step:
+                print(
+                    f"✓ Workflow started from '{start_from_step}' and completed successfully"
+                )
+            else:
+                print("✓ Workflow completed successfully")
 
-        if skip_step_list:
-            print(f"• Skipped steps: {', '.join(skip_step_list)}")
-        if args.flow:
-            print(f"• Flow executed: {args.flow}")
+            if skip_step_list:
+                print(f"• Skipped steps: {', '.join(skip_step_list)}")
+            if args.flow:
+                print(f"• Flow executed: {args.flow}")
 
-        # Print step outputs in a clean format
-        if results.get("outputs"):
-            print("=== Step Outputs ===")
-            first_step = True
-            for step_name, output_container in results["outputs"].items():
-                # The actual result is nested under 'result'
-                output_value = output_container.get("result")
+            # Print step outputs in a clean format
+            if results.get("outputs"):
+                print("=== Step Outputs ===")
+                first_step = True
+                for step_name, output_container in results["outputs"].items():
+                    output_value = output_container.get("result")
+                    if output_value is None or (
+                        isinstance(output_value, str) and not output_value.strip()
+                    ):
+                        continue
+                    if first_step:
+                        print(f"• {step_name}:")
+                        first_step = False
+                    else:
+                        print(f"\n• {step_name}:")
+                    if isinstance(output_value, str) and "\n" in output_value:
+                        print(output_value)
+                    elif isinstance(output_value, (dict, list)):
+                        print(
+                            yaml.dump(output_value, indent=2, default_flow_style=False)
+                        )
+                    else:
+                        print(f"  {output_value}")
 
-                # Skip printing entirely if the actual result is None or empty string
-                if output_value is None or (
-                    isinstance(output_value, str) and not output_value.strip()
-                ):
-                    continue  # Skip printing this step's output section
-
-                # Print step name header (only if output is being printed)
-                if first_step:
-                    print(f"• {step_name}:")
-                    first_step = False
-                else:
-                    print(f"\n• {step_name}:")  # Add newline before subsequent steps
-
-                # Print the actual output value (potentially multi-line)
-                if isinstance(output_value, str) and "\n" in output_value:
-                    print(output_value)  # Print multi-line strings directly
-                elif isinstance(output_value, dict) or isinstance(output_value, list):
-                    # Pretty print dicts/lists using YAML for readability
-                    print(yaml.dump(output_value, indent=2, default_flow_style=False))
-                else:
-                    print(f"  {output_value}")  # Indent simple values
-
-        print("\n=== Workspace Info ===")
-        print(f"• Location: {engine.workspace}")
-        # Get run number from the workspace metadata
-        run_number = engine.state.metadata.get("run_number", "unknown")
-        print(f"• Run number: {run_number}")
+            print("\n=== Workspace Info ===")
+            print(f"• Location: {engine.workspace}")
+            run_number = engine.state.metadata.get("run_number", "unknown")
+            print(f"• Run number: {run_number}")
 
     except WorkflowError as e:
         print(f"Workflow error: {str(e)}", file=sys.stderr)
@@ -285,6 +284,26 @@ def validate_workflow(args):
         print("Workflow validation successful")
     except (WorkflowError, yaml.YAMLError, OSError) as e:
         print(f"Validation failed: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def visualize_workflow(args):
+    """Visualize a workflow as a Mermaid diagram."""
+    try:
+        with open(args.workflow) as f:
+            workflow = yaml.safe_load(f)
+
+        mermaid_output = generate_mermaid(workflow, flow=args.flow)
+
+        if args.output:
+            with open(args.output, "w") as f:
+                f.write(mermaid_output)
+                f.write("\n")
+            print(f"Mermaid diagram written to: {args.output}")
+        else:
+            print(mermaid_output)
+    except (yaml.YAMLError, OSError) as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
 
@@ -510,6 +529,7 @@ Commands:
   run                 Run a workflow
   list               List available workflows
   validate           Validate a workflow file
+  visualize          Visualize a workflow as a Mermaid diagram
   workspace          Workspace management commands
   init               Initialize a new project with example workflows
 """
@@ -543,6 +563,12 @@ Commands:
         help="Name of the flow to execute (default: use flow specified in workflow file)",
     )
     run_parser.add_argument(
+        "--dry-run",
+        "-n",
+        action="store_true",
+        help="Validate and preview workflow without executing tasks",
+    )
+    run_parser.add_argument(
         "params", nargs="*", help="Parameters in the format name=value or --name=value"
     )
 
@@ -555,6 +581,16 @@ Commands:
     # Validate command
     validate_parser = subparsers.add_parser("validate", help="Validate a workflow file")
     validate_parser.add_argument("workflow", help="Path to workflow file")
+
+    # Visualize command
+    visualize_parser = subparsers.add_parser(
+        "visualize", help="Visualize a workflow as a Mermaid diagram"
+    )
+    visualize_parser.add_argument("workflow", help="Path to workflow file")
+    visualize_parser.add_argument("--flow", help="Flow name to visualize")
+    visualize_parser.add_argument(
+        "--output", "-o", help="Output file (default: stdout)"
+    )
 
     # Workspace commands
     workspace_parser = subparsers.add_parser(
@@ -631,6 +667,8 @@ Commands:
             list_workflows(args)
         elif args.command == "validate":
             validate_workflow(args)
+        elif args.command == "visualize":
+            visualize_workflow(args)
         elif args.command == "workspace":
             if args.workspace_command == "list":
                 list_workspaces(args)

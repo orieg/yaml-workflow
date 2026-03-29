@@ -131,7 +131,17 @@ exclude = ["build/", ".venv/", "site/"] # Exclude build, venv, and site director
 mypy_path = "src"
 namespace_packages = true
 
+[tool.coverage.run]
+source = ["src/yaml_workflow"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__",
+]
+
 [tool.pytest.ini_options]
 markers = [
     "last: mark test to run last",
-] 
+]
