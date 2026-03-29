@@ -7,17 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-29
+
 ### Added
 - `--dry-run` / `-n` mode to preview workflow execution without side effects
 - `http.request` task for HTTP GET/POST/PUT using stdlib urllib (zero new dependencies)
 - `yaml-workflow visualize` command with ASCII text (default) and Mermaid output formats
-- Unicode box-drawing for regular steps, diamond shapes for conditional steps in ASCII output
-- Codecov configuration and coverage settings in pyproject.toml
+- Branching DAG visualization: adjacent conditional steps rendered side-by-side with fan-out/fan-in
+- `data_pipeline.yaml` example demonstrating conditional branching (4 branches)
+- Cross-platform CI: Linux, macOS, Windows test matrix
+- Branch protection with required status checks
+- Codecov integration with coverage badge
+- 591 tests with 95% branch coverage (up from 394 tests / 86%)
 
 ### Changed
 - Rewrote CLI documentation to match actual implemented commands and flags
+- Updated README with visualization and dry-run example output
 - Updated docs landing page and tasks reference with new features
-- README now includes visualize and dry-run example output
+
+### Fixed
+- `DEFAULT_NAMESPACES` shallow copy mutation bug in state.py
+- Codecov action v5 `file` → `files` parameter
+- Log file handler cleanup for Windows compatibility
 
 ## [0.4.1] - 2026-03-28
 
@@ -82,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input/output variable management
 - Error handling with retry mechanisms
 
-[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/orieg/yaml-workflow/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/orieg/yaml-workflow/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/orieg/yaml-workflow/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/orieg/yaml-workflow/compare/v0.2.0...v0.3.0
