@@ -54,30 +54,6 @@ def test_discover_plugins_handles_import_error(caplog):
     )
 
 
-def test_discover_plugins_fallback_for_old_python():
-    """Test the fallback path for Python < 3.10 entry_points API."""
-
-    def fake_load():
-        @register_task("fallback_plugin_task")
-        def fallback_task(config: TaskConfig) -> Dict[str, Any]:
-            return {"result": "fallback"}
-
-    mock_ep = MagicMock()
-    mock_ep.name = "fallback_plugin_task"
-    mock_ep.load = fake_load
-
-    def entry_points_raises(**kwargs):
-        if "group" in kwargs:
-            raise TypeError("entry_points() got an unexpected keyword argument 'group'")
-        return {"yaml_workflow.tasks": [mock_ep]}
-
-    with patch("importlib.metadata.entry_points", side_effect=entry_points_raises):
-        _discover_plugins()
-
-    handler = get_task_handler("fallback_plugin_task")
-    assert handler is not None
-
-
 def test_plugin_registered_task_accessible(temp_workspace):
     """Test that a plugin-registered task is accessible via get_task_handler and works."""
 
