@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import shutil
 import subprocess
@@ -13,6 +14,21 @@ import yaml
 
 from yaml_workflow.tasks import TaskConfig, register_task
 
+
+def _close_all_log_handlers():
+    """Close all logging file handlers to release file locks.
+
+    On Windows, open file handles prevent temp directory cleanup.
+    This must be called before any TemporaryDirectory context exits.
+    """
+    for logger_name in list(logging.Logger.manager.loggerDict.keys()) + [""]:
+        logger = logging.getLogger(logger_name)
+        for handler in logger.handlers[:]:
+            if isinstance(handler, logging.FileHandler):
+                handler.close()
+                logger.removeHandler(handler)
+
+
 # Add the src directory to Python path
 src_dir = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_dir))
@@ -21,6 +37,18 @@ sys.path.insert(0, str(src_dir))
 TESTS_DIR = Path(__file__).parent
 PROJECT_ROOT = TESTS_DIR.parent
 EXAMPLES_DIR = PROJECT_ROOT / "src" / "yaml_workflow" / "examples"
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_log_handlers():
+    """Auto-cleanup logging file handlers after every test.
+
+    On Windows, open FileHandler handles prevent pytest's tmp_path
+    cleanup from deleting temp directories. This runs after every
+    test to release all file locks.
+    """
+    yield
+    _close_all_log_handlers()
 
 
 @pytest.fixture
