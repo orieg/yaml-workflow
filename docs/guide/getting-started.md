@@ -4,7 +4,19 @@ This guide will help you get started with the YAML Workflow Engine.
 
 ## Installation
 
-Install the YAML Workflow Engine using pip:
+**Option 1: pipx (recommended for CLI use)**
+
+[pipx](https://pipx.pypa.io/) installs the `yaml-workflow` command in an isolated environment, so it never conflicts with your project's dependencies:
+
+```bash
+pipx install yaml-workflow
+```
+
+Install pipx first if needed: `brew install pipx` (macOS) or `pip install pipx`.
+
+**Option 2: pip**
+
+Install into the current Python environment (useful when using yaml-workflow as a library):
 
 ```bash
 pip install yaml-workflow

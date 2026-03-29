@@ -47,7 +47,10 @@ Most workflow tools (Airflow, Prefect, Dagster) are designed for distributed clo
 ## Quick Start
 
 ```bash
-# Install
+# Install (isolated CLI — recommended)
+pipx install yaml-workflow
+
+# Or install with pip
 pip install yaml-workflow
 
 # Initialize example workflows

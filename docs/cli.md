@@ -4,11 +4,20 @@ The YAML Workflow CLI provides commands to run, validate, visualize, and manage 
 
 ## Installation
 
-The CLI is automatically installed with the package:
+Install as an isolated CLI tool using `pipx` (recommended — keeps `yaml-workflow` out of your project's virtual environment):
+
+```bash
+pipx install yaml-workflow
+```
+
+Or install with `pip` into the current environment:
 
 ```bash
 pip install yaml-workflow
 ```
+
+> **Tip:** `pipx` installs the CLI in its own isolated virtualenv and makes the `yaml-workflow` command available globally. This is the preferred approach when you want to use yaml-workflow as a standalone automation tool rather than a library dependency.
+> Install pipx with `brew install pipx` (macOS) or `pip install pipx`.
 
 ## Commands
 
