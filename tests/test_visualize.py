@@ -1,6 +1,6 @@
 """Tests for workflow visualization utilities."""
 
-from yaml_workflow.visualize import generate_mermaid
+from yaml_workflow.visualize import generate_mermaid, generate_text
 
 
 def _simple_workflow():
@@ -168,5 +168,76 @@ class TestNestedWorkflowFormat:
         wrapped = {"workflow": _simple_workflow()}
         result = generate_mermaid(wrapped)
         assert "graph TD" in result
+        assert "step_one" in result
+        assert "step_two" in result
+
+
+class TestTextSimpleWorkflow:
+    def test_contains_workflow_name(self):
+        result = generate_text(_simple_workflow())
+        assert "Simple Workflow" in result
+
+    def test_each_step_name_appears(self):
+        result = generate_text(_simple_workflow())
+        assert "step_one" in result
+        assert "step_two" in result
+
+    def test_task_types_appear(self):
+        result = generate_text(_simple_workflow())
+        assert "shell" in result
+        assert "echo" in result
+
+    def test_box_borders(self):
+        result = generate_text(_simple_workflow())
+        assert "+" in result
+        assert "-" in result
+
+    def test_connectors(self):
+        result = generate_text(_simple_workflow())
+        assert "|" in result
+        assert "v" in result
+
+    def test_summary_line(self):
+        result = generate_text(_simple_workflow())
+        assert "2 steps" in result
+        assert "0 conditional" in result
+
+
+class TestTextConditionalStep:
+    def test_conditional_marker(self):
+        result = generate_text(_conditional_workflow())
+        # Conditional steps have a ? marker
+        assert "?" in result
+
+    def test_summary_counts(self):
+        result = generate_text(_conditional_workflow())
+        assert "1 conditional" in result
+        assert "2 always-run" in result
+
+
+class TestTextErrorHandling:
+    def test_error_edge_annotation(self):
+        result = generate_text(_error_handling_workflow())
+        assert "--error-->" in result
+        assert "error_handler" in result
+
+    def test_error_summary(self):
+        result = generate_text(_error_handling_workflow())
+        assert "1 error path(s)" in result
+        assert "risky_step -> error_handler" in result
+
+
+class TestTextFlowOrdering:
+    def test_explicit_flow(self):
+        result = generate_text(_flow_workflow(), flow="reverse_flow")
+        lines = result.split("\n")
+        # gamma should appear before alpha
+        gamma_line = next(i for i, l in enumerate(lines) if "gamma" in l)
+        alpha_line = next(i for i, l in enumerate(lines) if "alpha" in l)
+        assert gamma_line < alpha_line
+
+    def test_nested_workflow_format(self):
+        wrapped = {"workflow": _simple_workflow()}
+        result = generate_text(wrapped)
         assert "step_one" in result
         assert "step_two" in result

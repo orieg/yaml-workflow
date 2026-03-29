@@ -18,7 +18,7 @@ import yaml
 from . import __version__  # Import version
 from .engine import WorkflowEngine
 from .exceptions import WorkflowError
-from .visualize import generate_mermaid
+from .visualize import generate_mermaid, generate_text
 from .workspace import get_workspace_info
 
 
@@ -288,20 +288,24 @@ def validate_workflow(args):
 
 
 def visualize_workflow(args):
-    """Visualize a workflow as a Mermaid diagram."""
+    """Visualize a workflow as a diagram."""
     try:
         with open(args.workflow) as f:
             workflow = yaml.safe_load(f)
 
-        mermaid_output = generate_mermaid(workflow, flow=args.flow)
+        fmt = getattr(args, "format", "text")
+        if fmt == "mermaid":
+            output = generate_mermaid(workflow, flow=args.flow)
+        else:
+            output = generate_text(workflow, flow=args.flow)
 
         if args.output:
             with open(args.output, "w") as f:
-                f.write(mermaid_output)
+                f.write(output)
                 f.write("\n")
-            print(f"Mermaid diagram written to: {args.output}")
+            print(f"Diagram written to: {args.output}")
         else:
-            print(mermaid_output)
+            print(output)
     except (yaml.YAMLError, OSError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -584,10 +588,17 @@ Commands:
 
     # Visualize command
     visualize_parser = subparsers.add_parser(
-        "visualize", help="Visualize a workflow as a Mermaid diagram"
+        "visualize", help="Visualize a workflow as a diagram"
     )
     visualize_parser.add_argument("workflow", help="Path to workflow file")
     visualize_parser.add_argument("--flow", help="Flow name to visualize")
+    visualize_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["text", "mermaid"],
+        default="text",
+        help="Output format: text (ASCII, default) or mermaid",
+    )
     visualize_parser.add_argument(
         "--output", "-o", help="Output file (default: stdout)"
     )
