@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-03-29
+
 ### Added
 - Workflow composition via `imports` — reuse steps/params across YAML files
   with relative paths, transitive imports, and circular detection
@@ -17,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Windows shell compatibility — auto-detect PowerShell on Windows
 - Performance benchmarks via pytest-benchmark with CI artifact upload
 - Public `context` and `processed_inputs` properties on TaskConfig
+- GitHub ruleset for main branch protection
+- 614 tests
 
 ### Changed
 - Replaced all `config._context` / `config._processed_inputs` private access
@@ -108,7 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input/output variable management
 - Error handling with retry mechanisms
 
-[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/orieg/yaml-workflow/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/orieg/yaml-workflow/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/orieg/yaml-workflow/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/orieg/yaml-workflow/compare/v0.3.0...v0.4.0
