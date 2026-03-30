@@ -222,11 +222,28 @@ def _run_workflow_impl(args):
             dry_run=getattr(args, "dry_run", False),
         )
 
+        # When using structured output, redirect all console logging to stderr
+        # so only the JSON/YAML goes to stdout
+        fmt = getattr(args, "format", "text")
+        if fmt in ("json", "yaml"):
+            for handler in logging.getLogger().handlers:
+                if (
+                    isinstance(handler, logging.StreamHandler)
+                    and handler.stream is sys.stdout
+                ):
+                    handler.stream = sys.stderr
+
         # Update parameters
         if param_dict and not getattr(args, "dry_run", False):
-            print("Parameters provided:")
+            print(
+                "Parameters provided:",
+                file=sys.stderr if fmt in ("json", "yaml") else sys.stdout,
+            )
             for name, value in param_dict.items():
-                print(f"  {name}: {value}")
+                print(
+                    f"  {name}: {value}",
+                    file=sys.stderr if fmt in ("json", "yaml") else sys.stdout,
+                )
 
         # Parse skip steps
         skip_step_list = []
@@ -253,59 +270,122 @@ def _run_workflow_impl(args):
 
         # In dry-run mode, the engine already printed the summary
         if not getattr(args, "dry_run", False):
-            # Print completion status
-            print("\n=== Workflow Status ===")
-            if resume_from:
-                print(
-                    f"✓ Workflow resumed from '{resume_from}' and completed successfully"
-                )
-            elif start_from_step:
-                print(
-                    f"✓ Workflow started from '{start_from_step}' and completed successfully"
-                )
+            fmt = getattr(args, "format", "text")
+            output_file = getattr(args, "output", None)
+
+            if fmt in ("json", "yaml"):
+                # Build structured result
+                structured = {
+                    "status": "success",
+                    "workflow": engine.workflow.get("name", ""),
+                    "workspace": str(engine.workspace),
+                    "outputs": {},
+                }
+
+                # Extract step outputs
+                if results and results.get("outputs"):
+                    for step_name, step_data in results["outputs"].items():
+                        if isinstance(step_data, dict) and "result" in step_data:
+                            structured["outputs"][step_name] = step_data["result"]
+                        else:
+                            structured["outputs"][step_name] = step_data
+
+                if fmt == "json":
+                    import json as json_module
+
+                    formatted = json_module.dumps(structured, indent=2, default=str)
+                else:
+                    formatted = yaml.dump(structured, default_flow_style=False)
+
+                if output_file:
+                    with open(output_file, "w") as f:
+                        f.write(formatted)
+                    print(f"Output written to: {output_file}", file=sys.stderr)
+                else:
+                    print(formatted)
             else:
-                print("✓ Workflow completed successfully")
+                # Existing text output
+                # Print completion status
+                print("\n=== Workflow Status ===")
+                if resume_from:
+                    print(
+                        f"✓ Workflow resumed from '{resume_from}' and completed successfully"
+                    )
+                elif start_from_step:
+                    print(
+                        f"✓ Workflow started from '{start_from_step}' and completed successfully"
+                    )
+                else:
+                    print("✓ Workflow completed successfully")
 
-            if skip_step_list:
-                print(f"• Skipped steps: {', '.join(skip_step_list)}")
-            if args.flow:
-                print(f"• Flow executed: {args.flow}")
+                if skip_step_list:
+                    print(f"• Skipped steps: {', '.join(skip_step_list)}")
+                if args.flow:
+                    print(f"• Flow executed: {args.flow}")
 
-            # Print step outputs in a clean format
-            if results.get("outputs"):
-                print("=== Step Outputs ===")
-                first_step = True
-                for step_name, output_container in results["outputs"].items():
-                    output_value = output_container.get("result")
-                    if output_value is None or (
-                        isinstance(output_value, str) and not output_value.strip()
-                    ):
-                        continue
-                    if first_step:
-                        print(f"• {step_name}:")
-                        first_step = False
-                    else:
-                        print(f"\n• {step_name}:")
-                    if isinstance(output_value, str) and "\n" in output_value:
-                        print(output_value)
-                    elif isinstance(output_value, (dict, list)):
-                        print(
-                            yaml.dump(output_value, indent=2, default_flow_style=False)
-                        )
-                    else:
-                        print(f"  {output_value}")
+                # Print step outputs in a clean format
+                if results.get("outputs"):
+                    print("=== Step Outputs ===")
+                    first_step = True
+                    for step_name, output_container in results["outputs"].items():
+                        output_value = output_container.get("result")
+                        if output_value is None or (
+                            isinstance(output_value, str) and not output_value.strip()
+                        ):
+                            continue
+                        if first_step:
+                            print(f"• {step_name}:")
+                            first_step = False
+                        else:
+                            print(f"\n• {step_name}:")
+                        if isinstance(output_value, str) and "\n" in output_value:
+                            print(output_value)
+                        elif isinstance(output_value, (dict, list)):
+                            print(
+                                yaml.dump(
+                                    output_value,
+                                    indent=2,
+                                    default_flow_style=False,
+                                )
+                            )
+                        else:
+                            print(f"  {output_value}")
 
-            print("\n=== Workspace Info ===")
-            print(f"• Location: {engine.workspace}")
-            run_number = engine.state.metadata.get("run_number", "unknown")
-            print(f"• Run number: {run_number}")
+                print("\n=== Workspace Info ===")
+                print(f"• Location: {engine.workspace}")
+                run_number = engine.state.metadata.get("run_number", "unknown")
+                print(f"• Run number: {run_number}")
 
-    except WorkflowError as e:
-        print(f"Workflow error: {str(e)}", file=sys.stderr)
-        sys.exit(1)
-    except Exception as e:  # Top-level catch-all for unexpected errors
-        print(f"Error: {str(e)}", file=sys.stderr)
-        sys.exit(1)
+    except (WorkflowError, Exception) as e:
+        fmt = getattr(args, "format", "text")
+        output_file = getattr(args, "output", None)
+
+        if fmt in ("json", "yaml"):
+            structured = {
+                "status": "failed",
+                "error": str(e),
+            }
+
+            if fmt == "json":
+                import json as json_module
+
+                formatted = json_module.dumps(structured, indent=2, default=str)
+            else:
+                formatted = yaml.dump(structured, default_flow_style=False)
+
+            if output_file:
+                with open(output_file, "w") as f:
+                    f.write(formatted)
+                print(f"Output written to: {output_file}", file=sys.stderr)
+            else:
+                print(formatted)
+            sys.exit(1)
+        else:
+            if isinstance(e, WorkflowError):
+                print(f"Workflow error: {str(e)}", file=sys.stderr)
+            else:
+                print(f"Error: {str(e)}", file=sys.stderr)
+            sys.exit(1)
 
 
 def list_workflows(args):
@@ -772,6 +852,18 @@ Commands:
         "-w",
         action="store_true",
         help="Watch workflow file for changes and re-run automatically",
+    )
+    run_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["text", "json", "yaml"],
+        default="text",
+        help="Output format: text (default), json, or yaml",
+    )
+    run_parser.add_argument(
+        "--output",
+        "-o",
+        help="Write output to file instead of stdout",
     )
     run_parser.add_argument(
         "params", nargs="*", help="Parameters in the format name=value or --name=value"

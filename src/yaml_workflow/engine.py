@@ -202,6 +202,7 @@ class WorkflowEngine:
             "flows",
             "settings",
             "imports",
+            "secrets",
         }
         for key in self.workflow:
             if key not in allowed_keys:
@@ -222,6 +223,9 @@ class WorkflowEngine:
             self.workflow, self.imported_files = self._process_imports(
                 self.workflow, self.workflow_file
             )
+
+        # --- Validate Secrets ---
+        self._validate_secrets()
 
         if "steps" not in self.workflow and "flows" not in self.workflow:
             raise WorkflowError(
@@ -483,6 +487,26 @@ class WorkflowEngine:
 
         _import_stack.discard(current_path)
         return workflow, all_imported_files
+
+    def _validate_secrets(self) -> None:
+        """Validate that all required secret environment variables are set.
+
+        Raises:
+            ConfigurationError: If secrets is not a list or if required
+                environment variables are missing.
+        """
+        secrets = self.workflow.get("secrets", [])
+        if not secrets:
+            return
+        if not isinstance(secrets, list):
+            raise ConfigurationError(
+                "'secrets' must be a list of environment variable names"
+            )
+        missing = [name for name in secrets if not os.environ.get(name)]
+        if missing:
+            raise ConfigurationError(
+                f"Missing required secrets (environment variables): {', '.join(missing)}"
+            )
 
     # Re-adding template resolution methods that were removed during refactoring
     def resolve_template(self, template_str: str) -> str:

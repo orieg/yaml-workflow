@@ -12,6 +12,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+unix_only = pytest.mark.skipif(sys.platform == "win32", reason="bash-specific syntax")
+
 from yaml_workflow.cli import main
 from yaml_workflow.engine import WorkflowEngine
 
@@ -58,6 +60,7 @@ def workspace_dir(tmp_path):
     return workspace
 
 
+@unix_only
 def test_basic_hello_world(run_cli, example_workflows_dir, workspace_dir):
     """Test the basic hello world example workflow."""
     workflow_file = example_workflows_dir / "hello_world.yaml"
@@ -109,6 +112,7 @@ def test_basic_hello_world(run_cli, example_workflows_dir, workspace_dir):
     assert "Hello, Alice!" in greeting_content
 
 
+@unix_only
 def test_advanced_hello_world_success(run_cli, example_workflows_dir, workspace_dir):
     """Test the advanced hello world example workflow with valid input."""
     workflow_file = example_workflows_dir / "advanced_hello_world.yaml"
@@ -662,6 +666,7 @@ EXAMPLES_DIR = Path(__file__).parent.parent / "src" / "yaml_workflow" / "example
 ADVANCED_HELLO_WORLD_YAML = EXAMPLES_DIR / "advanced_hello_world.yaml"
 
 
+@unix_only
 @pytest.mark.last
 def test_advanced_hello_world_example():
     """

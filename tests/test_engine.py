@@ -1,8 +1,11 @@
 import os
+import sys
 import time
 from pathlib import Path
 
 import pytest
+
+unix_only = pytest.mark.skipif(sys.platform == "win32", reason="bash-specific syntax")
 
 from yaml_workflow.engine import WorkflowEngine
 from yaml_workflow.exceptions import (
@@ -580,6 +583,7 @@ def test_on_error_template_message(tmp_path):
     )
 
 
+@unix_only
 def test_step_output_namespace(tmp_path):
     """Test that step outputs are correctly placed in the steps namespace."""
     workflow_dict = {

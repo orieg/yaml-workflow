@@ -99,6 +99,21 @@ yaml-workflow run workflows/hello_world.yaml name=Alice --watch
 
 The engine polls file modification times every 1.5 seconds. On change, it prints a separator and re-runs. Press `Ctrl+C` to stop.
 
+#### Structured output
+
+Get machine-readable output for CI integration or post-processing:
+
+```bash
+# Get JSON output for CI integration
+yaml-workflow run workflows/pipeline.yaml --format json
+
+# Get YAML output
+yaml-workflow run workflows/pipeline.yaml --format yaml
+
+# Save results to a file
+yaml-workflow run workflows/pipeline.yaml --format json --output results.json
+```
+
 ### `list` - List Available Workflows
 
 Display workflows found in a directory:
@@ -297,6 +312,8 @@ yaml-workflow workspace remove hello_world_run_1 --force
 | `run` | `--flow` | Flow name to execute |
 | `run` | `--dry-run`, `-n` | Preview without executing |
 | `run` | `--watch`, `-w` | Watch files and re-run on changes |
+| `run` | `--format`, `-f` | Output format: `text` (default), `json`, or `yaml` |
+| `run` | `--output`, `-o` | Write output to file instead of stdout |
 | `list` | `--base-dir` | Directory containing workflows |
 | `validate` | `workflow` | Path to workflow file |
 | `validate` | `--strict` | Treat warnings as errors (non-zero exit) |

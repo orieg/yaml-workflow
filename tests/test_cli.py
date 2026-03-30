@@ -1272,4 +1272,104 @@ def test_cli_run_resume_with_missing_retry_state(
     )
 
 
+# --- Tests for --format / --output flags on run command ---
+
+
+def test_cli_run_format_json(run_cli, sample_workflow_file, workspace_setup):
+    """Test running a workflow with --format json produces valid JSON output."""
+    import json as _json
+
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(sample_workflow_file),
+            "--workspace",
+            str(workspace_setup),
+            "--base-dir",
+            str(workspace_setup.parent),
+            "--format",
+            "json",
+            "name=World",
+        ]
+    )
+    assert exit_code == 0, f"CLI failed with stderr: {err}"
+    data = _json.loads(out)
+    assert data["status"] == "success"
+    assert isinstance(data["outputs"], dict)
+    assert "workflow" in data
+    assert "workspace" in data
+
+
+def test_cli_run_format_yaml(run_cli, sample_workflow_file, workspace_setup):
+    """Test running a workflow with --format yaml produces valid YAML output."""
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(sample_workflow_file),
+            "--workspace",
+            str(workspace_setup),
+            "--base-dir",
+            str(workspace_setup.parent),
+            "--format",
+            "yaml",
+            "name=World",
+        ]
+    )
+    assert exit_code == 0, f"CLI failed with stderr: {err}"
+    data = yaml.safe_load(out)
+    assert data["status"] == "success"
+    assert isinstance(data["outputs"], dict)
+    assert "workflow" in data
+    assert "workspace" in data
+
+
+def test_cli_run_output_file(run_cli, sample_workflow_file, tmp_path):
+    """Test running a workflow with --format json --output writes to file."""
+    import json as _json
+
+    base_dir = tmp_path / "runs"
+    base_dir.mkdir()
+    workspace_dir = base_dir / "output_test_workspace"
+    workspace_dir.mkdir()
+
+    # Create metadata file
+    metadata = {
+        "created_at": datetime.now().isoformat(),
+        "workflow": "test_workflow",
+        "status": "pending",
+        "execution_state": {
+            "status": "pending",
+            "current_step": None,
+            "failed_step": None,
+        },
+        "run_number": 1,
+    }
+    (workspace_dir / ".workflow_metadata.json").write_text(json.dumps(metadata))
+
+    output_path = tmp_path / "result.json"
+    exit_code, out, err = run_cli(
+        [
+            "run",
+            str(sample_workflow_file),
+            "--workspace",
+            str(workspace_dir),
+            "--base-dir",
+            str(base_dir),
+            "--format",
+            "json",
+            "--output",
+            str(output_path),
+            "name=World",
+        ]
+    )
+    assert exit_code == 0, f"CLI failed with stderr: {err}"
+    # stdout should NOT contain the JSON (it goes to the file)
+    assert "Output written to:" in err
+    assert output_path.exists()
+    content = output_path.read_text()
+    data = _json.loads(content)
+    assert data["status"] == "success"
+    assert isinstance(data["outputs"], dict)
+
+
 # --- Tests for other commands/edge cases ---

@@ -78,6 +78,13 @@
         ]
       }
     },
+    "secrets": {
+      "type": "array",
+      "description": "Environment variable names that must be set before the workflow runs",
+      "items": {
+        "type": "string"
+      }
+    },
     "steps": {
       "type": "array",
       "description": "Ordered list of steps to execute",

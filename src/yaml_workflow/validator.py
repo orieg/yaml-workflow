@@ -63,6 +63,7 @@ ALLOWED_TOP_LEVEL_KEYS = {
     "flows",
     "settings",
     "imports",
+    "secrets",
 }
 
 # Pattern that indicates a likely double-result bug:  steps.X.result.result.Y
@@ -152,6 +153,7 @@ class WorkflowValidator:
             return result
 
         result.issues.extend(self._check_structure())
+        result.issues.extend(self._check_secrets_format())
         result.issues.extend(self._check_step_names_unique())
         result.issues.extend(self._check_task_types())
         result.issues.extend(self._check_flow_references())
@@ -282,6 +284,39 @@ class WorkflowValidator:
                         line=line,
                         step=step_label,
                         hint="Every step must have a 'task' field specifying the task type.",
+                    )
+                )
+
+        return issues
+
+    def _check_secrets_format(self) -> List[ValidationIssue]:
+        """Check that 'secrets', when present, is a list of strings."""
+        issues: List[ValidationIssue] = []
+        wf = self._workflow
+        if not isinstance(wf, dict):
+            return issues
+
+        if "secrets" not in wf:
+            return issues
+
+        secrets = wf["secrets"]
+        if not isinstance(secrets, list):
+            issues.append(
+                ValidationIssue(
+                    level="error",
+                    message="'secrets' must be a list of environment variable names.",
+                    hint="Example: secrets: [API_KEY, DB_PASSWORD]",
+                )
+            )
+            return issues
+
+        for idx, item in enumerate(secrets):
+            if not isinstance(item, str):
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        message=f"Secret at index {idx} must be a string, got {type(item).__name__}.",
+                        hint="Each entry in 'secrets' should be an environment variable name.",
                     )
                 )
 

@@ -186,6 +186,7 @@ from .file_tasks import (
 )
 from .file_utils import list_files
 from .http_tasks import http_request_task
+from .noop import noop_task
 from .notify_tasks import notify_task
 from .python_tasks import print_vars_task
 from .shell_tasks import shell_task
@@ -229,6 +230,7 @@ __all__ = [
     "print_vars_task",
     "render_template",
     "batch_task",
+    "noop_task",
     "echo",
     "fail",
     "hello_world",
