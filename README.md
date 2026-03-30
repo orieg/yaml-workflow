@@ -205,17 +205,39 @@ yaml-workflow run workflows/hello_world.yaml name=Alice --watch
 
 Monitors the workflow file and all imported files. Press `Ctrl+C` to stop.
 
+### GitHub Actions
+
+Run workflows in CI with the [yaml-workflow action](https://github.com/marketplace/actions/yaml-workflow):
+
+```yaml
+- name: Run pipeline
+  uses: orieg/yaml-workflow@v0.8.2
+  id: pipeline
+  with:
+    workflow: workflows/deploy.yaml
+    params: |
+      env=production
+      version=1.2.0
+    format: json
+
+- name: Use results
+  run: echo '${{ steps.pipeline.outputs.result }}'
+```
+
 ### More commands
 
 ```bash
 # List available workflows
 yaml-workflow list
 
-# Validate a workflow
-yaml-workflow validate workflows/hello_world.yaml
+# Validate a workflow (with JSON output for CI)
+yaml-workflow validate workflows/hello_world.yaml --format json
 
 # Resume a failed workflow
 yaml-workflow run workflows/hello_world.yaml --resume
+
+# Structured output for scripting
+yaml-workflow run workflows/pipeline.yaml --format json --output results.json
 ```
 
 ## Documentation
