@@ -58,7 +58,10 @@ runs:
           PARAMS=$(echo "${{ inputs.params }}" | tr '\n' ' ')
         fi
 
-        OUTPUT=$(yaml-workflow run "${{ inputs.workflow }}" $PARAMS --format "${{ inputs.format }}" 2>&1)
+        OUTPUT=$(yaml-workflow run "${{ inputs.workflow }}" $PARAMS --format "${{ inputs.format }}" 2>/tmp/yaml-workflow-stderr.log)
+        if [ -s /tmp/yaml-workflow-stderr.log ]; then
+          echo "::debug::$(cat /tmp/yaml-workflow-stderr.log)"
+        fi
 
         # Use heredoc for multi-line output
         {
