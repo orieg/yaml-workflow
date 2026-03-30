@@ -32,7 +32,7 @@
     "settings": {
       "type": "object",
       "description": "Workflow-level settings",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "max_workers": {
           "type": "integer",
@@ -95,21 +95,18 @@
     "flows": {
       "type": "object",
       "description": "Named execution flows that reference steps by name",
-      "additionalProperties": {
-        "$ref": "#/definitions/flow"
-      }
+      "additionalProperties": true
     }
   },
   "definitions": {
     "paramDefinition": {
       "type": "object",
       "description": "Full parameter definition with type, default, and description",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["string", "integer", "number", "boolean", "list", "dict"],
-          "description": "Parameter type"
+          "description": "Parameter type (string, integer, number, boolean, list, dict)"
         },
         "default": {
           "description": "Default value for the parameter"
@@ -126,10 +123,19 @@
           "type": "array",
           "description": "Enumeration of allowed values"
         },
+        "enum": {
+          "type": "array",
+          "description": "Enumeration of allowed values (alias for allowedValues)"
+        },
         "minLength": {
           "type": "integer",
           "minimum": 0,
           "description": "Minimum string length (for string type)"
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum string length (for string type)"
         }
       }
     },
@@ -144,38 +150,8 @@
           "description": "Unique name for this step"
         },
         "task": {
-          "description": "Task type to execute",
-          "oneOf": [
-            {
-              "type": "string",
-              "enum": [
-                "shell",
-                "python_code",
-                "python_function",
-                "python_script",
-                "python_module",
-                "template",
-                "http.request",
-                "file.write",
-                "file.read",
-                "file.append",
-                "file.copy",
-                "file.move",
-                "file.delete",
-                "file.read_json",
-                "file.write_json",
-                "file.read_yaml",
-                "file.write_yaml",
-                "batch",
-                "noop",
-                "notify"
-              ]
-            },
-            {
-              "type": "string",
-              "description": "Plugin or custom task type (e.g., my_plugin.task)"
-            }
-          ]
+          "type": "string",
+          "description": "Task type to execute. Built-in: shell, python_code, python_function, python_script, python_module, template, http.request, file.write, file.read, file.append, file.copy, file.move, file.delete, file.read_json, file.write_json, file.read_yaml, file.write_yaml, batch, noop, notify. Plugins may register additional types."
         },
         "description": {
           "type": "string",
@@ -203,7 +179,10 @@
           ]
         },
         "retry": {
-          "$ref": "#/definitions/retryConfig"
+          "oneOf": [
+            {"type": "integer", "minimum": 1, "description": "Shorthand: max retry attempts"},
+            {"$ref": "#/definitions/retryConfig"}
+          ]
         },
         "always_run": {
           "type": "boolean",

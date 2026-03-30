@@ -265,24 +265,18 @@ steps:
 
         os.makedirs(os.path.dirname(outfile) or ".", exist_ok=True)
 
-        content = f"""# Document Digest
-
-**Generated:** {date.today().isoformat()}
-**Model:** {provider}/{model}
-**Documents processed:** {count}
-
----
-
-## Executive Overview
-
-{overview}
-
----
-
-## Per-Document Summaries
-
-{summaries_md}
-"""
+        content = (
+            f"# Document Digest\n\n"
+            f"**Generated:** {date.today().isoformat()}\n"
+            f"**Model:** {provider}/{model}\n"
+            f"**Documents processed:** {count}\n\n"
+            f"---\n\n"
+            f"## Executive Overview\n\n"
+            f"{overview}\n\n"
+            f"---\n\n"
+            f"## Per-Document Summaries\n\n"
+            f"{summaries_md}\n"
+        )
         with open(outfile, "w") as f:
             f.write(content)
 

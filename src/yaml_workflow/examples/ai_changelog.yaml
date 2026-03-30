@@ -96,21 +96,19 @@ steps:
         version  = args.get("version", "NEXT")
         log      = steps["check_commits"]["result"]["log"]
 
-        prompt = f"""You are a technical writer generating release notes.
-Given the following git commit log for release {version}, write a concise
-CHANGELOG entry in Markdown.
-
-Rules:
-- Use these sections (omit empty ones): ## Features, ## Bug Fixes, ## Improvements, ## Chore
-- Each bullet starts with the scope in bold if present, e.g. **cli**: ...
-- Skip merge commits and version bumps
-- Rewrite commit messages into clear, user-facing language
-- Add a one-sentence summary paragraph at the top
-
-Commits:
-{log}
-
-Output only the Markdown for the ## [{version}] section, nothing else."""
+        prompt = (
+            f"You are a technical writer generating release notes.\n"
+            f"Given the following git commit log for release {version}, write a concise\n"
+            f"CHANGELOG entry in Markdown.\n\n"
+            f"Rules:\n"
+            f"- Use these sections (omit empty ones): ## Features, ## Bug Fixes, ## Improvements, ## Chore\n"
+            f"- Each bullet starts with the scope in bold if present, e.g. **cli**: ...\n"
+            f"- Skip merge commits and version bumps\n"
+            f"- Rewrite commit messages into clear, user-facing language\n"
+            f"- Add a one-sentence summary paragraph at the top\n\n"
+            f"Commits:\n{log}\n\n"
+            f"Output only the Markdown for the ## [{version}] section, nothing else."
+        )
 
         if provider == "claude":
             model = model or "claude-3-5-haiku-20241022"

@@ -1,0 +1,55 @@
+name: Test Action
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'action.yml'
+      - 'src/yaml_workflow/**'
+      - '.github/workflows/test-action.yml'
+  pull_request:
+    paths:
+      - 'action.yml'
+      - 'src/yaml_workflow/**'
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Run action with text format
+        uses: ./
+        id: text_run
+        with:
+          workflow: src/yaml_workflow/examples/hello_world.yaml
+          params: name=CI
+          format: text
+
+      - name: Verify text output is non-empty
+        run: |
+          echo "=== Text output ==="
+          echo "${{ steps.text_run.outputs.result }}"
+          test -n "${{ steps.text_run.outputs.result }}"
+          echo "Text output OK"
+
+      - name: Run action with JSON format
+        uses: ./
+        id: json_run
+        with:
+          workflow: src/yaml_workflow/examples/hello_world.yaml
+          params: name=CI
+          format: json
+
+      - name: Verify JSON output is valid and successful
+        run: |
+          echo "=== JSON output ==="
+          echo '${{ steps.json_run.outputs.result }}'
+          echo '${{ steps.json_run.outputs.result }}' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data['status'] == 'success', f'Expected success, got {data[\"status\"]}'
+          assert 'outputs' in data, 'Missing outputs key'
+          assert 'workspace' in data, 'Missing workspace key'
+          print('Action test passed: JSON output valid with status=success')
+          "
