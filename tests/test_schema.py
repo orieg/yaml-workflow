@@ -3,10 +3,9 @@
 import json
 from pathlib import Path
 
+import jsonschema
 import pytest
 import yaml
-
-import jsonschema
 
 SCHEMA_PATH = Path(__file__).parent.parent / "schema" / "workflow-schema.json"
 EXAMPLES_DIR = Path(__file__).parent.parent / "src" / "yaml_workflow" / "examples"
