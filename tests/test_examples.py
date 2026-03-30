@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 import yaml
-from click.testing import CliRunner
 
 from yaml_workflow.cli import main
 from yaml_workflow.engine import WorkflowEngine

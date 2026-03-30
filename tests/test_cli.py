@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 import yaml
-from click.testing import CliRunner
 from jinja2 import Template
 
 from yaml_workflow.cli import main
