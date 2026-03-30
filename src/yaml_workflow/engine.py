@@ -9,7 +9,9 @@ import logging.handlers
 import os
 import re
 import tempfile
+import threading
 import time
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union, cast
@@ -177,6 +179,7 @@ class WorkflowEngine:
             WorkflowError: If workflow file not found or invalid
         """
         self.dry_run = dry_run
+        self._context_lock = threading.Lock()
         # --- 1. Load Workflow Definition ---
         if isinstance(workflow, dict):
             self.workflow = workflow
@@ -881,116 +884,130 @@ class WorkflowEngine:
                 print(f"[DRY-RUN] Flow: {flow}")
             print()
 
-        # Main execution loop
-        current_index = 0
+        # Detect DAG mode: if any step has depends_on, use parallel execution
         executed_step_names: Set[str] = set(self.state.get_executed_steps())
-        while current_index < len(steps_to_execute):
-            step = steps_to_execute[current_index]
-            step_name = step["name"]
+        has_dag = any(
+            step.get("depends_on")
+            for step in steps_to_execute
+            if isinstance(step, dict)
+        )
 
-            # Skip if already executed (in case of resume/retry jumps)
-            if step_name in executed_step_names:
-                self.logger.info(f"Skipping already executed step: {step_name}")
-                current_index += 1
-                continue
+        if has_dag:
+            self._run_dag(steps_to_execute, executed_step_names, flow=flow)
+            # Skip the sequential loop -- DAG mode handled everything
+        else:
+            # Original sequential execution loop (unchanged)
+            # Main execution loop
+            current_index = 0
+            while current_index < len(steps_to_execute):
+                step = steps_to_execute[current_index]
+                step_name = step["name"]
 
-            # Execute step with retry/error handling
-            try:
-                self.execute_step(step, max_retries)
-                executed_step_names.add(step_name)
-                current_index += 1
-            except TaskExecutionError as e:
-                # Check if it was a retry request first!
-                if isinstance(e, RetryStepException):
-                    self.logger.debug(
-                        f"Caught RetryStepException for step '{step_name}'. Looping."
-                    )
-                    # Don't increment current_index, just continue the loop
+                # Skip if already executed (in case of resume/retry jumps)
+                if step_name in executed_step_names:
+                    self.logger.info(f"Skipping already executed step: {step_name}")
+                    current_index += 1
                     continue
 
-                # Not a retry, so it's either a jump or a final halt
-                self.logger.debug(
-                    f"TaskExecutionError caught in run loop for step '{step_name}'. Checking for error flow."
-                )
-                error_flow_target = self.state.get_error_flow_target()
-                if error_flow_target:
-                    # --- Handle Error Flow Jump ---
-                    self.logger.info(
-                        f"Jumping to error handling step: {error_flow_target}"
-                    )
-                    # Find the index of the target step in the original *full* list of steps
-                    try:
-                        target_index_in_all = next(
-                            i
-                            for i, s in enumerate(all_steps)
-                            if s["name"] == error_flow_target
+                # Execute step with retry/error handling
+                try:
+                    self.execute_step(step, max_retries)
+                    executed_step_names.add(step_name)
+                    current_index += 1
+                except TaskExecutionError as e:
+                    # Check if it was a retry request first!
+                    if isinstance(e, RetryStepException):
+                        self.logger.debug(
+                            f"Caught RetryStepException for step '{step_name}'. Looping."
                         )
-                        # Reset the execution queue to start from the target step,
-                        # using the main list of all steps and respecting skips.
-                        steps_to_execute = [
-                            s
-                            for s in all_steps[target_index_in_all:]
-                            if s["name"] not in initial_skip_set
-                        ]
-                        current_index = 0  # Start from the beginning of the new list
-                        self.state.clear_error_flow_target()
-                        # Add the target step to executed_step_names *before* continuing
-                        # to prevent immediate re-execution if it was skipped initially.
-                        # However, let execute_step handle adding it after successful run.
-                        # We might need to clear executed_step_names specific to the failed branch?
-                        # For now, just continue loop.
+                        # Don't increment current_index, just continue the loop
                         continue
-                    except StopIteration:
-                        # This means the target step from on_error.next doesn't exist in the workflow steps
-                        self.logger.error(
-                            f"Configuration error: on_error.next target '{error_flow_target}' not found in workflow steps."
-                        )
-                        # Mark the *original* step as failed, as the jump target is invalid
-                        self.state.mark_step_failed(
-                            step_name,
-                            f"Invalid on_error.next target: {error_flow_target}",
-                        )
-                        self.state.save()
-                        raise WorkflowError(
-                            f"Invalid on_error.next target '{error_flow_target}' for step '{step_name}'"
-                        ) from e
-                else:
-                    # --- Handle Terminal Failure (No Jump Target) ---
-                    # The error was already marked as terminally failed in execute_step
-                    # which also sets the workflow state to failed.
-                    # Re-raise a WorkflowError to signal the end of execution
-                    root_cause = e.original_error or e  # Get the actual root cause
-                    final_error_message = f"Workflow halted at step '{step_name}' due to unhandled error: {root_cause}"  # Use root cause in message
-                    self.logger.error(final_error_message)
-                    # No need to call mark_workflow_failed here; mark_step_failed in execute_step handles it.
-                    raise WorkflowError(
-                        final_error_message, original_error=root_cause
-                    ) from root_cause
-            except Exception as e:
-                # Broad catch is intentional: this is the engine's top-level run loop
-                # and must handle any unexpected error (e.g. KeyError, AttributeError,
-                # OSError) from engine internals to mark the step/workflow as failed.
-                self.logger.error(
-                    f"Unexpected engine error during step '{step_name}': {e}",
-                    exc_info=True,
-                )
-                # Mark the step as failed (which also marks workflow as failed)
-                # Use a generic error message as this is an engine-level failure
-                engine_error_msg = (
-                    f"Unexpected engine error during step '{step_name}': {e}"
-                )
-                if (
-                    self.current_step
-                ):  # current_step might be None if error happens outside a step
-                    self.state.mark_step_failed(self.current_step, engine_error_msg)
-                else:
-                    # If we don't know the step, mark the workflow directly (though this is less ideal)
-                    # We might need a way to handle non-step-specific failures better.
-                    # For now, let's just log and re-raise, assuming execute_step handled state.
-                    pass  # Avoid redundant state marking if possible
 
-                # Wrap this in StepExecutionError for clarity, only passing original_error
-                raise StepExecutionError(step_name, original_error=e)
+                    # Not a retry, so it's either a jump or a final halt
+                    self.logger.debug(
+                        f"TaskExecutionError caught in run loop for step '{step_name}'. Checking for error flow."
+                    )
+                    error_flow_target = self.state.get_error_flow_target()
+                    if error_flow_target:
+                        # --- Handle Error Flow Jump ---
+                        self.logger.info(
+                            f"Jumping to error handling step: {error_flow_target}"
+                        )
+                        # Find the index of the target step in the original *full* list of steps
+                        try:
+                            target_index_in_all = next(
+                                i
+                                for i, s in enumerate(all_steps)
+                                if s["name"] == error_flow_target
+                            )
+                            # Reset the execution queue to start from the target step,
+                            # using the main list of all steps and respecting skips.
+                            steps_to_execute = [
+                                s
+                                for s in all_steps[target_index_in_all:]
+                                if s["name"] not in initial_skip_set
+                            ]
+                            current_index = (
+                                0  # Start from the beginning of the new list
+                            )
+                            self.state.clear_error_flow_target()
+                            # Add the target step to executed_step_names *before* continuing
+                            # to prevent immediate re-execution if it was skipped initially.
+                            # However, let execute_step handle adding it after successful run.
+                            # We might need to clear executed_step_names specific to the failed branch?
+                            # For now, just continue loop.
+                            continue
+                        except StopIteration:
+                            # This means the target step from on_error.next doesn't exist in the workflow steps
+                            self.logger.error(
+                                f"Configuration error: on_error.next target '{error_flow_target}' not found in workflow steps."
+                            )
+                            # Mark the *original* step as failed, as the jump target is invalid
+                            self.state.mark_step_failed(
+                                step_name,
+                                f"Invalid on_error.next target: {error_flow_target}",
+                            )
+                            self.state.save()
+                            raise WorkflowError(
+                                f"Invalid on_error.next target '{error_flow_target}' for step '{step_name}'"
+                            ) from e
+                    else:
+                        # --- Handle Terminal Failure (No Jump Target) ---
+                        # The error was already marked as terminally failed in execute_step
+                        # which also sets the workflow state to failed.
+                        # Re-raise a WorkflowError to signal the end of execution
+                        root_cause = e.original_error or e  # Get the actual root cause
+                        final_error_message = f"Workflow halted at step '{step_name}' due to unhandled error: {root_cause}"  # Use root cause in message
+                        self.logger.error(final_error_message)
+                        # No need to call mark_workflow_failed here; mark_step_failed in execute_step handles it.
+                        raise WorkflowError(
+                            final_error_message, original_error=root_cause
+                        ) from root_cause
+                except Exception as e:
+                    # Broad catch is intentional: this is the engine's top-level run loop
+                    # and must handle any unexpected error (e.g. KeyError, AttributeError,
+                    # OSError) from engine internals to mark the step/workflow as failed.
+                    self.logger.error(
+                        f"Unexpected engine error during step '{step_name}': {e}",
+                        exc_info=True,
+                    )
+                    # Mark the step as failed (which also marks workflow as failed)
+                    # Use a generic error message as this is an engine-level failure
+                    engine_error_msg = (
+                        f"Unexpected engine error during step '{step_name}': {e}"
+                    )
+                    if (
+                        self.current_step
+                    ):  # current_step might be None if error happens outside a step
+                        self.state.mark_step_failed(self.current_step, engine_error_msg)
+                    else:
+                        # If we don't know the step, mark the workflow directly (though this is less ideal)
+                        # We might need a way to handle non-step-specific failures better.
+                        # For now, let's just log and re-raise, assuming execute_step handled state.
+                        pass  # Avoid redundant state marking if possible
+
+                    # Wrap this in StepExecutionError for clarity, only passing original_error
+                    raise StepExecutionError(step_name, original_error=e)
 
         # Save final state only if no exceptions occurred during the loop
         # Check status before marking completed
@@ -1054,7 +1071,133 @@ class WorkflowEngine:
             "steps_state": final_step_states,  # Keep detailed step states as well
         }
 
-    def execute_step(self, step: Dict[str, Any], global_max_retries: int) -> None:
+    def _build_dep_graph(self, steps):
+        """Build a dependency graph from step depends_on fields.
+
+        Returns:
+            dict mapping step_name -> set of dependency step names.
+            Steps without depends_on have empty sets.
+        """
+        step_names = {s["name"] for s in steps if isinstance(s, dict)}
+        graph = {}
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            name = step["name"]
+            deps = step.get("depends_on", [])
+            if isinstance(deps, str):
+                deps = [deps]
+            dep_set = set(deps)
+            # Validate all dependencies exist
+            for dep in dep_set:
+                if dep not in step_names:
+                    raise ConfigurationError(
+                        f"Step '{name}' depends on '{dep}' which does not exist. "
+                        f"Available steps: {', '.join(sorted(step_names))}"
+                    )
+            graph[name] = dep_set
+        return graph
+
+    def _compute_levels(self, graph):
+        """Compute execution levels via topological sort (Kahn's algorithm).
+
+        Returns:
+            List of lists, where each inner list contains step names that
+            can execute in parallel (all their dependencies are in earlier levels).
+
+        Raises:
+            ConfigurationError: If a cycle is detected.
+        """
+        in_degree = {name: len(deps) for name, deps in graph.items()}
+        # Build reverse adjacency: who depends on me?
+        dependents = {name: set() for name in graph}
+        for name, deps in graph.items():
+            for dep in deps:
+                dependents[dep].add(name)
+
+        levels = []
+        remaining = set(graph.keys())
+
+        while remaining:
+            # Find steps with no unmet dependencies
+            ready = {name for name in remaining if in_degree[name] == 0}
+            if not ready:
+                raise ConfigurationError(
+                    f"Circular dependency detected among steps: "
+                    f"{', '.join(sorted(remaining))}"
+                )
+            levels.append(sorted(ready))  # Sort for deterministic order
+            remaining -= ready
+            # Decrease in-degree for dependents
+            for name in ready:
+                for dependent in dependents.get(name, set()):
+                    in_degree[dependent] -= 1
+
+        return levels
+
+    def _run_dag(self, steps_to_execute, executed_step_names, flow=None):
+        """Execute steps in DAG order with parallel execution of independent steps."""
+        step_dict = {s["name"]: s for s in steps_to_execute if isinstance(s, dict)}
+        graph = self._build_dep_graph(steps_to_execute)
+        levels = self._compute_levels(graph)
+
+        max_workers = self.workflow.get("settings", {}).get("max_workers", 4)
+
+        self.logger.info(
+            f"DAG execution: {len(levels)} level(s), " f"max_workers={max_workers}"
+        )
+
+        for level_idx, level_names in enumerate(levels):
+            # Filter out already-executed steps (for resume support)
+            pending = [name for name in level_names if name not in executed_step_names]
+
+            if not pending:
+                continue
+
+            if len(pending) == 1:
+                # Single step -- run directly (no thread overhead)
+                step = step_dict[pending[0]]
+                self.execute_step(step)
+            else:
+                # Multiple steps -- run in parallel
+                self.logger.info(
+                    f"Level {level_idx}: running {len(pending)} steps in parallel: "
+                    f"{', '.join(pending)}"
+                )
+                errors = []
+                with ThreadPoolExecutor(
+                    max_workers=min(max_workers, len(pending))
+                ) as executor:
+                    futures = {}
+                    for name in pending:
+                        step = step_dict[name]
+                        future = executor.submit(self._execute_step_thread_safe, step)
+                        futures[future] = name
+
+                    for future in as_completed(futures):
+                        name = futures[future]
+                        try:
+                            future.result()
+                        except Exception as e:
+                            errors.append((name, e))
+
+                if errors:
+                    # Report the first error (matching sequential behavior)
+                    name, error = errors[0]
+                    if len(errors) > 1:
+                        self.logger.warning(
+                            f"{len(errors)} steps failed in parallel level {level_idx}: "
+                            f"{', '.join(n for n, _ in errors)}"
+                        )
+                    raise error
+
+    def _execute_step_thread_safe(self, step):
+        """Wrapper around execute_step that acquires the context lock for writes."""
+        # The execute_step method reads from self.context (safe -- deps already written)
+        # and writes to self.context["steps"][name] (needs lock)
+        self.execute_step(step)
+
+    def execute_step(self, step: Dict[str, Any], global_max_retries: int = 3) -> None:
         """
         Execute a single workflow step.
 
@@ -1210,15 +1353,17 @@ class WorkflowEngine:
         if not step_failed:
             self.logger.debug(f"Processing successful result for step '{step_name}'.")
             # Store the raw task result under the 'result' key in the steps namespace
-            self.context["steps"][step_name] = {"result": result}
-
-            # Mark step as executed successfully in state
-            self.state.mark_step_success(step_name, self.context["steps"][step_name])
+            # Use lock for thread-safety during parallel DAG execution
+            with self._context_lock:
+                self.context["steps"][step_name] = {"result": result}
+                # Mark step as executed successfully in state
+                self.state.mark_step_success(
+                    step_name, self.context["steps"][step_name]
+                )
+                self.state.save()
             self.state.reset_step_retries(step_name)
             self.current_step = None
             self.logger.info(f"Step '{step_name}' executed successfully.")
-            # Save state and exit method on success
-            self.state.save()
             return
 
         # --- Handle Failure (if caught) ---

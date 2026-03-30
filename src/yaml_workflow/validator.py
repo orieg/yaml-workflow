@@ -155,6 +155,7 @@ class WorkflowValidator:
         result.issues.extend(self._check_structure())
         result.issues.extend(self._check_secrets_format())
         result.issues.extend(self._check_step_names_unique())
+        result.issues.extend(self._check_depends_on_references())
         result.issues.extend(self._check_task_types())
         result.issues.extend(self._check_flow_references())
         result.issues.extend(self._check_param_references())
@@ -346,6 +347,107 @@ class WorkflowValidator:
                 )
             else:
                 seen[name] = idx
+        return issues
+
+    def _check_depends_on_references(self) -> List[ValidationIssue]:
+        """Validate depends_on references and detect circular dependencies."""
+        issues: List[ValidationIssue] = []
+        steps = self._get_steps_list()
+        defined_step_names = {
+            s.get("name") for s in steps if isinstance(s, dict) and s.get("name")
+        }
+
+        # Build dependency graph and validate references
+        graph: Dict[str, set] = {}
+        has_depends_on = False
+        for step in steps:
+            if not isinstance(step, dict):
+                continue
+            name = step.get("name")
+            if not name:
+                continue
+            deps = step.get("depends_on", [])
+            if deps:
+                has_depends_on = True
+            if isinstance(deps, str):
+                deps = [deps]
+            if not isinstance(deps, list):
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        message=(
+                            f"Step '{name}': 'depends_on' must be a string or list of strings."
+                        ),
+                        step=name,
+                    )
+                )
+                continue
+            dep_set = set()
+            for dep in deps:
+                if not isinstance(dep, str):
+                    issues.append(
+                        ValidationIssue(
+                            level="error",
+                            message=(
+                                f"Step '{name}': depends_on entries must be strings, "
+                                f"got {type(dep).__name__}."
+                            ),
+                            step=name,
+                        )
+                    )
+                    continue
+                if dep not in defined_step_names:
+                    issues.append(
+                        ValidationIssue(
+                            level="error",
+                            message=(
+                                f"Step '{name}' depends on '{dep}' which does not exist."
+                            ),
+                            step=name,
+                            hint=(
+                                "Check the step name spelling. "
+                                f"Defined steps: {', '.join(sorted(s for s in defined_step_names if s)) or '(none)'}."
+                            ),
+                        )
+                    )
+                else:
+                    dep_set.add(dep)
+            graph[name] = dep_set
+
+        # Only check for cycles if there are depends_on declarations
+        if not has_depends_on:
+            return issues
+
+        # Detect cycles using Kahn's algorithm (topological sort)
+        in_degree = {name: len(deps) for name, deps in graph.items()}
+        # Build reverse adjacency
+        dependents: Dict[str, set] = {name: set() for name in graph}
+        for name, deps in graph.items():
+            for dep in deps:
+                if dep in dependents:
+                    dependents[dep].add(name)
+
+        remaining = set(graph.keys())
+        while remaining:
+            ready = {name for name in remaining if in_degree[name] == 0}
+            if not ready:
+                # Cycle detected among remaining steps
+                issues.append(
+                    ValidationIssue(
+                        level="error",
+                        message=(
+                            f"Circular dependency detected among steps: "
+                            f"{', '.join(sorted(remaining))}"
+                        ),
+                        hint="Remove or restructure the circular depends_on references.",
+                    )
+                )
+                break
+            remaining -= ready
+            for name in ready:
+                for dependent in dependents.get(name, set()):
+                    in_degree[dependent] -= 1
+
         return issues
 
     def _check_task_types(self) -> List[ValidationIssue]:

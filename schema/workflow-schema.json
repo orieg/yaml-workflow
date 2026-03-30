@@ -208,6 +208,19 @@
         "always_run": {
           "type": "boolean",
           "description": "If true, this step runs even if previous steps failed"
+        },
+        "depends_on": {
+          "oneOf": [
+            {
+              "type": "array",
+              "items": {"type": "string"},
+              "description": "Step names that must complete before this step runs"
+            },
+            {
+              "type": "string",
+              "description": "Single step name that must complete before this step"
+            }
+          ]
         }
       }
     },
