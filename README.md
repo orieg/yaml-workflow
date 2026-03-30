@@ -211,7 +211,7 @@ Run workflows in CI with the [yaml-workflow action](https://github.com/marketpla
 
 ```yaml
 - name: Run pipeline
-  uses: orieg/yaml-workflow@v0.8.2
+  uses: orieg/yaml-workflow@v0.8.3
   id: pipeline
   with:
     workflow: workflows/deploy.yaml

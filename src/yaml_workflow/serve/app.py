@@ -7,8 +7,8 @@ Usage:
     yaml-workflow serve --port 8080 --dir workflows/
 """
 
+import html
 import json
-import os
 import threading
 import uuid
 from datetime import datetime
@@ -99,7 +99,13 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
 
     def _get_run(run_id: str) -> Optional[Dict[str, Any]]:
         """Get details for a specific run."""
-        run_dir = Path(base_dir) / run_id
+        # Look up run_id in the known runs list instead of constructing paths
+        # from user input (avoids CodeQL py/path-injection)
+        known_runs = _scan_runs()
+        run_entry = next((r for r in known_runs if r["id"] == run_id), None)
+        if run_entry is None:
+            return None
+        run_dir = Path(run_entry["path"])
         metadata_file = run_dir / ".workflow_metadata.json"
         if not metadata_file.exists():
             return None
@@ -142,7 +148,7 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title} — yaml-workflow</title>
+    <title>{html.escape(title)} — yaml-workflow</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 </head>
@@ -173,7 +179,7 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             "pending": "bg-gray-100 text-gray-800",
         }
         cls = colors.get(status, "bg-gray-100 text-gray-800")
-        return f'<span class="px-2 py-1 rounded-full text-xs font-medium {cls}">{status}</span>'
+        return f'<span class="px-2 py-1 rounded-full text-xs font-medium {cls}">{html.escape(str(status))}</span>'
 
     # ------------------------------------------------------------------
     # Routes
@@ -187,13 +193,15 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
 
         wf_rows = ""
         for wf in workflows:
-            params_str = ", ".join(wf["params"].keys()) if wf["params"] else "none"
+            params_str = (
+                html.escape(", ".join(wf["params"].keys())) if wf["params"] else "none"
+            )
             wf_rows += f"""
             <tr class="border-b hover:bg-gray-50">
                 <td class="px-4 py-3 font-medium">
-                    <a href="/workflows/{wf['filename']}" class="text-blue-600 hover:underline">{wf['name']}</a>
+                    <a href="/workflows/{html.escape(wf['filename'])}" class="text-blue-600 hover:underline">{html.escape(wf['name'])}</a>
                 </td>
-                <td class="px-4 py-3 text-gray-600">{wf['description'][:80] if wf['description'] else '-'}</td>
+                <td class="px-4 py-3 text-gray-600">{html.escape(wf['description'][:80]) if wf['description'] else '-'}</td>
                 <td class="px-4 py-3 text-gray-500">{wf['step_count']} steps</td>
                 <td class="px-4 py-3 text-gray-500 text-sm">{params_str}</td>
             </tr>"""
@@ -203,11 +211,11 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             run_rows += f"""
             <tr class="border-b hover:bg-gray-50">
                 <td class="px-4 py-3">
-                    <a href="/runs/{run['id']}" class="text-blue-600 hover:underline text-sm">{run['id'][:40]}</a>
+                    <a href="/runs/{html.escape(run['id'])}" class="text-blue-600 hover:underline text-sm">{html.escape(run['id'][:40])}</a>
                 </td>
-                <td class="px-4 py-3">{run['workflow']}</td>
+                <td class="px-4 py-3">{html.escape(run['workflow'])}</td>
                 <td class="px-4 py-3">{_status_badge(run['status'])}</td>
-                <td class="px-4 py-3 text-gray-500 text-sm">{run['created_at'][:19] if run['created_at'] else '-'}</td>
+                <td class="px-4 py-3 text-gray-500 text-sm">{html.escape(run['created_at'][:19]) if run['created_at'] else '-'}</td>
                 <td class="px-4 py-3 text-gray-500 text-sm">{len(run['completed_steps'])} steps</td>
             </tr>"""
 
@@ -250,6 +258,8 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
     @app.get("/workflows/{filename}", response_class=HTMLResponse)
     async def workflow_detail(filename: str):
         """Workflow detail: YAML preview, params form, run history."""
+        # Look up filename in known workflows instead of constructing paths
+        # from user input (avoids CodeQL py/path-injection)
         workflows = _scan_workflows()
         wf = next((w for w in workflows if w["filename"] == filename), None)
         if not wf:
@@ -276,10 +286,10 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
                 ptype = "string"
             form_fields += f"""
             <div class="mb-3">
-                <label class="block text-sm font-medium text-gray-700 mb-1">{pname} <span class="text-gray-400">({ptype})</span></label>
-                <input type="text" name="{pname}" value="{default}"
+                <label class="block text-sm font-medium text-gray-700 mb-1">{html.escape(str(pname))} <span class="text-gray-400">({html.escape(str(ptype))})</span></label>
+                <input type="text" name="{html.escape(str(pname))}" value="{html.escape(str(default))}"
                        class="w-full px-3 py-2 border rounded-md text-sm"
-                       placeholder="{desc}">
+                       placeholder="{html.escape(str(desc))}">
             </div>"""
 
         # Find related runs
@@ -288,23 +298,23 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
         for run in runs:
             run_rows += f"""
             <tr class="border-b">
-                <td class="px-3 py-2"><a href="/runs/{run['id']}" class="text-blue-600 hover:underline text-sm">{run['id'][:30]}</a></td>
+                <td class="px-3 py-2"><a href="/runs/{html.escape(run['id'])}" class="text-blue-600 hover:underline text-sm">{html.escape(run['id'][:30])}</a></td>
                 <td class="px-3 py-2">{_status_badge(run['status'])}</td>
-                <td class="px-3 py-2 text-sm text-gray-500">{run['created_at'][:19] if run['created_at'] else '-'}</td>
+                <td class="px-3 py-2 text-sm text-gray-500">{html.escape(run['created_at'][:19]) if run['created_at'] else '-'}</td>
             </tr>"""
 
         content = f"""
         <div class="flex items-center gap-3 mb-6">
             <a href="/" class="text-gray-400 hover:text-gray-600">&larr; Dashboard</a>
-            <h1 class="text-2xl font-bold">{wf['name']}</h1>
+            <h1 class="text-2xl font-bold">{html.escape(wf['name'])}</h1>
         </div>
-        <p class="text-gray-600 mb-6">{wf['description'] or 'No description'}</p>
+        <p class="text-gray-600 mb-6">{html.escape(wf['description']) if wf['description'] else 'No description'}</p>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
                 <h2 class="text-lg font-semibold mb-3">Run Workflow</h2>
                 <form method="POST" action="/api/run" class="bg-white rounded-lg shadow p-4">
-                    <input type="hidden" name="workflow" value="{wf['path']}">
+                    <input type="hidden" name="workflow" value="{html.escape(wf['path'])}">
                     {form_fields or '<p class="text-gray-400 text-sm">No parameters</p>'}
                     <button type="submit"
                             class="mt-3 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium">
@@ -314,7 +324,7 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             </div>
             <div>
                 <h2 class="text-lg font-semibold mb-3">Workflow YAML</h2>
-                <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto max-h-96">{yaml_content}</pre>
+                <pre class="bg-gray-900 text-green-400 p-4 rounded-lg text-xs overflow-x-auto max-h-96">{html.escape(yaml_content)}</pre>
             </div>
         </div>
 
@@ -353,8 +363,8 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             ]
             steps_html += f"""
             <div class="border-l-4 border-green-400 pl-4 py-2 mb-3">
-                <div class="font-medium text-sm">{step_name} {_status_badge('completed')}</div>
-                <pre class="text-xs text-gray-600 mt-1 overflow-x-auto">{result_str}</pre>
+                <div class="font-medium text-sm">{html.escape(str(step_name))} {_status_badge('completed')}</div>
+                <pre class="text-xs text-gray-600 mt-1 overflow-x-auto">{html.escape(result_str)}</pre>
             </div>"""
 
         failed = run.get("failed_step")
@@ -367,19 +377,19 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             ferr = failed.get("error_message", "") if isinstance(failed, dict) else ""
             steps_html += f"""
             <div class="border-l-4 border-red-400 pl-4 py-2 mb-3">
-                <div class="font-medium text-sm">{fname} {_status_badge('failed')}</div>
-                <pre class="text-xs text-red-600 mt-1">{ferr}</pre>
+                <div class="font-medium text-sm">{html.escape(str(fname))} {_status_badge('failed')}</div>
+                <pre class="text-xs text-red-600 mt-1">{html.escape(str(ferr))}</pre>
             </div>"""
 
-        logs_html = run.get("logs", "")
+        logs_html = html.escape(run.get("logs", ""))
 
         content = f"""
         <div class="flex items-center gap-3 mb-6">
             <a href="/" class="text-gray-400 hover:text-gray-600">&larr; Dashboard</a>
-            <h1 class="text-2xl font-bold">Run: {run['workflow']}</h1>
+            <h1 class="text-2xl font-bold">Run: {html.escape(run['workflow'])}</h1>
             {_status_badge(run.get('status', 'unknown'))}
         </div>
-        <p class="text-sm text-gray-500 mb-6">ID: {run_id} &bull; Created: {run.get('created_at', '-')[:19]}</p>
+        <p class="text-sm text-gray-500 mb-6">ID: {html.escape(str(run_id))} &bull; Created: {html.escape(run.get('created_at', '-')[:19])}</p>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
@@ -394,7 +404,9 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             </div>
         </div>
         """
-        return HTMLResponse(_base_html(f"Run — {run['workflow']}", content))
+        return HTMLResponse(
+            _base_html(f"Run \u2014 {html.escape(run['workflow'])}", content)
+        )
 
     # ------------------------------------------------------------------
     # API routes
@@ -404,11 +416,22 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
     async def trigger_run(request: Request):
         """Trigger a workflow run in a background thread."""
         form = await request.form()
-        workflow_path = form.get("workflow", "")
+        workflow_ref = str(form.get("workflow", ""))
         params = {k: v for k, v in form.items() if k != "workflow" and v}
 
-        if not workflow_path:
+        if not workflow_ref:
             return JSONResponse({"error": "workflow path required"}, status_code=400)
+
+        # Look up the workflow in known workflows instead of using raw user
+        # input as a path (avoids CodeQL py/path-injection)
+        known_workflows = _scan_workflows()
+        wf_match = next(
+            (w for w in known_workflows if w["path"] == workflow_ref),
+            None,
+        )
+        if wf_match is None:
+            return JSONResponse({"error": "workflow not found"}, status_code=404)
+        workflow_path = wf_match["path"]
 
         run_id = (
             f"run_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
