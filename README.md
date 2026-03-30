@@ -16,7 +16,7 @@ Most workflow tools (Airflow, Prefect, Dagster) are designed for distributed clo
 |---|---|---|
 | **Setup** | `pip install yaml-workflow` | Server, database, scheduler, workers |
 | **Configuration** | Plain YAML files | Python DAGs + infrastructure config |
-| **Dependencies** | 3 (PyYAML, Jinja2, Click) | 50+ packages, Docker, PostgreSQL |
+| **Dependencies** | 2 (PyYAML, Jinja2) | 50+ packages, Docker, PostgreSQL |
 | **Use case** | Local automation, scripts, CI/CD, data pipelines | Enterprise orchestration at scale |
 | **Learning curve** | Minutes | Hours to days |
 | **State** | File-based, resumable | Database-backed |
