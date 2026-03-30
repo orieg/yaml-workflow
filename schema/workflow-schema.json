@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/orieg/yaml-workflow/schema/workflow-schema.json",
+  "$id": "https://raw.githubusercontent.com/orieg/yaml-workflow/main/schema/workflow-schema.json",
   "title": "YAML Workflow",
   "description": "Schema for yaml-workflow YAML workflow files",
   "type": "object",

@@ -41,3 +41,10 @@ You can also validate workflow files with any JSON Schema validator, for example
 pip install check-jsonschema
 check-jsonschema --schemafile schema/workflow-schema.json workflows/my_workflow.yaml
 ```
+
+## SchemaStore Auto-Detection
+
+The yaml-workflow schema is registered with [SchemaStore](https://www.schemastore.org/).
+Editors that support SchemaStore (VS Code with YAML extension, IntelliJ, etc.) will
+automatically validate and provide autocompletion for files matching `*workflow*.yaml`
+without any manual configuration.

@@ -88,6 +88,14 @@ dev = [
     "build>=1.0.0,<2.0.0",
     "twine>=4.0.0,<7.0.0",
 ]
+mcp = [
+    "mcp>=1.0,<2.0",
+]
+serve = [
+    "fastapi>=0.100,<1.0",
+    "uvicorn>=0.20,<1.0",
+    "python-multipart>=0.0.5,<1.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/orieg/yaml-workflow"
@@ -133,9 +141,13 @@ extend-exclude = '''
 '''
 
 [tool.mypy]
-exclude = ["build/", ".venv/", "site/"] # Exclude build, venv, and site directories
+exclude = ["build/", ".venv/", "site/"]
 mypy_path = "src"
 namespace_packages = true
+# Optional deps (mcp, fastapi) may not be installed; ignore missing imports
+[[tool.mypy.overrides]]
+module = ["mcp.*", "fastapi.*", "uvicorn.*"]
+ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["src/yaml_workflow"]

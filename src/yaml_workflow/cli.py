@@ -811,6 +811,8 @@ Commands:
   visualize          Visualize a workflow as a Mermaid diagram
   workspace          Workspace management commands
   init               Initialize a new project with example workflows
+  serve              Start web dashboard for monitoring and triggering workflows
+  serve-mcp          Start MCP server exposing workflows as tools
 """
     parser.add_argument(
         "--version",
@@ -970,6 +972,49 @@ Commands:
     )
     init_parser.add_argument("--example", help="Specific example workflow to copy")
 
+    # Serve command (web dashboard)
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="Start web dashboard for monitoring and triggering workflows",
+    )
+    serve_parser.add_argument(
+        "--dir",
+        default="workflows",
+        help="Directory containing workflow YAML files (default: workflows)",
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=8080,
+        help="Port to listen on (default: 8080)",
+    )
+    serve_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind to (default: 127.0.0.1)",
+    )
+    serve_parser.add_argument(
+        "--base-dir",
+        default="runs",
+        help="Base directory for workflow runs (default: runs)",
+    )
+
+    # MCP Server command
+    mcp_parser = subparsers.add_parser(
+        "serve-mcp",
+        help="Start MCP server exposing workflows as tools",
+    )
+    mcp_parser.add_argument(
+        "--dir",
+        default="workflows",
+        help="Directory containing workflow YAML files (default: workflows)",
+    )
+    mcp_parser.add_argument(
+        "--base-dir",
+        default="runs",
+        help="Base directory for workflow runs (default: runs)",
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -997,6 +1042,34 @@ Commands:
                 sys.exit(1)
         elif args.command == "init":
             init_project(args)
+        elif args.command == "serve":
+            try:
+                import uvicorn
+
+                from .serve.app import create_app
+            except ImportError:
+                print(
+                    "Web dashboard requires FastAPI and uvicorn.\n"
+                    "Install with: pip install 'yaml-workflow[serve]'",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            app = create_app(workflow_dir=args.dir, base_dir=args.base_dir)
+            print(f"Starting yaml-workflow dashboard at http://{args.host}:{args.port}")
+            uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+        elif args.command == "serve-mcp":
+            import asyncio
+
+            try:
+                from .mcp_server import serve
+            except ImportError:
+                print(
+                    "MCP server requires the 'mcp' package.\n"
+                    "Install it with: pip install 'yaml-workflow[mcp]'",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            asyncio.run(serve(args.dir, base_dir=args.base_dir))
     except KeyboardInterrupt:
         print("\nOperation cancelled by user", file=sys.stderr)
         sys.exit(1)

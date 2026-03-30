@@ -1,0 +1,68 @@
+name: 'yaml-workflow'
+description: 'Run yaml-workflow pipelines in GitHub Actions'
+branding:
+  icon: 'play-circle'
+  color: 'blue'
+
+inputs:
+  workflow:
+    description: 'Path to workflow YAML file'
+    required: true
+  params:
+    description: 'Parameters as name=value pairs (one per line)'
+    required: false
+    default: ''
+  format:
+    description: 'Output format (text, json, yaml)'
+    required: false
+    default: 'text'
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.12'
+  version:
+    description: 'yaml-workflow version to install (e.g. 0.8.0). Empty = latest.'
+    required: false
+    default: ''
+
+outputs:
+  result:
+    description: 'Workflow output (structured when format is json/yaml)'
+    value: ${{ steps.run.outputs.result }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install yaml-workflow
+      shell: bash
+      run: |
+        if [ -n "${{ inputs.version }}" ]; then
+          pip install "yaml-workflow==${{ inputs.version }}"
+        else
+          pip install yaml-workflow
+        fi
+
+    - name: Run workflow
+      id: run
+      shell: bash
+      run: |
+        PARAMS=""
+        if [ -n "${{ inputs.params }}" ]; then
+          PARAMS=$(echo "${{ inputs.params }}" | tr '\n' ' ')
+        fi
+
+        OUTPUT=$(yaml-workflow run "${{ inputs.workflow }}" $PARAMS --format "${{ inputs.format }}" 2>/dev/null)
+
+        # Use heredoc for multi-line output
+        {
+          echo "result<<YAML_WORKFLOW_EOF"
+          echo "$OUTPUT"
+          echo "YAML_WORKFLOW_EOF"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "$OUTPUT"
