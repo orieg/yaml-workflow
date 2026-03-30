@@ -169,9 +169,11 @@ def test_noop_instruct_error_handling(workspace, basic_context):
     step = {
         "name": "test_noop",
         "task": "noop",
-        "inputs": {"error_prone": """
+        "inputs": {
+            "error_prone": """
                 {{ args.nonexistent }}
-            """},
+            """
+        },
     }
 
     config = TaskConfig(step, basic_context, workspace)

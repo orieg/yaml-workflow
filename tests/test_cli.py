@@ -186,7 +186,21 @@ def test_cli_validate_workflow(run_cli, sample_workflow_file):
     """Test workflow validation through CLI."""
     exit_code, out, err = run_cli(["validate", str(sample_workflow_file)])
     assert exit_code == 0
-    assert "Workflow validation successful" in out
+    assert "Validation passed" in out
+    assert "YAML syntax OK" in out
+
+
+def test_cli_validate_workflow_json(run_cli, sample_workflow_file):
+    """Test workflow validation with JSON output format."""
+    import json as _json
+
+    exit_code, out, err = run_cli(
+        ["validate", str(sample_workflow_file), "--format", "json"]
+    )
+    assert exit_code == 0
+    data = _json.loads(out)
+    assert data["valid"] is True
+    assert data["error_count"] == 0
 
 
 def test_cli_validate_invalid_workflow(run_cli, tmp_path):
@@ -195,7 +209,7 @@ def test_cli_validate_invalid_workflow(run_cli, tmp_path):
     invalid_file.write_text("invalid: yaml: content")
     exit_code, out, err = run_cli(["validate", str(invalid_file)])
     assert exit_code != 0
-    assert "Validation failed" in err
+    assert "Validation failed" in out
 
 
 def test_cli_list_workflows(run_cli, tmp_path):

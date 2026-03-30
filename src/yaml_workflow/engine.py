@@ -7,6 +7,7 @@ import inspect
 import logging
 import logging.handlers
 import os
+import re
 import tempfile
 import time
 from datetime import datetime
@@ -35,6 +36,67 @@ from .tasks import TaskConfig, get_task_handler
 from .template import TemplateEngine
 from .utils.yaml_utils import get_safe_loader
 from .workspace import create_workspace, get_workspace_info
+
+# ---------------------------------------------------------------------------
+# Error-enrichment helpers
+# ---------------------------------------------------------------------------
+
+# Ordered list of (pattern, hint) pairs.  The first matching pattern wins.
+HINTS = [
+    (
+        "result.result",
+        "Hint: Step results are accessed as steps.NAME.result.KEY, "
+        "not steps.NAME.result.result.KEY",
+    ),
+    (
+        "is undefined",
+        "Hint: Check that the variable name is correct and the step has run before this one",
+    ),
+    (
+        "UndefinedError",
+        "Hint: Use {% if variable is defined %} to make a reference optional",
+    ),
+    (
+        "args.",
+        "Hint: Check the 'params' section — the referenced argument may not be declared",
+    ),
+]
+
+
+def _enrich_error_message(error: Exception, step: dict, context: dict) -> str:
+    """Return the error message enriched with a contextual hint when possible.
+
+    Args:
+        error: The original exception.
+        step: The step definition dict.
+        context: The current workflow context dict.
+
+    Returns:
+        The error message string, possibly with an appended hint.
+    """
+    base_message = str(error)
+    hint = None
+
+    for pattern, hint_text in HINTS:
+        if pattern in base_message:
+            hint = hint_text
+            break
+
+    # Extra context: if the message mentions steps.X, check whether X exists
+    if hint is None:
+        m = re.search(r"steps\.(\w+)", base_message)
+        if m:
+            referenced_step = m.group(1)
+            known_steps = set(context.get("steps", {}).keys())
+            if referenced_step and referenced_step not in known_steps:
+                hint = (
+                    f"Hint: Step '{referenced_step}' is referenced but has not yet run "
+                    f"or does not exist. Check the step name spelling."
+                )
+
+    if hint:
+        return f"{base_message}\n  {hint}"
+    return base_message
 
 
 def setup_logging(workspace: Path, name: str) -> logging.Logger:
@@ -1083,6 +1145,13 @@ class WorkflowEngine:
 
         except TaskExecutionError as e:
             # --- Catch task execution errors (already properly typed) ---
+            # Enrich the error with a hint if none was already attached.
+            if not e.hint:
+                orig = e.original_error or e
+                enriched = _enrich_error_message(orig, step, self.context)
+                raw = str(orig)
+                if enriched != raw:
+                    e.hint = enriched[len(raw) :].strip()
             self.logger.warning(
                 f"Step '{step_name}' caught TaskExecutionError during execution: {e}"
             )
@@ -1093,16 +1162,24 @@ class WorkflowEngine:
             # Broad catch is intentional: task handlers are user-provided code that
             # can raise arbitrary exceptions. We must catch and wrap them all to
             # ensure proper workflow error handling and state management.
+            enriched_message = _enrich_error_message(e, step, self.context)
             self.logger.warning(
-                f"Step '{step_name}' caught exception during execution: {e}"
+                f"Step '{step_name}' caught exception during execution: {enriched_message}"
             )
             step_failed = True
             self.logger.debug(f"Wrapping non-TaskExecutionError: {type(e).__name__}")
+            # Detect whether the enriched message added a hint (i.e. it differs from str(e))
+            hint = None
+            raw_msg = str(e)
+            if enriched_message != raw_msg:
+                # Extract the hint portion (everything after the first newline)
+                hint = enriched_message[len(raw_msg) :].strip()
             step_error = TaskExecutionError(
                 step_name=step_name,
                 original_error=e,
                 # Pass the raw step dict as task_config for context
                 task_config=task_config.step,
+                hint=hint,
             )
 
         # --- Handle Successful Execution (if not failed) ---

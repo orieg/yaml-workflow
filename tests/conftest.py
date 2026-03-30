@@ -166,7 +166,8 @@ def custom_task_module(temp_workspace):
     init_file.write_text("")
 
     task_file = module_dir / "my_task.py"
-    task_file.write_text("""
+    task_file.write_text(
+        """
 from yaml_workflow.tasks import TaskConfig, register_task
 
 @register_task('my_custom_task')
@@ -176,7 +177,8 @@ def my_custom_task_handler(config: TaskConfig) -> dict:
     if not message:
         raise ValueError("'message' is required in inputs")
     return {'result': f"{message} from custom task!"}
-""")
+"""
+    )
 
     return module_dir
 

@@ -18,6 +18,7 @@ import yaml
 from . import __version__  # Import version
 from .engine import WorkflowEngine
 from .exceptions import WorkflowError
+from .validator import WorkflowValidator
 from .visualize import generate_mermaid, generate_text
 from .workspace import get_workspace_info
 
@@ -356,13 +357,129 @@ def list_workflows(args):
 
 def validate_workflow(args):
     """Validate a workflow file."""
-    try:
-        # Just try to create the engine, which will validate the workflow
-        WorkflowEngine(args.workflow)
-        print("Workflow validation successful")
-    except (WorkflowError, yaml.YAMLError, OSError) as e:
-        print(f"Validation failed: {e}", file=sys.stderr)
+    fmt = getattr(args, "format", "text")
+    strict = getattr(args, "strict", False)
+
+    validator = WorkflowValidator(args.workflow)
+    result = validator.validate()
+    # Use the parsed workflow from the validator (None if YAML was invalid)
+    parsed_wf = validator._workflow
+
+    if fmt == "json":
+        print(json.dumps(result.to_dict(), indent=2))
+        if not result.is_valid or (strict and result.warnings):
+            sys.exit(1)
+        return
+
+    # --- Human-readable output ---
+    print(f"\nValidating: {args.workflow}\n")
+
+    # YAML syntax
+    syntax_errors = [
+        i
+        for i in result.issues
+        if "YAML syntax" in i.message
+        or "File not found" in i.message
+        or "Cannot read" in i.message
+    ]
+    if not syntax_errors:
+        print("  \u2713 YAML syntax OK")
+    else:
+        for issue in syntax_errors:
+            _print_issue(issue)
+
+    # Only continue printing structural details when YAML is valid
+    if parsed_wf is not None and isinstance(parsed_wf, dict):
+        struct_issues = [
+            i
+            for i in result.issues
+            if i not in syntax_errors and i.step is None and i.level == "error"
+        ]
+        if not struct_issues:
+            print("  \u2713 Structure OK")
+        else:
+            for issue in struct_issues:
+                _print_issue(issue)
+
+        # Step uniqueness summary
+        steps = parsed_wf.get("steps") or []
+        step_count = len(steps) if isinstance(steps, (list, dict)) else 0
+
+        dup_issues = [i for i in result.issues if "Duplicate step name" in i.message]
+        if not dup_issues and step_count > 0:
+            print(f"  \u2713 {step_count} step(s), all names unique")
+        elif dup_issues:
+            for issue in dup_issues:
+                _print_issue(issue)
+
+        # Flow references
+        flow_ref_issues = [
+            i
+            for i in result.issues
+            if "Flow '" in i.message
+            and (
+                "references step" in i.message
+                or "definition must be" in i.message
+                or "must have a 'steps'" in i.message
+            )
+        ]
+        if not flow_ref_issues and parsed_wf.get("flows"):
+            print("  \u2713 All flow references valid")
+        else:
+            for issue in flow_ref_issues:
+                _print_issue(issue)
+
+        # Per-step issues (task type warnings, double-result, param refs, missing task)
+        already_shown = set(
+            id(i) for i in syntax_errors + struct_issues + dup_issues + flow_ref_issues
+        )
+        step_issues = [i for i in result.issues if id(i) not in already_shown]
+        for issue in step_issues:
+            _print_issue(issue)
+
+    print()
+
+    error_count = len(result.errors)
+    warning_count = len(result.warnings)
+
+    effective_errors = error_count + (warning_count if strict else 0)
+
+    if effective_errors == 0:
+        if warning_count == 0:
+            print("Validation passed with no issues.")
+        else:
+            plural_w = "warning" if warning_count == 1 else "warnings"
+            print(f"Validation passed with 0 errors, {warning_count} {plural_w}.")
+    else:
+        plural_e = "error" if error_count == 1 else "errors"
+        plural_w = "warning" if warning_count == 1 else "warnings"
+        if strict and warning_count > 0:
+            print(
+                f"Validation failed (strict): {error_count} {plural_e}, {warning_count} {plural_w} (treated as errors)."
+            )
+        else:
+            print(
+                f"Validation failed: {error_count} {plural_e}, {warning_count} {plural_w}."
+            )
         sys.exit(1)
+
+
+def _print_issue(issue):
+    """Print a single ValidationIssue in human-readable format."""
+    if issue.level == "error":
+        symbol = "\u2717"
+    elif issue.level == "warning":
+        symbol = "\u26a0"
+    else:
+        symbol = "\u2139"
+
+    location = ""
+    if issue.line:
+        location = f"  (line {issue.line})"
+
+    print(f"  {symbol} {issue.message}{location}")
+    if issue.hint:
+        print(f"    Hint: {issue.hint}")
 
 
 def visualize_workflow(args):
@@ -669,6 +786,18 @@ Commands:
     # Validate command
     validate_parser = subparsers.add_parser("validate", help="Validate a workflow file")
     validate_parser.add_argument("workflow", help="Path to workflow file")
+    validate_parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Treat warnings as errors (non-zero exit if any warnings)",
+    )
+    validate_parser.add_argument(
+        "--format",
+        "-f",
+        choices=["text", "json"],
+        default="text",
+        help="Output format: text (default) or json (machine-readable)",
+    )
 
     # Visualize command
     visualize_parser = subparsers.add_parser(

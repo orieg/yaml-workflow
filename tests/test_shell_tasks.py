@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
@@ -16,6 +17,13 @@ from yaml_workflow.tasks.shell_tasks import (
     run_command,
     set_environment,
     shell_task,
+)
+
+# Mark for tests that rely on bash/unix-specific shell syntax or commands.
+# These are skipped on Windows where cmd.exe / PowerShell behave differently.
+unix_only = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="bash-specific syntax or unix commands not supported on Windows",
 )
 
 
@@ -41,6 +49,7 @@ def basic_context() -> Dict[str, Any]:
     }
 
 
+@unix_only
 def test_shell_basic(workspace, basic_context):
     """Test basic shell command execution."""
     step = {
@@ -57,6 +66,7 @@ def test_shell_basic(workspace, basic_context):
     assert result["stderr"] == ""
 
 
+@unix_only
 def test_shell_with_variables(workspace, basic_context):
     """Test shell command with variable substitution."""
     step = {
@@ -74,6 +84,7 @@ def test_shell_with_variables(workspace, basic_context):
     assert result["return_code"] == 0
 
 
+@unix_only
 def test_shell_with_working_dir(workspace, basic_context):
     """Test shell command with working directory."""
     test_dir = workspace / "test_dir"
@@ -94,6 +105,7 @@ def test_shell_with_working_dir(workspace, basic_context):
     assert result["return_code"] == 0
 
 
+@unix_only
 def test_shell_with_env_vars(workspace, basic_context):
     """Test shell command with environment variables."""
     step = {
@@ -109,6 +121,7 @@ def test_shell_with_env_vars(workspace, basic_context):
     assert result["return_code"] == 0
 
 
+@unix_only
 def test_shell_command_failure(workspace, basic_context):
     """Test shell command that fails."""
     step = {
@@ -124,6 +137,7 @@ def test_shell_command_failure(workspace, basic_context):
     assert "Command 'exit 1' returned non-zero exit status 1." in str(exc_info.value)
 
 
+@unix_only
 def test_shell_command_timeout(workspace, basic_context):
     """Test shell command with timeout."""
     step = {
@@ -139,6 +153,7 @@ def test_shell_command_timeout(workspace, basic_context):
     assert "Command 'sleep 5' timed out after 0.1 seconds" in str(exc_info.value)
 
 
+@unix_only
 def test_shell_with_batch_context(workspace, basic_context):
     """Test shell command in batch context."""
     basic_context["batch"] = {"item": "test_item", "index": 0, "total": 1}
@@ -156,6 +171,7 @@ def test_shell_with_batch_context(workspace, basic_context):
     assert result["return_code"] == 0
 
 
+@unix_only
 def test_shell_with_undefined_variable(workspace, basic_context):
     """Test shell command with undefined variable."""
     step = {
@@ -171,17 +187,20 @@ def test_shell_with_undefined_variable(workspace, basic_context):
     assert "undefined_var" in str(exc_info.value)
 
 
+@unix_only
 def test_shell_with_complex_command(workspace, basic_context):
     """Test shell command with complex operations."""
     step = {
         "name": "test_shell_complex",
         "task": "shell",
-        "inputs": {"command": """
+        "inputs": {
+            "command": """
             mkdir -p testdir
             cd testdir
             echo 'test' > file.txt
             cat file.txt
-            """},
+            """
+        },
     }
 
     config = TaskConfig(step, basic_context, workspace)
@@ -192,6 +211,7 @@ def test_shell_with_complex_command(workspace, basic_context):
     assert (workspace / "testdir" / "file.txt").exists()
 
 
+@unix_only
 def test_shell_with_special_chars(workspace, basic_context):
     """Test shell command with special characters."""
     basic_context["args"]["special"] = "test$with|special&chars"
@@ -225,6 +245,7 @@ def test_shell_command_as_list(workspace, basic_context):
     assert result["return_code"] == 0
 
 
+@unix_only
 def test_shell_command_failure_non_zero_exit(workspace, basic_context):
     """Test shell task when command succeeds but returns non-zero exit code."""
     step = {
@@ -255,6 +276,7 @@ def test_shell_command_failure_non_zero_exit(workspace, basic_context):
     assert "No such file or directory" in exc_info.value.original_error.stderr
 
 
+@unix_only
 def test_check_command_failure(workspace):
     """Test check_command utility failure."""
     with pytest.raises(subprocess.CalledProcessError):
@@ -291,6 +313,7 @@ def test_set_environment_utility():
         #         del os.environ[k]
 
 
+@unix_only
 def test_shell_with_absolute_working_dir(workspace, basic_context):
     """Test shell command with an absolute working directory path."""
     abs_test_dir = workspace / "abs_dir"

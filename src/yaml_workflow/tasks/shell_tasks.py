@@ -2,6 +2,7 @@
 Shell operation tasks for executing commands and managing processes.
 """
 
+import logging
 import os
 import platform
 import shutil
@@ -34,6 +35,98 @@ def _get_shell_executable() -> Optional[str]:
             if path:
                 return path
     return None
+
+
+def resolve_platform_command(command: Any) -> str:
+    """Resolve a platform-specific command dict to the appropriate string.
+
+    When ``command`` is a :class:`dict` with ``unix`` and/or ``windows`` keys
+    the correct variant is chosen based on :func:`platform.system`.  Any other
+    value is returned unchanged (callers are expected to validate the type).
+
+    Example workflow YAML::
+
+        - name: list_files
+          task: shell
+          inputs:
+            command:
+              unix: "ls -la"
+              windows: "dir /W"
+
+    Args:
+        command: A command string, list, or a dict with ``unix``/``windows``
+            keys.
+
+    Returns:
+        The resolved command string or list (unchanged if not a platform dict).
+
+    Raises:
+        ValueError: If ``command`` is a dict but contains neither a
+            ``unix`` nor a ``windows`` key.
+    """
+    if not isinstance(command, dict):
+        return command  # type: ignore[return-value]
+
+    system = platform.system()
+    if system == "Windows":
+        key = "windows"
+        fallback = "unix"
+    else:
+        key = "unix"
+        fallback = "windows"
+
+    if key in command:
+        return command[key]
+    if fallback in command:
+        logging.getLogger(__name__).warning(
+            "No '%s' key found in platform command dict; "
+            "falling back to '%s' variant.",
+            key,
+            fallback,
+        )
+        return command[fallback]
+
+    raise ValueError(
+        "platform command dict must contain at least a 'unix' or 'windows' key; "
+        f"got keys: {list(command.keys())}"
+    )
+
+
+# Patterns that are valid bash/sh syntax but will fail or behave differently
+# under Windows cmd.exe.  We emit a warning when these are detected so users
+# know to either skip the task on Windows or supply a 'windows' variant via
+# the platform command dict.
+_BASH_SYNTAX_PATTERNS = (
+    "$(",  # command substitution
+    " && ",  # bash AND operator (cmd uses & not &&)
+    " || ",  # bash OR operator
+    "\n",  # multi-line shell script
+)
+
+
+def _warn_if_bash_syntax(command: str, step_name: str) -> None:
+    """Emit a logger warning when *command* contains bash-specific constructs.
+
+    This is a best-effort heuristic; it will not catch every case.  The
+    warning is only emitted on Windows.
+
+    Args:
+        command: The resolved shell command string.
+        step_name: Name of the current workflow step (for log context).
+    """
+    if platform.system() != "Windows":
+        return
+    for pattern in _BASH_SYNTAX_PATTERNS:
+        if pattern in command:
+            logging.getLogger(__name__).warning(
+                "Step '%s': shell command may contain bash-specific syntax "
+                "(%r) that is not supported on Windows.  Consider using "
+                "shell=false with a command list, or provide a platform-"
+                "specific command dict with 'unix'/'windows' keys.",
+                step_name,
+                pattern,
+            )
+            break
 
 
 def run_command(
@@ -229,7 +322,7 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
         if "command" not in processed:
             missing_cmd_error = ValueError("command parameter is required")
             raise missing_cmd_error
-        command = processed["command"]
+        command = resolve_platform_command(processed["command"])
 
         cwd = config.workspace
         if "working_dir" in processed:
@@ -258,6 +351,8 @@ def shell_task(config: TaskConfig) -> Dict[str, Any]:
                 "task_config": config.step,
             }
             command = process_command(command, command_context)
+            if shell:
+                _warn_if_bash_syntax(command, task_name)
         elif not isinstance(command, list):
             # Raise error if command is neither string nor list
             invalid_type_error = TypeError(

@@ -1,0 +1,280 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/orieg/yaml-workflow/schema/workflow-schema.json",
+  "title": "YAML Workflow",
+  "description": "Schema for yaml-workflow YAML workflow files",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable name of the workflow"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of what the workflow does"
+    },
+    "params": {
+      "type": "object",
+      "description": "Input parameters accepted by the workflow",
+      "additionalProperties": {
+        "oneOf": [
+          {
+            "type": ["string", "number", "boolean", "null"],
+            "description": "Simple parameter with a default value"
+          },
+          {
+            "$ref": "#/definitions/paramDefinition"
+          }
+        ]
+      }
+    },
+    "settings": {
+      "type": "object",
+      "description": "Workflow-level settings",
+      "additionalProperties": false,
+      "properties": {
+        "max_workers": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of parallel workers"
+        },
+        "log_level": {
+          "type": "string",
+          "enum": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+          "description": "Logging level"
+        },
+        "timeout": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Global timeout in seconds for the entire workflow"
+        },
+        "workspace_dir": {
+          "type": "string",
+          "description": "Custom workspace directory path"
+        }
+      }
+    },
+    "imports": {
+      "type": "array",
+      "description": "List of workflow files to import steps and params from",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string",
+            "description": "Path to the workflow file to import"
+          },
+          {
+            "type": "object",
+            "required": ["path"],
+            "additionalProperties": false,
+            "properties": {
+              "path": {
+                "type": "string",
+                "description": "Path to the workflow file to import"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of steps to execute",
+      "items": {
+        "$ref": "#/definitions/step"
+      }
+    },
+    "flows": {
+      "type": "object",
+      "description": "Named execution flows that reference steps by name",
+      "additionalProperties": {
+        "$ref": "#/definitions/flow"
+      }
+    }
+  },
+  "definitions": {
+    "paramDefinition": {
+      "type": "object",
+      "description": "Full parameter definition with type, default, and description",
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean", "list", "dict"],
+          "description": "Parameter type"
+        },
+        "default": {
+          "description": "Default value for the parameter"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of the parameter"
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Whether the parameter is required (no default)"
+        },
+        "allowedValues": {
+          "type": "array",
+          "description": "Enumeration of allowed values"
+        },
+        "minLength": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Minimum string length (for string type)"
+        }
+      }
+    },
+    "step": {
+      "type": "object",
+      "description": "A single workflow step",
+      "required": ["name", "task"],
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique name for this step"
+        },
+        "task": {
+          "description": "Task type to execute",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "shell",
+                "python_code",
+                "python_function",
+                "python_script",
+                "python_module",
+                "template",
+                "http.request",
+                "file.write",
+                "file.read",
+                "file.append",
+                "file.copy",
+                "file.move",
+                "file.delete",
+                "file.read_json",
+                "file.write_json",
+                "file.read_yaml",
+                "file.write_yaml",
+                "batch",
+                "noop",
+                "notify"
+              ]
+            },
+            {
+              "type": "string",
+              "description": "Plugin or custom task type (e.g., my_plugin.task)"
+            }
+          ]
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this step"
+        },
+        "inputs": {
+          "type": "object",
+          "description": "Input key/value pairs for the task. Values may contain Jinja2 templates.",
+          "additionalProperties": true
+        },
+        "condition": {
+          "type": "string",
+          "description": "Jinja2 expression. Step is skipped when this evaluates to false."
+        },
+        "on_error": {
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": ["continue"],
+              "description": "Shorthand for on_error: {action: continue}"
+            },
+            {
+              "$ref": "#/definitions/onError"
+            }
+          ]
+        },
+        "retry": {
+          "$ref": "#/definitions/retryConfig"
+        },
+        "always_run": {
+          "type": "boolean",
+          "description": "If true, this step runs even if previous steps failed"
+        }
+      }
+    },
+    "onError": {
+      "type": "object",
+      "description": "Error handling configuration for a step",
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["skip", "fail", "retry", "continue"],
+          "description": "What to do when the step fails"
+        },
+        "next": {
+          "type": "string",
+          "description": "Name of the step to jump to on error"
+        },
+        "message": {
+          "type": "string",
+          "description": "Custom error message template (Jinja2)"
+        },
+        "retry": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of retries before applying action"
+        },
+        "delay": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Delay in seconds between retries"
+        }
+      }
+    },
+    "retryConfig": {
+      "type": "object",
+      "description": "Retry configuration for a step",
+      "additionalProperties": false,
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of total attempts (including first)"
+        },
+        "delay": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Delay in seconds between attempts"
+        },
+        "backoff": {
+          "type": "string",
+          "enum": ["fixed", "linear", "exponential"],
+          "description": "Delay growth strategy between retries"
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "description": "A named execution flow",
+      "required": ["steps"],
+      "additionalProperties": false,
+      "properties": {
+        "steps": {
+          "type": "array",
+          "description": "Ordered list of step names to execute in this flow",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of this flow"
+        }
+      }
+    }
+  }
+}

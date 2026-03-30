@@ -186,6 +186,7 @@ from .file_tasks import (
 )
 from .file_utils import list_files
 from .http_tasks import http_request_task
+from .notify_tasks import notify_task
 from .python_tasks import print_vars_task
 from .shell_tasks import shell_task
 from .template_tasks import render_template
@@ -216,6 +217,7 @@ __all__ = [
     "register_task",
     "get_task_handler",
     "http_request_task",
+    "notify_task",
     "shell_task",
     "write_file_task",
     "read_file_task",

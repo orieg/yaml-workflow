@@ -1,0 +1,167 @@
+name: AI Code Reviewer
+description: >
+  Review Python (or any text) files using a local Ollama model or Claude API.
+  Reads files with shell/file tasks, calls the LLM for each, and writes a
+  Markdown report. Demonstrates batch processing + AI integration.
+
+  Usage:
+    # Review a single file with local Ollama:
+    yaml-workflow run ai_code_review.yaml file=src/mymodule.py
+
+    # Review with Claude (set ANTHROPIC_API_KEY first):
+    yaml-workflow run ai_code_review.yaml \
+      file=src/mymodule.py \
+      provider=claude
+
+params:
+  file:
+    type: string
+    description: Path to the file to review
+    required: true
+
+  provider:
+    type: string
+    default: ollama
+    description: "LLM provider: 'ollama' or 'claude'"
+
+  model:
+    type: string
+    default: ""
+    description: "Model name (defaults: llama3.2 for ollama, claude-3-5-haiku-20241022 for claude)"
+
+  output_file:
+    type: string
+    default: output/code_review.md
+    description: Path to write the review report
+
+settings:
+  log_level: INFO
+
+steps:
+  # ── Step 1: Read the source file ─────────────────────────────────────────
+  - name: read_source
+    task: file.read
+    inputs:
+      path: "{{ args.file }}"
+
+  # ── Step 2: Build LLM request ────────────────────────────────────────────
+  - name: prepare_review_request
+    task: python_code
+    inputs:
+      code: |
+        provider  = args.get("provider", "ollama").lower()
+        model     = args.get("model", "")
+        file_path = args.get("file", "unknown")
+        source    = steps["read_source"]["result"]["content"]
+
+        prompt = (
+            f"You are an expert code reviewer. Review the following code from '{file_path}'.\n"
+            "Provide:\n"
+            "1. A brief summary of what the code does\n"
+            "2. Any bugs or potential issues\n"
+            "3. Suggestions for improvement\n"
+            "4. Overall quality score (1-10)\n\n"
+            f"```\n{source}\n```"
+        )
+
+        if provider == "claude":
+            model = model or "claude-3-5-haiku-20241022"
+            result = {
+                "provider": "claude",
+                "model": model,
+                "url": "https://api.anthropic.com/v1/messages",
+                "body": {
+                    "model": model,
+                    "max_tokens": 1024,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            }
+        else:
+            model = model or "llama3.2"
+            result = {
+                "provider": "ollama",
+                "model": model,
+                "url": "http://localhost:11434/api/generate",
+                "body": {
+                    "model": model,
+                    "prompt": prompt,
+                    "stream": False,
+                },
+            }
+
+  # ── Step 3a: Call Ollama (local) ─────────────────────────────────────────
+  - name: call_ollama
+    task: http.request
+    condition: "{{ steps.prepare_review_request.result.provider == 'ollama' }}"
+    inputs:
+      url:    "{{ steps.prepare_review_request.result.url }}"
+      method: POST
+      body:   "{{ steps.prepare_review_request.result.body }}"
+      retry:
+        max_attempts: 2
+        delay: 2.0
+
+  # ── Step 3b: Call Claude API ─────────────────────────────────────────────
+  - name: call_claude
+    task: http.request
+    condition: "{{ steps.prepare_review_request.result.provider == 'claude' }}"
+    inputs:
+      url:    "{{ steps.prepare_review_request.result.url }}"
+      method: POST
+      body:   "{{ steps.prepare_review_request.result.body }}"
+      auth:
+        type:      bearer
+        token_env: ANTHROPIC_API_KEY
+      headers:
+        anthropic-version: "2023-06-01"
+        content-type: application/json
+
+  # ── Step 4: Extract and structure the review ─────────────────────────────
+  - name: extract_review
+    task: python_code
+    inputs:
+      code: |
+        provider = steps["prepare_review_request"]["result"]["provider"]
+
+        if provider == "claude":
+            raw = steps.get("call_claude", {}).get("result", {})
+            content = raw.get("json") or {}
+            parts = content.get("content", [])
+            review = parts[0].get("text", "").strip() if parts else raw.get("body", "")
+        else:
+            raw = steps.get("call_ollama", {}).get("result", {})
+            content = raw.get("json") or {}
+            review = content.get("response", "").strip() or raw.get("body", "")
+
+        model = steps["prepare_review_request"]["result"]["model"]
+        result = {
+            "review": review,
+            "model": model,
+            "provider": provider,
+        }
+
+  # ── Step 5: Write the Markdown report ────────────────────────────────────
+  - name: write_report
+    task: file.write
+    inputs:
+      path: "{{ args.output_file }}"
+      content: |
+        # Code Review: {{ args.file }}
+
+        **Reviewer:** {{ steps.extract_review.result.provider }}/{{ steps.extract_review.result.model }}
+        **Date:** {% now 'utc', '%Y-%m-%d' %}
+
+        ---
+
+        {{ steps.extract_review.result.review }}
+
+        ---
+        *Generated by yaml-workflow ai_code_review*
+
+  # ── Step 6: Notify completion ─────────────────────────────────────────────
+  - name: notify_done
+    task: notify
+    inputs:
+      channel: log
+      level: info
+      message: "Code review complete for {{ args.file }}. Report: {{ args.output_file }}"

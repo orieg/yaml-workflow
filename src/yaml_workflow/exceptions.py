@@ -16,7 +16,18 @@ class WorkflowError(Exception):
 class WorkflowValidationError(WorkflowError):
     """Raised when workflow YAML validation fails."""
 
-    pass
+    def __init__(
+        self,
+        message: str,
+        file_path: Optional[str] = None,
+        original_error: Optional[Exception] = None,
+    ):
+        self.file_path = file_path
+        if file_path:
+            full_message = f"{message} (in {file_path})"
+        else:
+            full_message = message
+        super().__init__(full_message, original_error=original_error)
 
 
 class WorkflowNotFoundError(WorkflowError):
@@ -113,12 +124,17 @@ class TaskExecutionError(WorkflowRuntimeError):
         step_name: str,
         original_error: Exception,
         task_config: Optional[dict] = None,
+        hint: Optional[str] = None,
     ):
         self.step_name = step_name
         self.original_error = original_error
         self.task_config = task_config
+        self.hint = hint
+        base_message = f"Task '{step_name}' failed: {str(original_error)}"
+        if hint:
+            base_message = f"{base_message}\n  {hint}"
         super().__init__(
-            message=f"Task '{step_name}' failed: {str(original_error)}",
+            message=base_message,
             original_error=original_error,
         )
 
@@ -126,12 +142,20 @@ class TaskExecutionError(WorkflowRuntimeError):
 class InputResolutionError(WorkflowRuntimeError):
     """Raised when input variables cannot be resolved."""
 
-    def __init__(self, step_name: str, variable_name: str, message: str):
+    def __init__(
+        self,
+        step_name: str,
+        variable_name: str,
+        message: str,
+        hint: Optional[str] = None,
+    ):
         self.step_name = step_name
         self.variable_name = variable_name
-        super().__init__(
-            f"Failed to resolve input '{variable_name}' in step '{step_name}': {message}"
-        )
+        self.hint = hint
+        base_message = f"Failed to resolve input '{variable_name}' in step '{step_name}': {message}"
+        if hint:
+            base_message = f"{base_message}\n  {hint}"
+        super().__init__(base_message)
 
 
 class OutputHandlingError(WorkflowRuntimeError):
