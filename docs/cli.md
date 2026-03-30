@@ -298,6 +298,26 @@ yaml-workflow workspace remove hello_world_run_1 hello_world_run_2
 yaml-workflow workspace remove hello_world_run_1 --force
 ```
 
+### `serve` - Web Dashboard
+
+Start a web UI for monitoring and triggering workflows:
+
+```bash
+yaml-workflow serve --port 8080 --dir workflows/
+```
+
+Requires: `pip install 'yaml-workflow[serve]'`
+
+### `serve-mcp` - MCP Server
+
+Start an MCP server exposing workflows as AI agent tools:
+
+```bash
+yaml-workflow serve-mcp --dir workflows/
+```
+
+Requires: `pip install 'yaml-workflow[mcp]'`
+
 ## All Options
 
 | Command | Flag | Description |
@@ -324,4 +344,8 @@ yaml-workflow workspace remove hello_world_run_1 --force
 | `visualize` | `--output`, `-o` | Output file (default: stdout) |
 | `init` | `--dir` | Target directory (default: `workflows`) |
 | `init` | `--example` | Specific example to copy |
+| `serve` | `--dir` | Workflow directory (default: `workflows`) |
+| `serve` | `--port` | Port (default: `8080`) |
+| `serve` | `--host` | Host (default: `127.0.0.1`) |
+| `serve-mcp` | `--dir` | Workflow directory (default: `workflows`) |
 | `--version` | | Show version and exit |

@@ -46,7 +46,7 @@ steps:
     task: template
     inputs:
       template: |
-        {% set user = steps.validate_input.result.result %}
+        {% set user = steps.validate_input.result %}
         {% if args.template_format == "html" %}
         <div class="profile">
           <h1>{{ user.name }}</h1>
@@ -68,7 +68,7 @@ steps:
         {% if user.is_admin %}Admin: Yes{% endif %}
         {% endif %}
       output_file: "output/profile.{{ args.template_format }}"
-    condition: '{% if steps.validate_input.result.result.name %}True{% else %}False{% endif %}'
+    condition: '{% if steps.validate_input.result.name %}True{% else %}False{% endif %}'
 
   # Step 3: Display generated profile
   - name: show_profile
@@ -78,4 +78,4 @@ steps:
         echo "=== Generated Profile ({{ args.template_format }}) ==="
         cat "output/profile.{{ args.template_format }}"
         echo "=== End of Profile ==="
-    condition: '{% if steps.validate_input.result.result.name %}True{% else %}False{% endif %}'
+    condition: '{% if steps.validate_input.result.name %}True{% else %}False{% endif %}'

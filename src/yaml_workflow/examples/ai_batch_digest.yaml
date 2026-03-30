@@ -112,7 +112,7 @@ steps:
       steps:
         # 3a. Read the file
         - name: read_file
-          task: file.read
+          task: read_file
           inputs:
             path: "{{ batch.item }}"
 

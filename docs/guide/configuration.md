@@ -146,6 +146,19 @@ Available template variables are organized in namespaces:
     {{ workflow.timestamp }}     # Current time
     ``` 
 
+## Secrets
+
+Declare required environment variables that must be set before the workflow runs:
+
+```yaml
+secrets:
+  - ANTHROPIC_API_KEY
+  - DB_PASSWORD
+```
+
+The engine validates all secrets at startup. If any are missing, the workflow fails
+immediately with a clear error listing all missing variables -- no partial execution.
+
 # Use StrictUndefined to catch missing variables
 settings:
   error_handling:

@@ -151,7 +151,7 @@
         },
         "task": {
           "type": "string",
-          "description": "Task type to execute. Built-in: shell, python_code, python_function, python_script, python_module, template, http.request, file.write, file.read, file.append, file.copy, file.move, file.delete, file.read_json, file.write_json, file.read_yaml, file.write_yaml, batch, noop, notify. Plugins may register additional types."
+          "description": "Task type to execute. Built-in: shell, python_code, python_function, python_script, python_module, template, http.request, read_file, write_file, append_file, copy_file, move_file, delete_file, read_json, write_json, read_yaml, write_yaml, batch, noop, notify. Plugins may register additional types."
         },
         "description": {
           "type": "string",
