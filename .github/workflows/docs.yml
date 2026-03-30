@@ -6,12 +6,14 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - 'src/yaml_workflow/**'
       - '.github/workflows/docs.yml'
       - 'scripts/gen_ref_nav.py'
   pull_request:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+      - 'src/yaml_workflow/**'
       - '.github/workflows/docs.yml'
       - 'scripts/gen_ref_nav.py'
   workflow_dispatch:  # Allow manual trigger

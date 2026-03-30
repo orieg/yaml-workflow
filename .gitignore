@@ -62,3 +62,6 @@ logs/
 
 # Workflow execution directory
 /__workflows__/
+
+# Built documentation (deployed via GitHub Pages CI)
+site/
