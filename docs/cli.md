@@ -113,10 +113,69 @@ yaml-workflow list --base-dir my-workflows
 
 ### `validate` - Validate a Workflow
 
-Check a workflow file for configuration errors without running it:
+Check a workflow file for structural errors, naming conflicts, and common mistakes
+without executing it:
 
 ```bash
 yaml-workflow validate workflows/hello_world.yaml
+```
+
+Sample output:
+
+```
+Validating: workflows/hello_world.yaml
+
+  ✓ YAML syntax OK
+  ✓ Structure OK
+  ✓ 3 step(s), all names unique
+  ⚠ Step 'fetch': unknown task type 'my_plugin.task' (may be a plugin)
+
+Validation passed with 0 errors, 1 warning.
+```
+
+The validator detects:
+
+- YAML syntax errors (with line numbers)
+- Missing required fields (`name`, `task` on steps)
+- Duplicate step names
+- Flow references to non-existent steps
+- Undeclared param references (`args.X` not in `params`)
+- Double result access pattern (`steps.X.result.result.Y`)
+- Unknown task types (warning, since they may be plugins)
+
+#### Strict mode
+
+Treat warnings as errors — useful in CI pipelines:
+
+```bash
+yaml-workflow validate workflows/pipeline.yaml --strict
+```
+
+Returns a non-zero exit code if any warnings exist.
+
+#### Machine-readable output
+
+Output JSON for scripting and CI integration:
+
+```bash
+yaml-workflow validate workflows/pipeline.yaml --format json
+```
+
+```json
+{
+  "valid": true,
+  "error_count": 0,
+  "warning_count": 1,
+  "issues": [
+    {
+      "level": "warning",
+      "message": "Step 'fetch': unknown task type 'my_plugin.task' (may be a plugin).",
+      "line": null,
+      "step": "fetch",
+      "hint": "If this is a plugin task, make sure it is installed."
+    }
+  ]
+}
 ```
 
 ### `visualize` - Visualize a Workflow
@@ -240,6 +299,8 @@ yaml-workflow workspace remove hello_world_run_1 --force
 | `run` | `--watch`, `-w` | Watch files and re-run on changes |
 | `list` | `--base-dir` | Directory containing workflows |
 | `validate` | `workflow` | Path to workflow file |
+| `validate` | `--strict` | Treat warnings as errors (non-zero exit) |
+| `validate` | `--format`, `-f` | `text` (default) or `json` (machine-readable) |
 | `visualize` | `workflow` | Path to workflow file |
 | `visualize` | `--format`, `-f` | `text` (default) or `mermaid` |
 | `visualize` | `--flow` | Flow to visualize |

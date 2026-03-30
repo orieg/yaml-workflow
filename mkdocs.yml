@@ -120,6 +120,7 @@ nav:
       - Advanced Hello World: examples/advanced-hello-world.md
       - Resume Testing: examples/test-resume.md
       - Cookbook: examples/cookbook.md
+      - AI Integration: examples/ai-integration.md
   - API Reference: reference/SUMMARY.md
   - Contributing:
       - Development Guide: development.md
