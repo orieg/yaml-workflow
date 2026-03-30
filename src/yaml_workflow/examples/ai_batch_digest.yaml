@@ -1,0 +1,301 @@
+name: AI Batch Document Digest
+description: >
+  Process every Markdown/text file in a directory through an LLM and produce a
+  single digest document with one summary per file plus an executive overview.
+
+  This is the canonical example of where yaml-workflow shines over a plain
+  shell script or Python one-liner:
+
+    - Batch processing with configurable parallelism
+    - Automatic resume if the LLM call fails mid-batch (--resume)
+    - State-tracked outputs — already-processed files are not re-sent
+    - One YAML definition that works with Ollama, Claude, or any REST API
+
+  Usage:
+    # Summarise all .md files in docs/ with local Ollama:
+    yaml-workflow run workflows/ai_batch_digest.yaml input_dir=docs
+
+    # Resume an interrupted run:
+    yaml-workflow run workflows/ai_batch_digest.yaml input_dir=docs --resume
+
+    # Use Claude instead:
+    yaml-workflow run workflows/ai_batch_digest.yaml input_dir=docs provider=claude
+
+    # Dry-run to see which files would be processed:
+    yaml-workflow run workflows/ai_batch_digest.yaml input_dir=docs --dry-run
+
+params:
+  input_dir:
+    type: string
+    description: Directory containing files to summarise (.md and .txt)
+    required: true
+
+  glob:
+    type: string
+    default: "**/*.md"
+    description: "Glob pattern relative to input_dir (default: **/*.md)"
+
+  provider:
+    type: string
+    default: ollama
+    description: "LLM provider: 'ollama' or 'claude'"
+
+  model:
+    type: string
+    default: ""
+    description: "Model override. Defaults: llama3.2 for ollama, claude-3-5-haiku-20241022 for claude."
+
+  max_words:
+    type: integer
+    default: 80
+    description: Target word count for each per-file summary
+
+  output_file:
+    type: string
+    default: output/digest.md
+    description: Where to write the combined digest
+
+settings:
+  log_level: INFO
+
+steps:
+  # ── 1. Find all files matching the pattern ────────────────────────────────
+  - name: find_files
+    task: python_code
+    inputs:
+      code: |
+        import glob as _glob
+        import os
+
+        base = args.get("input_dir", ".")
+        pattern = os.path.join(base, args.get("glob", "**/*.md"))
+        files = sorted(_glob.glob(pattern, recursive=True))
+
+        if not files:
+            raise ValueError(
+                f"No files found matching '{pattern}'. "
+                "Check input_dir and glob parameters."
+            )
+
+        result = {"files": files, "count": len(files)}
+
+  # ── 2. Resolve provider/model config once ────────────────────────────────
+  - name: llm_config
+    task: python_code
+    inputs:
+      code: |
+        provider = args.get("provider", "ollama").lower()
+        model    = args.get("model", "")
+
+        if provider == "claude":
+            result = {
+                "provider": "claude",
+                "model":    model or "claude-3-5-haiku-20241022",
+                "url":      "https://api.anthropic.com/v1/messages",
+                "auth":     {"type": "bearer", "token_env": "ANTHROPIC_API_KEY"},
+                "headers":  {"anthropic-version": "2023-06-01"},
+            }
+        else:
+            result = {
+                "provider": "ollama",
+                "model":    model or "llama3.2",
+                "url":      "http://localhost:11434/api/generate",
+                "auth":     None,
+                "headers":  {},
+            }
+
+  # ── 3. Process each file — summary is stored in steps.summarise_files ────
+  - name: summarise_files
+    task: batch
+    inputs:
+      items:  "{{ steps.find_files.result.files }}"
+      steps:
+        # 3a. Read the file
+        - name: read_file
+          task: file.read
+          inputs:
+            path: "{{ batch.item }}"
+
+        # 3b. Build the LLM request for this file
+        - name: build_request
+          task: python_code
+          inputs:
+            code: |
+              import os
+              provider  = steps["llm_config"]["result"]["provider"]
+              model     = steps["llm_config"]["result"]["model"]
+              max_words = int(args.get("max_words", 80))
+              filepath  = batch["item"]
+              content   = steps["read_file"]["result"]["content"][:4000]  # trim very large files
+
+              prompt = (
+                  f"Summarise the document '{os.path.basename(filepath)}' "
+                  f"in {max_words} words or fewer. "
+                  "Return only the summary text, no title, no preamble.\n\n"
+                  f"{content}"
+              )
+
+              if provider == "claude":
+                  result = {
+                      "body": {
+                          "model": model, "max_tokens": 256,
+                          "messages": [{"role": "user", "content": prompt}],
+                      }
+                  }
+              else:
+                  result = {
+                      "body": {"model": model, "prompt": prompt, "stream": False}
+                  }
+
+        # 3c. Call the LLM
+        - name: call_llm
+          task: http.request
+          inputs:
+            url:     "{{ steps.llm_config.result.url }}"
+            method:  POST
+            body:    "{{ steps.build_request.result.body }}"
+            auth:    "{{ steps.llm_config.result.auth }}"
+            headers: "{{ steps.llm_config.result.headers }}"
+            retry:
+              max_attempts: 3
+              delay: 2.0
+              status_codes: [429, 500, 503]
+
+        # 3d. Extract the text from the response
+        - name: extract_summary
+          task: python_code
+          inputs:
+            code: |
+              import os
+              provider = steps["llm_config"]["result"]["provider"]
+              filepath = batch["item"]
+
+              if provider == "claude":
+                  parts = (steps["call_llm"]["result"].get("json") or {}).get("content", [])
+                  text  = parts[0].get("text", "").strip() if parts else ""
+              else:
+                  text = (steps["call_llm"]["result"].get("json") or {}).get("response", "").strip()
+
+              result = {
+                  "file":    filepath,
+                  "name":    os.path.basename(filepath),
+                  "summary": text,
+              }
+
+  # ── 4. Combine all summaries + ask for an executive overview ─────────────
+  - name: build_overview_prompt
+    task: python_code
+    inputs:
+      code: |
+        summaries = []
+        for item_result in steps["summarise_files"]["result"]:
+            r = item_result.get("extract_summary", {})
+            summaries.append(f"- **{r.get('name', '?')}**: {r.get('summary', '(no summary)')}")
+
+        combined = "\n".join(summaries)
+        count    = len(summaries)
+        model    = steps["llm_config"]["result"]["model"]
+        provider = steps["llm_config"]["result"]["provider"]
+
+        overview_prompt = (
+            f"The following are summaries of {count} documents. "
+            "Write a 3–5 sentence executive overview that captures the main themes "
+            "and key points across all documents. Be concise and factual.\n\n"
+            f"{combined}"
+        )
+
+        if provider == "claude":
+            body = {
+                "model": model, "max_tokens": 512,
+                "messages": [{"role": "user", "content": overview_prompt}],
+            }
+        else:
+            body = {"model": model, "prompt": overview_prompt, "stream": False}
+
+        result = {
+            "summaries_md": combined,
+            "count": count,
+            "body": body,
+        }
+
+  # ── 5. Call LLM once more for the executive overview ─────────────────────
+  - name: call_overview_ollama
+    task: http.request
+    condition: "{{ steps.llm_config.result.provider == 'ollama' }}"
+    inputs:
+      url:    "{{ steps.llm_config.result.url }}"
+      method: POST
+      body:   "{{ steps.build_overview_prompt.result.body }}"
+
+  - name: call_overview_claude
+    task: http.request
+    condition: "{{ steps.llm_config.result.provider == 'claude' }}"
+    inputs:
+      url:    "{{ steps.llm_config.result.url }}"
+      method: POST
+      body:   "{{ steps.build_overview_prompt.result.body }}"
+      auth:
+        type:      bearer
+        token_env: ANTHROPIC_API_KEY
+      headers:
+        anthropic-version: "2023-06-01"
+        content-type: application/json
+
+  # ── 6. Assemble and write the final digest ────────────────────────────────
+  - name: write_digest
+    task: python_code
+    inputs:
+      code: |
+        from datetime import date
+        import os
+
+        provider = steps["llm_config"]["result"]["provider"]
+        if provider == "claude":
+            raw   = steps.get("call_overview_claude", {}).get("result", {})
+            parts = (raw.get("json") or {}).get("content", [])
+            overview = parts[0].get("text", "").strip() if parts else ""
+        else:
+            raw      = steps.get("call_overview_ollama", {}).get("result", {})
+            overview = (raw.get("json") or {}).get("response", "").strip()
+
+        summaries_md = steps["build_overview_prompt"]["result"]["summaries_md"]
+        count        = steps["build_overview_prompt"]["result"]["count"]
+        model        = steps["llm_config"]["result"]["model"]
+        outfile      = args.get("output_file", "output/digest.md")
+
+        os.makedirs(os.path.dirname(outfile) or ".", exist_ok=True)
+
+        content = f"""# Document Digest
+
+**Generated:** {date.today().isoformat()}
+**Model:** {provider}/{model}
+**Documents processed:** {count}
+
+---
+
+## Executive Overview
+
+{overview}
+
+---
+
+## Per-Document Summaries
+
+{summaries_md}
+"""
+        with open(outfile, "w") as f:
+            f.write(content)
+
+        result = {"output_file": outfile, "count": count}
+
+  # ── 7. Done ───────────────────────────────────────────────────────────────
+  - name: done
+    task: notify
+    inputs:
+      channel: log
+      level: info
+      message: >-
+        Digest complete: {{ steps.write_digest.result.count }} documents →
+        {{ steps.write_digest.result.output_file }}
+        (provider: {{ steps.llm_config.result.provider }},
+        model: {{ steps.llm_config.result.model }})

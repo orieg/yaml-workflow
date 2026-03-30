@@ -1,145 +1,165 @@
 # AI Integration
 
-yaml-workflow can drive any LLM API using the built-in `http.request` task with authentication. No new dependencies are needed — just HTTP calls, Jinja2 templates, and `python_code` for response parsing.
+yaml-workflow adds real value around LLM calls — not replacing them. The combination of **batch processing with resume**, **state persistence**, **conditional branching**, and **reproducible YAML pipelines** is what makes it useful here.
 
-## Supported providers out of the box
+## When yaml-workflow helps vs. just using Ollama/curl
 
-| Provider | Auth | Endpoint |
+| Scenario | Just use Ollama CLI | Use yaml-workflow |
 |---|---|---|
-| **Ollama** (local) | None | `http://localhost:11434/api/generate` |
-| **Anthropic Claude** | Bearer `ANTHROPIC_API_KEY` | `https://api.anthropic.com/v1/messages` |
-| **OpenAI / compatible** | Bearer `OPENAI_API_KEY` | `https://api.openai.com/v1/chat/completions` |
-| Any REST API | bearer / api_key / basic | configurable |
+| Single prompt, read answer | ✓ faster | overkill |
+| Process 200 documents, resume if rate-limited | painful | ✓ `--resume` |
+| Multi-step pipeline (fetch → clean → summarise → store → notify) | shell script sprawl | ✓ one YAML |
+| Different providers based on a flag | if/else mess | ✓ `condition:` |
+| Retry on 429, with backoff | custom code | ✓ `retry:` in http.request |
+| Run the same pipeline in CI and locally | env juggling | ✓ parameterised |
 
 ---
 
-## Example 1: Text Summarizer
+## Example 1: AI Changelog Generator
 
-The `ai_summarize` example ships with yaml-workflow and supports both Ollama and Claude.
+Reads `git log`, groups commits, and writes a `## [version]` entry to `CHANGELOG.md`.
 
-Initialize it first:
+**Why not just pipe git log to Ollama?** Because you also want: templated prompt, file read/write, optional Slack notification, dry-run support, and retries — all in one place.
+
+Initialize it:
 ```bash
 yaml-workflow init
 ```
 
-### With Ollama (local, no API key)
-
-[Install Ollama](https://ollama.ai/) and pull a model:
+Run it:
 ```bash
-ollama pull llama3.2
-ollama serve   # starts on http://localhost:11434
+# Local Ollama (install llama3.2 first: ollama pull llama3.2)
+yaml-workflow run workflows/ai_changelog.yaml version=1.2.0
+
+# Claude API
+ANTHROPIC_API_KEY=sk-ant-... \
+yaml-workflow run workflows/ai_changelog.yaml version=1.2.0 provider=claude
+
+# Preview the git log and prompt without hitting the LLM
+yaml-workflow run workflows/ai_changelog.yaml version=1.2.0 --dry-run
+
+# Specific range from last tag
+yaml-workflow run workflows/ai_changelog.yaml version=1.2.0 since=v1.1.0
 ```
 
-Run the workflow:
-```bash
-yaml-workflow run workflows/ai_summarize.yaml \
-  text="Python is a high-level, general-purpose programming language known for its
-        readability and extensive standard library. It was created by Guido van
-        Rossum and first released in 1991."
-```
-
-**Output** (`output/summary.md`):
+**Sample output** prepended to `CHANGELOG.md`:
 ```markdown
-# Summary
+## [1.2.0] — 2026-03-29
 
-**Provider:** ollama
-**Model:** llama3.2
-**Words:** 32
+This release improves the HTTP task with authentication support and adds a new
+notification task for webhooks and Slack.
+
+## Features
+- **http**: Bearer, API key, and Basic authentication via the `auth:` input
+- **notify**: New task supporting webhook, Slack, log, and file channels
+
+## Bug Fixes
+- **engine**: Step results now correctly attached when using `always_run: true`
+
+## Chore
+- Updated CI matrix to remove `continue-on-error` for Windows
+```
+
+**Pipeline steps:**
+```
+get_git_log    (shell)      → git log -30 --oneline
+check_commits  (python_code) → fail fast if no commits
+prepare_request(python_code) → build provider-specific request body
+call_ollama    (http.request)→ POST to localhost:11434  [conditional]
+call_claude    (http.request)→ POST to api.anthropic.com [conditional]
+extract_entry  (python_code) → parse response format
+update_changelog(python_code)→ prepend to CHANGELOG.md
+notify_slack   (notify)      → post to Slack [conditional on slack_webhook param]
+```
 
 ---
 
-Python is a readable, general-purpose language created by Guido van Rossum in 1991,
-known for its extensive standard library and ease of use.
-```
+## Example 2: AI Batch Document Digest
 
-### With Anthropic Claude
+Processes every Markdown/text file in a directory — reads each, summarises it, then generates a combined digest with an executive overview.
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
-
-yaml-workflow run workflows/ai_summarize.yaml \
-  provider=claude \
-  model=claude-3-5-haiku-20241022 \
-  text="Python is a high-level, general-purpose programming language..."
-```
-
----
-
-## Example 2: AI Code Reviewer
-
-Reviews a source file and writes a Markdown report.
+**Why yaml-workflow here?** This is 200+ LLM calls. A shell script breaks down:
+- No resume if the API rate-limits you at file 147
+- No per-file state tracking
+- No easy provider switching
+- No dry-run
 
 ```bash
-# Local Ollama
-yaml-workflow run workflows/ai_code_review.yaml \
-  file=src/mymodule.py
+# Summarise all docs/ Markdown files
+yaml-workflow run workflows/ai_batch_digest.yaml input_dir=docs
 
-# With Claude
-yaml-workflow run workflows/ai_code_review.yaml \
-  file=src/mymodule.py \
-  provider=claude
+# Resume an interrupted run (already-done files are skipped)
+yaml-workflow run workflows/ai_batch_digest.yaml input_dir=docs --resume
+
+# Only .txt files, with Claude
+ANTHROPIC_API_KEY=sk-ant-... \
+yaml-workflow run workflows/ai_batch_digest.yaml \
+  input_dir=reports glob="**/*.txt" provider=claude
+
+# Preview which files would be processed
+yaml-workflow run workflows/ai_batch_digest.yaml input_dir=docs --dry-run
 ```
 
-**Sample output** (`output/code_review.md`):
+**Sample output** (`output/digest.md`):
 ```markdown
-# Code Review: src/mymodule.py
+# Document Digest
 
-**Reviewer:** ollama/llama3.2
-**Date:** 2026-03-29
+**Generated:** 2026-03-29
+**Model:** ollama/llama3.2
+**Documents processed:** 23
 
 ---
 
-## Summary
-The module implements a data transformation pipeline...
+## Executive Overview
 
-## Potential Issues
-1. Missing error handling in `process_record()` — an invalid record will raise...
+The documentation covers the core concepts of the workflow engine, including task
+types, flow control, and state management. Several guides focus on real-world use
+cases such as data pipelines and plugin development. The architecture document
+provides a high-level overview of the execution model.
 
-## Suggestions
-- Add type hints to improve readability
-- Extract the magic number `42` into a named constant
+---
 
-## Quality Score: 7/10
+## Per-Document Summaries
+
+- **getting-started.md**: Step-by-step guide to installing and running the first workflow.
+- **configuration.md**: Reference for all workflow YAML fields including params and settings.
+- **cookbook.md**: Collection of production-ready recipes for common automation patterns.
+...
+```
+
+**Pipeline:**
+```
+find_files          (python_code) → glob for matching files
+llm_config          (python_code) → resolve provider/model/URL once
+
+summarise_files     (batch)       → one iteration per file:
+  └ read_file       (file.read)
+  └ build_request   (python_code) → provider-specific body
+  └ call_llm        (http.request)→ with retry: max_attempts=3, status_codes=[429,503]
+  └ extract_summary (python_code) → parse response
+
+build_overview_prompt(python_code)→ combine all summaries
+call_overview_*     (http.request)→ one more LLM call for exec overview
+write_digest        (python_code) → assemble and write Markdown
+done                (notify)      → log completion
 ```
 
 ---
 
-## How it works
+## HTTP authentication patterns
 
-Both examples follow the same pattern:
+All examples work with any REST LLM API. Change the `auth:` input and URL:
 
-```
-prepare_request (python_code)
-    │  Build URL, body, auth config for the chosen provider
-    ▼
-call_llm_ollama / call_llm_claude (http.request)
-    │  Conditional on provider — only one runs
-    ▼
-extract_response (python_code)
-    │  Parse provider-specific response format
-    ▼
-write_output (file.write)
-    │  Render Markdown report with template
-    ▼
-notify_done (notify)
-       Log completion message
-```
-
----
-
-## Building your own AI workflow
-
-### Bearer auth (Claude, OpenAI, etc.)
-
+### Bearer token (Claude, OpenAI, Mistral AI, …)
 ```yaml
-- name: call_ai
+- name: call_api
   task: http.request
   inputs:
     url: https://api.openai.com/v1/chat/completions
     method: POST
     auth:
       type: bearer
-      token_env: OPENAI_API_KEY   # read from environment
+      token_env: OPENAI_API_KEY    # reads from environment, never hardcoded
     body:
       model: gpt-4o-mini
       messages:
@@ -147,76 +167,42 @@ notify_done (notify)
           content: "{{ args.prompt }}"
 ```
 
-### API key in header
-
+### Retry on rate limits
 ```yaml
-- name: call_cohere
-  task: http.request
-  inputs:
-    url: https://api.cohere.com/v2/generate
-    method: POST
+    retry:
+      max_attempts: 5
+      delay: 10.0
+      status_codes: [429, 503]
+```
+
+### API key in header (Cohere, custom APIs)
+```yaml
     auth:
       type: api_key
       header: Authorization
-      key: "Bearer {{ env.COHERE_API_KEY }}"
-    body:
-      model: command-r
-      prompt: "{{ args.prompt }}"
-```
-
-### Retry on rate limits
-
-The `http.request` task supports automatic retries — useful for LLM APIs that enforce rate limits:
-
-```yaml
-- name: call_llm
-  task: http.request
-  inputs:
-    url: "{{ steps.setup.result.url }}"
-    method: POST
-    body: "{{ steps.setup.result.body }}"
-    auth:
-      type: bearer
-      token_env: API_KEY
-    retry:
-      max_attempts: 3
-      delay: 2.0
-      status_codes: [429, 503]   # retry on rate limit and service unavailable
-```
-
-### Batch processing multiple items
-
-Process many items through an LLM using the `batch` task:
-
-```yaml
-- name: summarize_articles
-  task: batch
-  inputs:
-    items: "{{ args.articles }}"
-    steps:
-      - name: summarize_one
-        task: http.request
-        inputs:
-          url: http://localhost:11434/api/generate
-          method: POST
-          body:
-            model: llama3.2
-            prompt: "Summarize: {{ batch.item }}"
-            stream: false
+      key: "Bearer {{ env.COHERE_KEY }}"
 ```
 
 ---
 
-## AI + Notifications
-
-Combine AI processing with the `notify` task to alert on completion or errors:
+## Notify on completion or failure
 
 ```yaml
-- name: alert_slack
+- name: alert_done
   task: notify
   inputs:
     channel: slack
     webhook_url: "{{ env.SLACK_WEBHOOK_URL }}"
-    message: "AI review of {{ args.file }} complete. Score: {{ steps.extract.result.score }}/10"
+    message: ":white_check_mark: Digest ready — {{ steps.write_digest.result.count }} docs processed"
     color: good
+
+- name: alert_error
+  task: notify
+  always_run: true          # runs even if a previous step failed
+  condition: "{{ workflow.failed }}"
+  inputs:
+    channel: slack
+    webhook_url: "{{ env.SLACK_WEBHOOK_URL }}"
+    message: ":x: Digest pipeline failed at step {{ workflow.failed_step }}"
+    color: danger
 ```

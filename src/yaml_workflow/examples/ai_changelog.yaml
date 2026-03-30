@@ -1,0 +1,239 @@
+name: AI Changelog Generator
+description: >
+  Generate a human-readable CHANGELOG from git history using a local LLM.
+
+  Reads the last N commits from git, groups them by type (feat/fix/docs/chore),
+  and asks the LLM to write a proper release-notes entry. Writes the result
+  to CHANGELOG.md (prepended to any existing content) and optionally posts
+  a Slack notification.
+
+  Why yaml-workflow instead of a shell script?
+    - Dry-run support: preview the git log and prompt without calling the LLM
+    - State persistence: resume if the LLM call fails (e.g. rate limit)
+    - Parameterised: change version/range/provider without editing the script
+    - Composable: import this as a step in your release workflow
+
+  Usage:
+    # Quick start — local Ollama required (https://ollama.ai):
+    #   ollama pull llama3.2
+    yaml-workflow run workflows/ai_changelog.yaml version=1.0.0
+
+    # Specific commit range:
+    yaml-workflow run workflows/ai_changelog.yaml version=1.0.0 since=v0.9.0
+
+    # Claude API:
+    yaml-workflow run workflows/ai_changelog.yaml version=1.0.0 provider=claude
+
+    # Dry-run — see the prompt without calling the LLM:
+    yaml-workflow run workflows/ai_changelog.yaml version=1.0.0 --dry-run
+
+params:
+  version:
+    type: string
+    description: Release version label (e.g. 1.2.0)
+    required: true
+
+  since:
+    type: string
+    default: ""
+    description: "Git ref to start from (e.g. v0.9.0 or a commit SHA). Empty = last 30 commits."
+
+  provider:
+    type: string
+    default: ollama
+    description: "LLM provider: 'ollama' (local) or 'claude'"
+
+  model:
+    type: string
+    default: ""
+    description: "Model override. Defaults: llama3.2 for ollama, claude-3-5-haiku-20241022 for claude."
+
+  output_file:
+    type: string
+    default: CHANGELOG.md
+
+  slack_webhook:
+    type: string
+    default: ""
+    description: "Slack Incoming Webhook URL. Leave empty to skip notification."
+
+settings:
+  log_level: INFO
+
+steps:
+  # ── 1. Collect git log ────────────────────────────────────────────────────
+  - name: get_git_log
+    task: shell
+    inputs:
+      command: >-
+        {% if args.since %}
+          git log {{ args.since }}..HEAD --oneline --no-merges
+        {% else %}
+          git log -30 --oneline --no-merges
+        {% endif %}
+
+  # ── 2. Fail fast if there is nothing to summarise ─────────────────────────
+  - name: check_commits
+    task: python_code
+    inputs:
+      code: |
+        log = steps["get_git_log"]["result"]["stdout"].strip()
+        if not log:
+            raise ValueError(
+                "No commits found. Pass since=<ref> or ensure there are commits "
+                "since the last tag."
+            )
+        lines = [l for l in log.splitlines() if l.strip()]
+        result = {"log": log, "count": len(lines)}
+
+  # ── 3. Build LLM request ─────────────────────────────────────────────────
+  - name: prepare_request
+    task: python_code
+    inputs:
+      code: |
+        provider = args.get("provider", "ollama").lower()
+        model    = args.get("model", "")
+        version  = args.get("version", "NEXT")
+        log      = steps["check_commits"]["result"]["log"]
+
+        prompt = f"""You are a technical writer generating release notes.
+Given the following git commit log for release {version}, write a concise
+CHANGELOG entry in Markdown.
+
+Rules:
+- Use these sections (omit empty ones): ## Features, ## Bug Fixes, ## Improvements, ## Chore
+- Each bullet starts with the scope in bold if present, e.g. **cli**: ...
+- Skip merge commits and version bumps
+- Rewrite commit messages into clear, user-facing language
+- Add a one-sentence summary paragraph at the top
+
+Commits:
+{log}
+
+Output only the Markdown for the ## [{version}] section, nothing else."""
+
+        if provider == "claude":
+            model = model or "claude-3-5-haiku-20241022"
+            result = {
+                "provider": provider, "model": model,
+                "url": "https://api.anthropic.com/v1/messages",
+                "body": {
+                    "model": model, "max_tokens": 1024,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            }
+        else:
+            model = model or "llama3.2"
+            result = {
+                "provider": provider, "model": model,
+                "url": "http://localhost:11434/api/generate",
+                "body": {"model": model, "prompt": prompt, "stream": False},
+            }
+
+  # ── 4a. Call Ollama ───────────────────────────────────────────────────────
+  - name: call_ollama
+    task: http.request
+    condition: "{{ steps.prepare_request.result.provider == 'ollama' }}"
+    inputs:
+      url:    "{{ steps.prepare_request.result.url }}"
+      method: POST
+      body:   "{{ steps.prepare_request.result.body }}"
+      retry:
+        max_attempts: 3
+        delay: 2.0
+
+  # ── 4b. Call Claude ───────────────────────────────────────────────────────
+  - name: call_claude
+    task: http.request
+    condition: "{{ steps.prepare_request.result.provider == 'claude' }}"
+    inputs:
+      url:    "{{ steps.prepare_request.result.url }}"
+      method: POST
+      body:   "{{ steps.prepare_request.result.body }}"
+      auth:
+        type:      bearer
+        token_env: ANTHROPIC_API_KEY
+      headers:
+        anthropic-version: "2023-06-01"
+        content-type: application/json
+      retry:
+        max_attempts: 3
+        delay: 5.0
+        status_codes: [429, 503]
+
+  # ── 5. Extract the generated text ────────────────────────────────────────
+  - name: extract_entry
+    task: python_code
+    inputs:
+      code: |
+        provider = steps["prepare_request"]["result"]["provider"]
+        version  = args.get("version", "NEXT")
+
+        if provider == "claude":
+            raw = steps.get("call_claude", {}).get("result", {})
+            parts = (raw.get("json") or {}).get("content", [])
+            text  = parts[0].get("text", "").strip() if parts else raw.get("body", "")
+        else:
+            raw  = steps.get("call_ollama", {}).get("result", {})
+            text = (raw.get("json") or {}).get("response", "").strip() or raw.get("body", "")
+
+        result = {
+            "entry": text,
+            "version": version,
+            "model": steps["prepare_request"]["result"]["model"],
+            "commit_count": steps["check_commits"]["result"]["count"],
+        }
+
+  # ── 6. Prepend the new entry to CHANGELOG.md ──────────────────────────────
+  - name: update_changelog
+    task: python_code
+    inputs:
+      code: |
+        import os
+        from datetime import date
+
+        entry   = steps["extract_entry"]["result"]["entry"]
+        version = steps["extract_entry"]["result"]["version"]
+        outfile = args.get("output_file", "CHANGELOG.md")
+
+        header = f"## [{version}] — {date.today().isoformat()}\n\n"
+        new_section = header + entry.strip() + "\n\n"
+
+        existing = ""
+        if os.path.exists(outfile):
+            with open(outfile) as f:
+                existing = f.read()
+
+        with open(outfile, "w") as f:
+            if existing.startswith("# Changelog"):
+                # Insert after the title line
+                lines = existing.split("\n", 2)
+                f.write(lines[0] + "\n\n" + new_section + ("\n".join(lines[1:]) if len(lines) > 1 else ""))
+            else:
+                f.write("# Changelog\n\n" + new_section + existing)
+
+        result = {"output_file": outfile, "written": True}
+
+  # ── 7. Print a summary ────────────────────────────────────────────────────
+  - name: print_summary
+    task: notify
+    inputs:
+      channel: log
+      level: info
+      message: >-
+        Changelog entry for v{{ steps.extract_entry.result.version }} written to
+        {{ steps.extract_entry.result.output_file | default(args.output_file) }}
+        ({{ steps.extract_entry.result.commit_count }} commits,
+        model: {{ steps.extract_entry.result.model }}).
+
+  # ── 8. Optional Slack notification ───────────────────────────────────────
+  - name: notify_slack
+    task: notify
+    condition: "{{ args.slack_webhook != '' }}"
+    inputs:
+      channel: slack
+      webhook_url: "{{ args.slack_webhook }}"
+      message: >-
+        :memo: Changelog updated for *v{{ steps.extract_entry.result.version }}*
+        ({{ steps.extract_entry.result.commit_count }} commits).
+      color: good
