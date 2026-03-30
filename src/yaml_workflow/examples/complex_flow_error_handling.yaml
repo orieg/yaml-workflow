@@ -3,9 +3,9 @@ name: Complex Flow and Error Handling Demo
 description: >
   Demonstrates multiple execution flows and various error handling strategies
   (retry, continue, next/jump) within a single workflow.
+  All steps use cross-platform tasks (no bash-specific commands).
 
 params:
-  # Set to "fail" to trigger error handling in the 'flaky_step'
   flaky_mode:
     description: Controls the behavior of flaky_step. Set to 'fail' to force failure.
     default: success
@@ -16,73 +16,83 @@ params:
 steps:
   # 1. Setup
   - name: setup_workspace
-    task: shell
+    task: python_code
     inputs:
-      command: |
-        echo "Setting up workspace..."
-        mkdir -p "output/"
-        echo "Initial data for {{ args.user_name }}" > "output/input_data.txt"
+      code: |
+        import os
+        ws = context["workspace"]
+        print("Setting up workspace...")
+        out_dir = os.path.join(ws, "output")
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, "input_data.txt"), "w") as f:
+            f.write("Initial data for " + args.get("user_name", "DemoUser"))
+        result = {"status": "workspace ready"}
 
-  # 2. Core Step 1 - Changed to echo task to output structured data
+  # 2. Core Step 1
   - name: process_core_1
     task: echo
     inputs:
-      message:
-        result: "Core 1 OK"
+      message: "Core 1 OK"
 
   # 3. Flaky Step - Demonstrates Retry and Error Flow Jump (next)
   - name: flaky_step
-    task: shell
+    task: python_code
     inputs:
-      command: |
-        echo "Attempting flaky step..."
-        if [ "{{ args.flaky_mode }}" = "fail" ]; then
-          echo "Flaky step is configured to fail!" >&2
-          # Simulate failure by exiting with non-zero code
-          exit 1
-        else
-          echo "Flaky step succeeded." >> "output/processing_log.txt"
-          echo "Flaky Success" # Output result on success
-        fi
-    outputs: flaky_result # Map stdout to this variable on success
+      code: |
+        import os
+        ws = context["workspace"]
+        print("Attempting flaky step...")
+        if args.get("flaky_mode") == "fail":
+            raise RuntimeError("Flaky step is configured to fail!")
+        else:
+            out_dir = os.path.join(ws, "output")
+            os.makedirs(out_dir, exist_ok=True)
+            with open(os.path.join(out_dir, "processing_log.txt"), "a") as f:
+                f.write("Flaky step succeeded.\n")
+            print("Flaky step succeeded.")
+            result = "Flaky Success"
     on_error:
-      action: retry # Explicitly state retry action
-      retry: 3 # Max attempts as integer
-      delay: 1 # Wait 1 second between retries
-      # If all retries fail, jump to the error_handler step
+      action: retry
+      retry: 3
+      delay: 1
       next: handle_flaky_error
       message: "Flaky step failed: {{ error.message }}"
 
   # 4. Optional Step - Demonstrates Continue on Error
   - name: optional_step
-    task: shell
+    task: python_code
     inputs:
-      command: |
-        set -e # Exit immediately if a command exits with a non-zero status.
-        echo "Attempting optional step..."
-        # Simulate a failure (e.g., trying to access a non-existent file)
-        cat "non_existent_file.txt"
-        echo "THIS SHOULD NOT PRINT IF CAT FAILED" # This line should now not be reached
-        echo "Optional step output (should not be reached on failure)"
+      code: |
+        print("Attempting optional step...")
+        # Deliberately fail by reading a non-existent file
+        with open("non_existent_file_that_does_not_exist.txt") as f:
+            content = f.read()
+        result = content
     on_error:
-      action: continue # Add this to make the workflow continue despite failure
+      action: continue
       message: "Optional step failed as expected, continuing..."
 
-  # 5. Core Step 2 - Depends on Core Step 1 implicitly via log file
+  # 5. Core Step 2
   - name: process_core_2
-    task: shell
+    task: python_code
     inputs:
-      command: |
-        echo "Processing core step 2..."
-        # process_core_1 (echo) returns {'result': 'Core 1 OK'}, stored directly
-        echo "Status from Core 1: {{ steps.process_core_1.result.result }}" >> "output/processing_log.txt"
-        # flaky_step (shell) returns {'stdout': ...}, stored directly
-        echo "Flaky step result (if successful): {{ steps.flaky_step.result.stdout | trim | default('N/A') }}" >> "output/processing_log.txt"
-        echo "Core 2 processed" >> "output/processing_log.txt"
+      code: |
+        import os
+        ws = context["workspace"]
+        print("Processing core step 2...")
+        core1 = steps.get("process_core_1", {}).get("result", "N/A")
+        flaky = steps.get("flaky_step", {}).get("result", "N/A")
+        out_dir = os.path.join(ws, "output")
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, "processing_log.txt"), "a") as f:
+            f.write("Status from Core 1: " + str(core1) + "\n")
+            f.write("Flaky step result: " + str(flaky) + "\n")
+            f.write("Core 2 processed\n")
+        result = {"status": "Core 2 complete"}
 
   # 6. Error Handler Step - Target for 'next' from flaky_step
   - name: handle_flaky_error
-    task: echo # Could be a notification task, write_file, etc.
+    task: echo
     inputs:
       message: |
         --------------------------------------------------
@@ -93,42 +103,44 @@ steps:
         User: {{ args.user_name }}
         See logs in workspace: {{ workspace }}
         --------------------------------------------------
-    outputs: error_handled_message
 
-  # 7. Cleanup Step - Should run in most flows
+  # 7. Cleanup Step
   - name: cleanup
-    task: shell
+    task: python_code
     inputs:
-      command: |
-        echo "Performing cleanup..."
-        # Example: list final output files
-        ls -l output/
-        echo "Cleanup finished."
+      code: |
+        import os
+        ws = context["workspace"]
+        print("Performing cleanup...")
+        output_dir = os.path.join(ws, "output")
+        if os.path.isdir(output_dir):
+            for name in sorted(os.listdir(output_dir)):
+                path = os.path.join(output_dir, name)
+                size = os.path.getsize(path)
+                print("  " + name + ": " + str(size) + " bytes")
+        print("Cleanup finished.")
+        result = {"cleanup": "done"}
 
 # Define Execution Flows
 flows:
-  default: full_run # Default flow if none specified
+  default: full_run
 
   definitions:
-    # Flow 1: Runs all steps including optional ones
     - full_run:
         - setup_workspace
         - process_core_1
-        - flaky_step # Will retry/jump on failure
-        - optional_step # Will continue on failure
+        - flaky_step
+        - optional_step
         - process_core_2
         - cleanup
 
-    # Flow 2: Skips the optional step
     - core_only:
         - setup_workspace
         - process_core_1
-        - flaky_step # Will retry/jump on failure
+        - flaky_step
         - process_core_2
         - cleanup
 
-    # Flow 3: Explicit error handling path (also reachable via on_error.next)
-    # This flow might be run manually for diagnostics or if the main flows fail early
     - error_path:
-        - handle_flaky_error # Directly run the handler
-        - cleanup 
+        - handle_flaky_error
+        - cleanup

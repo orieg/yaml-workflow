@@ -575,7 +575,7 @@ def visualize_workflow(args):
             output = generate_text(workflow, flow=args.flow)
 
         if args.output:
-            with open(args.output, "w") as f:
+            with open(args.output, "w", encoding="utf-8") as f:
                 f.write(output)
                 f.write("\n")
             print(f"Diagram written to: {args.output}")

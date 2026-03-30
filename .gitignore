@@ -65,3 +65,4 @@ logs/
 
 # Built documentation (deployed via GitHub Pages CI)
 site/
+output/

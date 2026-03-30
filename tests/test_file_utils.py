@@ -57,7 +57,7 @@ def test_list_files_default(tmp_path, setup_test_files):
     assert result["total_files"] == 2
     # Convert paths to strings for easier comparison
     file_list_str = sorted(
-        [str(Path(f).relative_to(test_dir)) for f in result["file_list"]]
+        [Path(f).relative_to(test_dir).as_posix() for f in result["file_list"]]
     )
     assert file_list_str == ["file1.txt", "file2.log"]
 
@@ -70,7 +70,9 @@ def test_list_files_specific_pattern(tmp_path, setup_test_files):
     )
 
     assert result["total_files"] == 1
-    file_list_str = [str(Path(f).relative_to(test_dir)) for f in result["file_list"]]
+    file_list_str = [
+        Path(f).relative_to(test_dir).as_posix() for f in result["file_list"]
+    ]
     assert file_list_str == ["file1.txt"]
 
 
@@ -83,7 +85,7 @@ def test_list_files_recursive_default_pattern(tmp_path, setup_test_files):
 
     assert result["total_files"] == 5  # Includes base, subdir, and nested_dir files
     file_list_str = sorted(
-        [str(Path(f).relative_to(test_dir)) for f in result["file_list"]]
+        [Path(f).relative_to(test_dir).as_posix() for f in result["file_list"]]
     )
     expected = [
         "file1.txt",
@@ -104,7 +106,7 @@ def test_list_files_recursive_specific_pattern(tmp_path, setup_test_files):
 
     assert result["total_files"] == 3  # txt files in base, subdir, and nested_dir
     file_list_str = sorted(
-        [str(Path(f).relative_to(test_dir)) for f in result["file_list"]]
+        [Path(f).relative_to(test_dir).as_posix() for f in result["file_list"]]
     )
     expected = [
         "file1.txt",
@@ -124,7 +126,9 @@ def test_list_files_subdir(tmp_path, setup_test_files):
 
     assert result["total_files"] == 1
     # Check relative to sub_dir
-    file_list_str = [str(Path(f).relative_to(sub_dir)) for f in result["file_list"]]
+    file_list_str = [
+        Path(f).relative_to(sub_dir).as_posix() for f in result["file_list"]
+    ]
     assert file_list_str == ["sub_file2.yaml"]
 
 
@@ -145,7 +149,7 @@ def test_list_files_relative_path(tmp_path, setup_test_files):
         assert result["total_files"] == 1
         # Check relative to test_dir for consistency
         file_list_str = [
-            str(Path(f).relative_to(test_dir)) for f in result["file_list"]
+            Path(f).relative_to(test_dir).as_posix() for f in result["file_list"]
         ]
         assert file_list_str == ["file2.log"]
     finally:

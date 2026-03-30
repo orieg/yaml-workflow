@@ -33,32 +33,45 @@ params:
     required: true
 
 steps:
-  # Step 1: Validate required parameter
+  # Step 1: Validate required parameter and write check result
   - name: check_required_param
-    task: shell
+    task: python_code
     inputs:
-      command: |
-        # The workflow should fail before reaching this point due to required_param validation
-        echo "{{ args.required_param }}" > "output/check_result.txt"
-    outputs:
-      check_result: "{{ args.required_param }}"
+      code: |
+        import os
+        ws = context["workspace"]
+        val = args.get("required_param", "")
+        out_dir = os.path.join(ws, "output")
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, "check_result.txt"), "w") as f:
+            f.write(val)
+        print("Checked required_param: " + val)
+        result = {"check_result": val}
 
   # Step 2: Process the data
   - name: process_data
-    task: shell
+    task: python_code
     inputs:
-      command: |
-        echo "Processing data with {{ args.required_param }}"
-        echo "{{ args.required_param }}" > "output/result.txt"
-    outputs:
-      process_result: "{{ args.required_param }}"
+      code: |
+        import os
+        ws = context["workspace"]
+        val = args.get("required_param", "")
+        print("Processing data with " + val)
+        out_dir = os.path.join(ws, "output")
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, "result.txt"), "w") as f:
+            f.write(val)
+        result = {"process_result": val}
 
   # Step 3: Final verification
   - name: final_step
-    task: shell
+    task: python_code
     inputs:
-      command: |
-        echo "Final step - reading result"
-        cat "output/result.txt"
-    outputs:
-      final_result: "$(cat output/result.txt)" 
+      code: |
+        import os
+        ws = context["workspace"]
+        print("Final step - reading result")
+        with open(os.path.join(ws, "output", "result.txt")) as f:
+            content = f.read().strip()
+        print("Result: " + content)
+        result = {"final_result": content}
