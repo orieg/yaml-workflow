@@ -211,7 +211,7 @@ Run workflows in CI with the [yaml-workflow action](https://github.com/marketpla
 
 ```yaml
 - name: Run pipeline
-  uses: orieg/yaml-workflow@v0.8.3
+  uses: orieg/yaml-workflow@v0.9.0
   id: pipeline
   with:
     workflow: workflows/deploy.yaml
@@ -223,6 +223,29 @@ Run workflows in CI with the [yaml-workflow action](https://github.com/marketpla
 - name: Use results
   run: echo '${{ steps.pipeline.outputs.result }}'
 ```
+
+### Docker & Kubernetes
+
+Run anywhere without installing Python:
+
+```bash
+# Run a workflow in Docker
+docker run --rm -v $(pwd)/workflows:/app/workflows \
+  ghcr.io/orieg/yaml-workflow run /app/workflows/pipeline.yaml
+
+# Start the web dashboard
+docker run -p 8080:8080 -v $(pwd)/workflows:/app/workflows \
+  ghcr.io/orieg/yaml-workflow
+```
+
+Deploy on Kubernetes with the Helm chart:
+
+```bash
+helm install my-workflows ./helm/yaml-workflow \
+  --set-file workflows.files.pipeline\\.yaml=workflows/pipeline.yaml
+```
+
+Compatible with ArgoCD (GitOps) and Argo Workflows. See the [Kubernetes guide](https://orieg.github.io/yaml-workflow/guide/kubernetes/).
 
 ### More commands
 

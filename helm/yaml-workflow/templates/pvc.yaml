@@ -1,0 +1,17 @@
+{{- if .Values.runs.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-runs
+  labels:
+    {{- include "yaml-workflow.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- toYaml .Values.runs.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.runs.persistence.size }}
+  {{- if .Values.runs.persistence.storageClass }}
+  storageClassName: {{ .Values.runs.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}

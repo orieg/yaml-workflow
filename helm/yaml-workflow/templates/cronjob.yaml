@@ -1,0 +1,52 @@
+{{- if .Values.cronjob.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-scheduled
+  labels:
+    {{- include "yaml-workflow.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.cronjob.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "yaml-workflow.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: yaml-workflow
+              image: "{{ .Values.image.repository }}:{{ include "yaml-workflow.imageTag" . }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args:
+                - run
+                - /app/workflows/{{ .Values.cronjob.workflow }}
+                {{- if .Values.cronjob.params }}
+                - {{ .Values.cronjob.params | quote }}
+                {{- end }}
+                - --format
+                - json
+              volumeMounts:
+                - name: workflows
+                  mountPath: /app/workflows
+                  readOnly: true
+                - name: runs
+                  mountPath: /app/runs
+          volumes:
+            - name: workflows
+              {{- if .Values.workflows.existingConfigMap }}
+              configMap:
+                name: {{ .Values.workflows.existingConfigMap }}
+              {{- else }}
+              configMap:
+                name: {{ .Release.Name }}-workflows
+              {{- end }}
+            - name: runs
+              {{- if .Values.runs.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ .Release.Name }}-runs
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+{{- end }}

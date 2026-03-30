@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "yaml-workflow.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "yaml-workflow.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "yaml-workflow.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: yaml-workflow
+          image: "{{ .Values.image.repository }}:{{ include "yaml-workflow.imageTag" . }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - serve
+            - --host
+            - {{ .Values.serve.host | quote }}
+            - --port
+            - {{ .Values.serve.port | quote }}
+            - --dir
+            - /app/workflows
+            - --base-dir
+            - /app/runs
+          ports:
+            - name: http
+              containerPort: {{ .Values.serve.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: workflows
+              mountPath: /app/workflows
+              readOnly: true
+            - name: runs
+              mountPath: /app/runs
+      volumes:
+        - name: workflows
+          {{- if .Values.workflows.existingConfigMap }}
+          configMap:
+            name: {{ .Values.workflows.existingConfigMap }}
+          {{- else }}
+          configMap:
+            name: {{ .Release.Name }}-workflows
+          {{- end }}
+        - name: runs
+          {{- if .Values.runs.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-runs
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

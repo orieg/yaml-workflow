@@ -1,0 +1,26 @@
+yaml-workflow has been deployed.
+
+Dashboard:
+{{- if .Values.ingress.enabled }}
+  URL: http{{ if (index .Values.ingress.tls 0) }}s{{ end }}://{{ (index .Values.ingress.hosts 0).host }}
+{{- else }}
+  kubectl port-forward svc/{{ .Release.Name }} 8080:{{ .Values.service.port }}
+  Then open: http://localhost:8080
+{{- end }}
+
+Run a workflow:
+  kubectl exec deploy/{{ .Release.Name }} -- yaml-workflow run /app/workflows/<name>.yaml
+
+Validate a workflow:
+  kubectl exec deploy/{{ .Release.Name }} -- yaml-workflow validate /app/workflows/<name>.yaml
+
+Add workflows via values.yaml:
+  workflows:
+    files:
+      my_pipeline.yaml: |
+        name: My Pipeline
+        steps:
+          - name: step1
+            task: echo
+            inputs:
+              message: "Hello from Kubernetes!"

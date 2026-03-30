@@ -116,6 +116,7 @@ nav:
       - Parallel Execution: guide/parallel.md
       - MCP Integration: guide/mcp.md
       - Web Dashboard: guide/serve.md
+      - Kubernetes: guide/kubernetes.md
       - Dependencies: dependencies.md
   - Examples:
       - Basic Workflow: examples/basic-workflow.md

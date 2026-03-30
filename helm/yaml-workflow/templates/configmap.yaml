@@ -1,0 +1,26 @@
+{{- if not .Values.workflows.existingConfigMap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-workflows
+  labels:
+    {{- include "yaml-workflow.labels" . | nindent 4 }}
+data:
+  {{- range $name, $content := .Values.workflows.files }}
+  {{ $name }}: |
+    {{- $content | nindent 4 }}
+  {{- end }}
+  {{- if not .Values.workflows.files }}
+  # No workflows defined — add them via values.yaml:
+  #   workflows:
+  #     files:
+  #       hello.yaml: |
+  #         name: Hello
+  #         steps:
+  #           - name: greet
+  #             task: echo
+  #             inputs:
+  #               message: "Hello from Kubernetes!"
+  _placeholder: ""
+  {{- end }}
+{{- end }}

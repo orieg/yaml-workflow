@@ -1,0 +1,74 @@
+# yaml-workflow Helm chart values
+
+image:
+  repository: ghcr.io/orieg/yaml-workflow
+  tag: ""  # Defaults to appVersion from Chart.yaml
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# Web dashboard settings
+serve:
+  port: 8080
+  host: "0.0.0.0"
+
+# Workflow files — define inline or mount from existing ConfigMap
+workflows:
+  # Inline workflow definitions (each key becomes a YAML file)
+  # files:
+  #   hello_world.yaml: |
+  #     name: Hello World
+  #     steps:
+  #       - name: greet
+  #         task: echo
+  #         inputs:
+  #           message: "Hello from Kubernetes!"
+  files: {}
+
+  # OR use an existing ConfigMap containing workflow files
+  existingConfigMap: ""
+
+# Run history storage
+runs:
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8080
+
+# Ingress for external access
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: yaml-workflow.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Optional: scheduled workflow execution via CronJob
+cronjob:
+  enabled: false
+  # schedule: "0 9 * * 1-5"
+  # workflow: "pipeline.yaml"
+  # params: "env=production"
+
+resources: {}
+  # limits:
+  #   cpu: 500m
+  #   memory: 256Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
