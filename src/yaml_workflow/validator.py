@@ -396,7 +396,7 @@ class WorkflowValidator:
                             ),
                             hint=(
                                 "Check the step name spelling. "
-                                f"Defined steps: {', '.join(sorted(defined_step_names)) or '(none)'}."
+                                f"Defined steps: {', '.join(sorted(s for s in defined_step_names if s)) or '(none)'}."
                             ),
                         )
                     )
