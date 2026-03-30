@@ -58,7 +58,7 @@ runs:
           PARAMS=$(echo "${{ inputs.params }}" | tr '\n' ' ')
         fi
 
-        OUTPUT=$(yaml-workflow run "${{ inputs.workflow }}" $PARAMS --format "${{ inputs.format }}" 2>/dev/null)
+        OUTPUT=$(yaml-workflow run "${{ inputs.workflow }}" $PARAMS --format "${{ inputs.format }}" 2>&1)
 
         # Use heredoc for multi-line output
         {

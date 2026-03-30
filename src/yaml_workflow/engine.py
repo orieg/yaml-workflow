@@ -1074,20 +1074,31 @@ class WorkflowEngine:
     def _build_dep_graph(self, steps):
         """Build a dependency graph from step depends_on fields.
 
+        Steps with explicit ``depends_on`` use exactly those dependencies.
+        Steps WITHOUT ``depends_on`` implicitly depend on the previous step
+        in list order, preserving sequential behaviour for steps that don't
+        opt into the DAG.
+
         Returns:
             dict mapping step_name -> set of dependency step names.
-            Steps without depends_on have empty sets.
         """
         step_names = {s["name"] for s in steps if isinstance(s, dict)}
         graph = {}
+        prev_name = None
         for step in steps:
             if not isinstance(step, dict):
                 continue
             name = step["name"]
-            deps = step.get("depends_on", [])
-            if isinstance(deps, str):
-                deps = [deps]
-            dep_set = set(deps)
+            if "depends_on" in step:
+                deps = step["depends_on"]
+                if isinstance(deps, str):
+                    deps = [deps]
+                dep_set = set(deps)
+            elif prev_name is not None:
+                # No explicit depends_on → depend on previous step (sequential)
+                dep_set = {prev_name}
+            else:
+                dep_set = set()
             # Validate all dependencies exist
             for dep in dep_set:
                 if dep not in step_names:
@@ -1096,6 +1107,7 @@ class WorkflowEngine:
                         f"Available steps: {', '.join(sorted(step_names))}"
                     )
             graph[name] = dep_set
+            prev_name = name
         return graph
 
     def _compute_levels(self, graph):
