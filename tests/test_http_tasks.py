@@ -1,7 +1,11 @@
 """Tests for HTTP request task implementation."""
 
+import base64
 import json
+import os
 import socket
+import ssl
+import time
 import urllib.error
 from io import BytesIO
 from pathlib import Path
@@ -12,7 +16,7 @@ import pytest
 
 from yaml_workflow.exceptions import TaskExecutionError
 from yaml_workflow.tasks import TaskConfig
-from yaml_workflow.tasks.http_tasks import http_request_task
+from yaml_workflow.tasks.http_tasks import _apply_auth, http_request_task
 
 
 @pytest.fixture
@@ -526,3 +530,308 @@ class TestHttpRequestMethodVariants:
 
         req = mock_urlopen.call_args[0][0]
         assert req.method == "GET"
+
+
+# ============================================================================
+# v0.7 feature tests: _apply_auth, retry, verify_ssl
+# ============================================================================
+
+
+class TestApplyAuthBearer:
+    """Unit tests for _apply_auth() with bearer token auth."""
+
+    def test_bearer_auth_with_token(self):
+        headers = _apply_auth({}, {"type": "bearer", "token": "tok123"}, None)
+        assert headers["Authorization"] == "Bearer tok123"
+
+    @patch.dict(os.environ, {"MY_TOKEN": "env-tok"})
+    def test_bearer_auth_with_token_env(self):
+        headers = _apply_auth({}, {"type": "bearer", "token_env": "MY_TOKEN"}, None)
+        assert headers["Authorization"] == "Bearer env-tok"
+
+    def test_bearer_auth_token_env_missing(self):
+        env = os.environ.copy()
+        env.pop("NONEXISTENT_VAR_xyz", None)
+        with patch.dict(os.environ, env, clear=True):
+            with pytest.raises(ValueError, match="not set or is empty"):
+                _apply_auth(
+                    {}, {"type": "bearer", "token_env": "NONEXISTENT_VAR_xyz"}, None
+                )
+
+    def test_bearer_auth_missing_both(self):
+        with pytest.raises(ValueError, match="requires either"):
+            _apply_auth({}, {"type": "bearer"}, None)
+
+
+class TestApplyAuthApiKey:
+    """Unit tests for _apply_auth() with API key auth."""
+
+    def test_api_key_default_header(self):
+        headers = _apply_auth({}, {"type": "api_key", "key": "abc"}, None)
+        assert headers["X-API-Key"] == "abc"
+
+    def test_api_key_custom_header(self):
+        headers = _apply_auth(
+            {}, {"type": "api_key", "key": "abc", "header": "X-Custom"}, None
+        )
+        assert headers["X-Custom"] == "abc"
+        assert "X-API-Key" not in headers
+
+    def test_api_key_missing_key(self):
+        with pytest.raises(ValueError, match="requires 'key'"):
+            _apply_auth({}, {"type": "api_key"}, None)
+
+
+class TestApplyAuthBasic:
+    """Unit tests for _apply_auth() with basic auth."""
+
+    def test_basic_auth(self):
+        headers = _apply_auth(
+            {}, {"type": "basic", "username": "user", "password": "pass"}, None
+        )
+        expected = base64.b64encode(b"user:pass").decode("ascii")
+        assert headers["Authorization"] == f"Basic {expected}"
+
+    def test_basic_auth_missing_password(self):
+        with pytest.raises(ValueError, match="requires both"):
+            _apply_auth({}, {"type": "basic", "username": "u"}, None)
+
+    def test_basic_auth_missing_username(self):
+        with pytest.raises(ValueError, match="requires both"):
+            _apply_auth({}, {"type": "basic", "password": "p"}, None)
+
+
+class TestApplyAuthTopLevelToken:
+    """Unit tests for the top-level token shorthand."""
+
+    def test_top_level_token_shorthand(self):
+        headers = _apply_auth({}, None, "my-token")
+        assert headers["Authorization"] == "Bearer my-token"
+
+    def test_top_level_token_does_not_override_existing(self):
+        headers = _apply_auth({"Authorization": "existing"}, None, "my-token")
+        assert headers["Authorization"] == "existing"
+
+
+class TestApplyAuthEdgeCases:
+    """Edge case tests for _apply_auth()."""
+
+    def test_unsupported_auth_type(self):
+        with pytest.raises(ValueError, match="Unsupported auth type"):
+            _apply_auth({}, {"type": "oauth2"}, None)
+
+    def test_no_auth_no_token(self):
+        original = {"Content-Type": "application/json"}
+        result = _apply_auth(original, None, None)
+        assert result == original
+
+    def test_headers_not_mutated(self):
+        original = {"Content-Type": "application/json"}
+        _apply_auth(original, {"type": "bearer", "token": "t"}, None)
+        assert "Authorization" not in original
+
+
+class TestHttpRequestVerifySSL:
+    """Integration tests for verify_ssl parameter."""
+
+    @patch("yaml_workflow.tasks.http_tasks.urllib.request.urlopen")
+    def test_verify_ssl_false_creates_unverified_context(
+        self, mock_urlopen, workspace, basic_context
+    ):
+        mock_urlopen.return_value = _make_mock_response(body="ok", status=200)
+        step = {
+            "name": "test_ssl_off",
+            "task": "http.request",
+            "inputs": {
+                "url": "https://api.example.com/data",
+                "verify_ssl": False,
+            },
+        }
+        config = TaskConfig(step, basic_context, workspace)
+        http_request_task(config)
+
+        call_kwargs = mock_urlopen.call_args
+        ctx = call_kwargs[1].get("context") or call_kwargs.kwargs.get("context")
+        assert isinstance(ctx, ssl.SSLContext)
+        assert ctx.check_hostname is False
+        assert ctx.verify_mode == ssl.CERT_NONE
+
+    @patch("yaml_workflow.tasks.http_tasks.urllib.request.urlopen")
+    def test_verify_ssl_true_by_default(self, mock_urlopen, workspace, basic_context):
+        mock_urlopen.return_value = _make_mock_response(body="ok", status=200)
+        step = {
+            "name": "test_ssl_default",
+            "task": "http.request",
+            "inputs": {"url": "https://api.example.com/data"},
+        }
+        config = TaskConfig(step, basic_context, workspace)
+        http_request_task(config)
+
+        call_kwargs = mock_urlopen.call_args
+        ctx = call_kwargs[1].get("context") or call_kwargs.kwargs.get("context")
+        assert ctx is None
+
+
+class TestHttpRequestRetry:
+    """Integration tests for the retry loop."""
+
+    @patch("yaml_workflow.tasks.http_tasks.time.sleep")
+    @patch("yaml_workflow.tasks.http_tasks.urllib.request.urlopen")
+    def test_retry_on_503_then_success(
+        self, mock_urlopen, mock_sleep, workspace, basic_context
+    ):
+        mock_urlopen.side_effect = [
+            urllib.error.HTTPError(
+                "https://ex.com", 503, "Unavailable", {}, BytesIO(b"")
+            ),
+            _make_mock_response(body='{"ok":true}', status=200),
+        ]
+        step = {
+            "name": "test_retry",
+            "task": "http.request",
+            "inputs": {
+                "url": "https://ex.com/api",
+                "retry": {"max_attempts": 3, "delay": 0.01},
+            },
+        }
+        config = TaskConfig(step, basic_context, workspace)
+        result = http_request_task(config)
+        assert result["status_code"] == 200
+        mock_sleep.assert_called_once_with(0.01)
+
+    @patch("yaml_workflow.tasks.http_tasks.time.sleep")
+    @patch("yaml_workflow.tasks.http_tasks.urllib.request.urlopen")
+    def test_retry_exhausted_raises(
+        self, mock_urlopen, mock_sleep, workspace, basic_context
+    ):
+        mock_urlopen.side_effect = [
+            urllib.error.HTTPError(
+                "https://ex.com", 503, "Unavailable", {}, BytesIO(b"")
+            ),
+            urllib.error.HTTPError(
+                "https://ex.com", 503, "Unavailable", {}, BytesIO(b"")
+            ),
+        ]
+        step = {
+            "name": "test_retry_exhausted",
+            "task": "http.request",
+            "inputs": {
+                "url": "https://ex.com/api",
+                "retry": {"max_attempts": 2, "delay": 0.01},
+            },
+        }
+        config = TaskConfig(step, basic_context, workspace)
+        with pytest.raises(TaskExecutionError):
+            http_request_task(config)
+        mock_sleep.assert_called_once()
+
+    @patch("yaml_workflow.tasks.http_tasks.time.sleep")
+    @patch("yaml_workflow.tasks.http_tasks.urllib.request.urlopen")
+    def test_non_retryable_status_raises_immediately(
+        self, mock_urlopen, mock_sleep, workspace, basic_context
+    ):
+        mock_urlopen.side_effect = urllib.error.HTTPError(
+            "https://ex.com", 404, "Not Found", {}, BytesIO(b"")
+        )
+        step = {
+            "name": "test_no_retry_404",
+            "task": "http.request",
+            "inputs": {
+                "url": "https://ex.com/api",
+                "retry": {"max_attempts": 3, "status_codes": [503]},
+            },
+        }
+        config = TaskConfig(step, basic_context, workspace)
+        with pytest.raises(TaskExecutionError):
+            http_request_task(config)
+        mock_sleep.assert_not_called()
+
+    @patch("yaml_workflow.tasks.http_tasks.time.sleep")
+    @patch("yaml_workflow.tasks.http_tasks.urllib.request.urlopen")
+    def test_retry_on_network_error(
+        self, mock_urlopen, mock_sleep, workspace, basic_context
+    ):
+        mock_urlopen.side_effect = [
+            urllib.error.URLError("Connection refused"),
+            _make_mock_response(body="ok", status=200),
+        ]
+        step = {
+            "name": "test_retry_net",
+            "task": "http.request",
+            "inputs": {
+                "url": "https://ex.com/api",
+                "retry": {"max_attempts": 2, "delay": 0.01},
+            },
+        }
+        config = TaskConfig(step, basic_context, workspace)
+        result = http_request_task(config)
+        assert result["status_code"] == 200
+        mock_sleep.assert_called_once()
+
+    @patch("yaml_workflow.tasks.http_tasks.time.sleep")
+    @patch("yaml_workflow.tasks.http_tasks.urllib.request.urlopen")
+    def test_no_retry_by_default(
+        self, mock_urlopen, mock_sleep, workspace, basic_context
+    ):
+        mock_urlopen.side_effect = urllib.error.HTTPError(
+            "https://ex.com", 503, "Unavailable", {}, BytesIO(b"")
+        )
+        step = {
+            "name": "test_no_retry_default",
+            "task": "http.request",
+            "inputs": {"url": "https://ex.com/api"},
+        }
+        config = TaskConfig(step, basic_context, workspace)
+        with pytest.raises(TaskExecutionError):
+            http_request_task(config)
+        mock_sleep.assert_not_called()
+
+
+class TestHttpRequestAuthIntegration:
+    """End-to-end tests for auth through http_request_task."""
+
+    @patch("yaml_workflow.tasks.http_tasks.urllib.request.urlopen")
+    def test_bearer_auth_sets_header(self, mock_urlopen, workspace, basic_context):
+        mock_urlopen.return_value = _make_mock_response(body="ok", status=200)
+        step = {
+            "name": "test_auth_bearer",
+            "task": "http.request",
+            "inputs": {
+                "url": "https://api.example.com/data",
+                "auth": {"type": "bearer", "token": "my-secret-token"},
+            },
+        }
+        config = TaskConfig(step, basic_context, workspace)
+        http_request_task(config)
+
+        req = mock_urlopen.call_args[0][0]
+        assert req.get_header("Authorization") == "Bearer my-secret-token"
+
+    @patch("yaml_workflow.tasks.http_tasks.time.sleep")
+    @patch("yaml_workflow.tasks.http_tasks.urllib.request.urlopen")
+    def test_auth_with_retry_combined(
+        self, mock_urlopen, mock_sleep, workspace, basic_context
+    ):
+        mock_urlopen.side_effect = [
+            urllib.error.HTTPError(
+                "https://ex.com", 429, "Rate Limited", {}, BytesIO(b"")
+            ),
+            _make_mock_response(body='{"ok":true}', status=200),
+        ]
+        step = {
+            "name": "test_auth_retry",
+            "task": "http.request",
+            "inputs": {
+                "url": "https://ex.com/api",
+                "auth": {"type": "api_key", "key": "k123"},
+                "retry": {
+                    "max_attempts": 2,
+                    "delay": 0.01,
+                    "status_codes": [429],
+                },
+            },
+        }
+        config = TaskConfig(step, basic_context, workspace)
+        result = http_request_task(config)
+        assert result["status_code"] == 200
+        mock_sleep.assert_called_once()
