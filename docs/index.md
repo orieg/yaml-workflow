@@ -26,6 +26,11 @@ Define powerful workflows through simple YAML files with advanced features like 
 - **Parallel execution** with configurable worker pools
 - **Retry mechanisms** with configurable strategies
 - **Flow control** with custom step sequences and conditions
+- **Parallel step execution** via `depends_on` dependency graph
+- **Secrets validation** -- fail-fast environment variable checking
+- **Structured output** -- `--format json/yaml` for CI integration
+- **MCP server** for AI agent integration (Claude Desktop, Claude Code)
+- **Web dashboard** for monitoring and triggering workflows
 - **Extensible** task system via `@register_task` decorator
 
 ## Quick Start

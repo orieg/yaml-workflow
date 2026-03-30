@@ -6,11 +6,11 @@
 [![codecov](https://codecov.io/gh/orieg/yaml-workflow/graph/badge.svg)](https://codecov.io/gh/orieg/yaml-workflow)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
-A lightweight, powerful, and flexible workflow engine that executes tasks defined in YAML configuration files. Create modular, reusable workflows by connecting tasks through YAML definitions, with support for parallel processing, batch operations, and state management.
+A lightweight workflow engine for CI/CD pipelines, data processing, and DevOps automation. Define reproducible, version-controlled workflows in YAML — run them locally, in CI, or on any machine with Python installed.
 
 ## Why yaml-workflow?
 
-Most workflow tools (Airflow, Prefect, Dagster) are designed for distributed cloud infrastructure with complex server setups. **yaml-workflow** takes a different approach:
+Most workflow tools require servers, databases, and complex infrastructure. **yaml-workflow** takes a GitOps approach — workflows are plain YAML files, version-controlled alongside your code:
 
 | | yaml-workflow | Airflow / Prefect / Dagster |
 |---|---|---|
@@ -27,6 +27,8 @@ Most workflow tools (Airflow, Prefect, Dagster) are designed for distributed clo
 - Batch processing with parallel execution
 - State persistence and workflow resume after failures
 - A lightweight alternative to shell scripts with better error handling
+- GitOps-friendly pipelines that live in your repo alongside the code
+- A single tool that runs the same pipeline locally and in CI
 
 ## Features
 
@@ -43,6 +45,20 @@ Most workflow tools (Airflow, Prefect, Dagster) are designed for distributed clo
 - Namespaced variables (`args`, `env`, `steps`, `batch`)
 - Flow control with custom step sequences and conditions
 - Extensible task system via `@register_task` decorator
+- Parallel step execution via `depends_on` — run independent steps concurrently
+- Secrets validation — fail fast if required environment variables are missing
+- Structured output (`--format json`) for CI integration and scripting
+- MCP server — expose workflows as AI agent tools (`pip install yaml-workflow[mcp]`)
+- Web dashboard — monitor runs and trigger workflows (`pip install yaml-workflow[serve]`)
+- GitHub Action — run workflows in CI with `uses: orieg/yaml-workflow-action`
+
+## Use Cases
+
+- **CI/CD pipelines** — multi-step build, test, deploy workflows in YAML
+- **Data processing** — batch ETL pipelines with retry and resume on failure
+- **DevOps automation** — infrastructure tasks with secrets management and notifications
+- **AI/LLM pipelines** — orchestrate API calls with auth, retry, and batch processing
+- **Local automation** — replace shell scripts with reproducible, parameterized workflows
 
 ## Quick Start
 
@@ -153,6 +169,31 @@ steps:
 ```
 
 Imported steps are prepended. Imported params provide defaults that the main workflow can override. Supports transitive imports with circular detection.
+
+### Parallel Steps
+
+Run independent steps concurrently with `depends_on`:
+
+```yaml
+steps:
+  - name: fetch_api
+    task: http.request
+    inputs: {url: "https://api.example.com/data"}
+
+  - name: fetch_db
+    task: python_code
+    inputs:
+      code: "result = query_database()"
+
+  - name: merge
+    task: python_code
+    depends_on: [fetch_api, fetch_db]
+    inputs:
+      code: |
+        api_data = steps["fetch_api"]["result"]
+        db_data = steps["fetch_db"]["result"]
+        result = {"merged": True}
+```
 
 ### Watch mode
 

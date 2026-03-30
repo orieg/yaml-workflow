@@ -113,6 +113,9 @@ nav:
       - Task Development: guide/task-development.md
       - Plugin Authoring: guide/plugins.md
       - Architecture: guide/architecture.md
+      - Parallel Execution: guide/parallel.md
+      - MCP Integration: guide/mcp.md
+      - Web Dashboard: guide/serve.md
       - Dependencies: dependencies.md
   - Examples:
       - Basic Workflow: examples/basic-workflow.md
