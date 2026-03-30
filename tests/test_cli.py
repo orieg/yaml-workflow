@@ -859,7 +859,7 @@ def test_cli_visualize_with_output_file(run_cli, tmp_path):
     assert exit_code == 0
     assert "Diagram written to:" in out
     assert output_file.exists()
-    content = output_file.read_text()
+    content = output_file.read_text(encoding="utf-8")
     assert "only_step" in content
 
 
@@ -916,7 +916,7 @@ def test_cli_visualize_mermaid_with_output(run_cli, tmp_path):
     )
     assert exit_code == 0
     assert output_file.exists()
-    content = output_file.read_text()
+    content = output_file.read_text(encoding="utf-8")
     assert "graph TD" in content
 
 
