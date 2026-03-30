@@ -43,6 +43,8 @@ runs:
       run: |
         if [ -n "${{ inputs.version }}" ]; then
           pip install "yaml-workflow==${{ inputs.version }}"
+        elif [ -f "${{ github.action_path }}/pyproject.toml" ]; then
+          pip install "${{ github.action_path }}"
         else
           pip install yaml-workflow
         fi

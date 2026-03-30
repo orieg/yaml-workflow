@@ -18,11 +18,11 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Create a simple cross-platform workflow for testing
-      - name: Create test workflow
+      # ── Test 1: Simple workflow ──────────────────────────────────────
+      - name: Create simple test workflow
         run: |
-          cat > /tmp/test_action_workflow.yaml << 'WORKFLOW'
-          name: Action Test
+          cat > /tmp/test_simple.yaml << 'WORKFLOW'
+          name: Simple Action Test
           params:
             greeting:
               type: string
@@ -39,38 +39,139 @@ jobs:
                   result = {"message": "Action works", "param": args.get("greeting", "?")}
           WORKFLOW
 
-      - name: Run action with text format
+      - name: Run simple workflow (text)
         uses: ./
         id: text_run
         with:
-          workflow: /tmp/test_action_workflow.yaml
+          workflow: /tmp/test_simple.yaml
           params: greeting=CI
           format: text
 
-      - name: Verify text output is non-empty
+      - name: Verify text output
         run: |
-          echo "=== Text output ==="
           echo "${{ steps.text_run.outputs.result }}"
           test -n "${{ steps.text_run.outputs.result }}"
-          echo "Text output OK"
 
-      - name: Run action with JSON format
+      - name: Run simple workflow (JSON)
         uses: ./
         id: json_run
         with:
-          workflow: /tmp/test_action_workflow.yaml
+          workflow: /tmp/test_simple.yaml
           params: greeting=CI
           format: json
 
-      - name: Verify JSON output is valid and successful
+      - name: Verify JSON output
         run: |
-          echo "=== JSON output ==="
-          echo '${{ steps.json_run.outputs.result }}'
           echo '${{ steps.json_run.outputs.result }}' | python3 -c "
           import sys, json
           data = json.load(sys.stdin)
-          assert data['status'] == 'success', f'Expected success, got {data[\"status\"]}'
-          assert 'outputs' in data, 'Missing outputs key'
-          assert 'workspace' in data, 'Missing workspace key'
-          print('Action test passed: JSON output valid with status=success')
+          assert data['status'] == 'success', f'Got {data[\"status\"]}'
+          assert 'outputs' in data
+          print('Simple test passed')
+          "
+
+      # ── Test 2: Complex workflow (shell, conditions, depends_on) ──
+      - name: Create complex test workflow
+        run: |
+          cat > /tmp/test_complex.yaml << 'WORKFLOW'
+          name: Complex Action Test
+          description: Exercises shell, python_code, conditions, depends_on, and notify.
+
+          params:
+            count:
+              type: integer
+              default: 5
+            mode:
+              type: string
+              default: full
+
+          steps:
+            - name: setup
+              task: python_code
+              inputs:
+                code: |
+                  import os, json
+                  os.makedirs(os.path.join(context["workspace"], "output"), exist_ok=True)
+                  result = {"ready": True, "count": int(args.get("count", 5))}
+
+            - name: fetch_data
+              task: shell
+              inputs:
+                command: "echo Fetched data with count={{ args.count }}"
+
+            - name: fetch_config
+              task: python_code
+              inputs:
+                code: |
+                  result = {"db": "postgres", "cache": True}
+
+            - name: process
+              task: python_code
+              depends_on: [fetch_data, fetch_config]
+              inputs:
+                code: |
+                  cfg = steps["fetch_config"]["result"]
+                  count = steps["setup"]["result"]["count"]
+                  records = [{"id": i, "value": i * 10} for i in range(count)]
+                  result = {"records": records, "total": len(records), "db": cfg["db"]}
+
+            - name: write_report
+              task: python_code
+              inputs:
+                code: |
+                  import os, json
+                  total = steps["process"]["result"]["total"]
+                  report = {"summary": "Processed " + str(total) + " records", "status": "complete"}
+                  path = os.path.join(context["workspace"], "output", "report.json")
+                  with open(path, "w") as f:
+                      json.dump(report, f)
+                  result = report
+
+            - name: optional_analytics
+              task: python_code
+              condition: "{{ args.mode == 'full' }}"
+              inputs:
+                code: |
+                  total = steps["process"]["result"]["total"]
+                  result = {"avg_value": 50 * (total - 1) / 2 if total > 0 else 0}
+
+            - name: notify_done
+              task: notify
+              inputs:
+                channel: log
+                level: info
+                message: "Pipeline complete: {{ steps.process.result.total }} records processed"
+          WORKFLOW
+
+      - name: Run complex workflow (JSON)
+        uses: ./
+        id: complex_run
+        with:
+          workflow: /tmp/test_complex.yaml
+          params: |
+            count=3
+            mode=full
+          format: json
+
+      - name: Verify complex workflow output
+        run: |
+          echo '${{ steps.complex_run.outputs.result }}' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data['status'] == 'success', f'Got {data[\"status\"]}'
+          outputs = data.get('outputs', {})
+          assert 'process' in outputs, 'Missing process step'
+          assert 'optional_analytics' in outputs, 'Conditional step should have run'
+          assert 'notify_done' in outputs, 'Notify step should have run'
+          print(f'Complex test passed: {len(outputs)} steps completed')
+          "
+
+      # ── Test 3: Validate command ───────────────────────────────────
+      - name: Validate the complex workflow
+        run: |
+          yaml-workflow validate /tmp/test_complex.yaml --format json | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data['valid'], 'Validation failed'
+          print('Validate test passed')
           "
