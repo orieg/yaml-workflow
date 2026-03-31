@@ -102,6 +102,9 @@ serve = [
     "uvicorn>=0.20,<1.0",
     "python-multipart>=0.0.5,<1.0",
 ]
+all = [
+    "yaml-workflow[serve,mcp]",
+]
 
 [project.urls]
 Homepage = "https://github.com/orieg/yaml-workflow"

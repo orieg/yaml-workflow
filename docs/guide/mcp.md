@@ -5,9 +5,11 @@ discoverable by AI agents like Claude Desktop and Claude Code.
 
 ## Installation
 
-Install with the `mcp` extra:
+The MCP server requires the `mcp` extra:
 
 ```bash
+pipx install 'yaml-workflow[mcp]'   # or yaml-workflow[all]
+# or
 pip install 'yaml-workflow[mcp]'
 ```
 

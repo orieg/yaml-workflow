@@ -4,9 +4,11 @@ yaml-workflow includes a web UI for monitoring workflows and triggering runs.
 
 ## Installation
 
-Install with the `serve` extra:
+The web dashboard requires the `serve` extra:
 
 ```bash
+pipx install 'yaml-workflow[serve]'   # or yaml-workflow[all]
+# or
 pip install 'yaml-workflow[serve]'
 ```
 

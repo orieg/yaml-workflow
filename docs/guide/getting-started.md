@@ -9,7 +9,17 @@ This guide will help you get started with the YAML Workflow Engine.
 [pipx](https://pipx.pypa.io/) installs the `yaml-workflow` command in an isolated environment, so it never conflicts with your project's dependencies:
 
 ```bash
+# Core CLI (run, validate, visualize, init)
 pipx install yaml-workflow
+
+# With web dashboard
+pipx install 'yaml-workflow[serve]'
+
+# With MCP server (AI agent integration)
+pipx install 'yaml-workflow[mcp]'
+
+# Everything
+pipx install 'yaml-workflow[all]'
 ```
 
 Install pipx first if needed: `brew install pipx` (macOS) or `pip install pipx`.
@@ -19,7 +29,18 @@ Install pipx first if needed: `brew install pipx` (macOS) or `pip install pipx`.
 Install into the current Python environment (useful when using yaml-workflow as a library):
 
 ```bash
-pip install yaml-workflow
+pip install yaml-workflow          # Core
+pip install 'yaml-workflow[serve]' # + web dashboard
+pip install 'yaml-workflow[mcp]'   # + MCP server
+pip install 'yaml-workflow[all]'   # Everything
+```
+
+**Option 3: Docker**
+
+Run without installing Python:
+
+```bash
+docker run -p 8080:8080 -v $(pwd)/workflows:/app/workflows ghcr.io/orieg/yaml-workflow
 ```
 
 ## Basic Concepts

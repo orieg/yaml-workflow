@@ -64,9 +64,10 @@ Most workflow tools require servers, databases, and complex infrastructure. **ya
 
 ```bash
 # Install (isolated CLI — recommended)
-pipx install yaml-workflow
+pipx install yaml-workflow            # Core CLI
+pipx install 'yaml-workflow[all]'     # + web dashboard + MCP server
 
-# Or install with pip
+# Or with pip
 pip install yaml-workflow
 
 # Initialize example workflows
