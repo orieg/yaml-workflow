@@ -1239,3 +1239,72 @@ def test_python_module_fail_no_check(tmp_path: Path, test_exec_module_file):
     status = engine.run()
     assert status["status"] == "completed"
     assert status["outputs"]["run_module_fail"]["result"]["returncode"] == 5
+
+
+# ---------------------------------------------------------------------------
+# CWD and workspace path tests
+# ---------------------------------------------------------------------------
+
+
+def test_python_code_cwd_is_workspace(tmp_path: Path):
+    """python_code should execute with CWD set to the workspace directory."""
+    workflow = {
+        "steps": [
+            {
+                "name": "check_cwd",
+                "task": "python_code",
+                "inputs": {"code": "import os; result = os.getcwd()"},
+            }
+        ]
+    }
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    status = engine.run()
+    assert status["status"] == "completed"
+    # CWD during exec should be the workspace
+    assert (
+        Path(status["outputs"]["check_cwd"]["result"]).resolve() == tmp_path.resolve()
+    )
+
+
+def test_python_code_workspace_variable(tmp_path: Path):
+    """python_code should have 'workspace' as a Path in the exec context."""
+    workflow = {
+        "steps": [
+            {
+                "name": "check_ws",
+                "task": "python_code",
+                "inputs": {
+                    "code": "from pathlib import Path; result = isinstance(workspace, Path)"
+                },
+            }
+        ]
+    }
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    status = engine.run()
+    assert status["status"] == "completed"
+    assert status["outputs"]["check_ws"]["result"] is True
+
+
+def test_python_code_relative_path_resolves_to_workspace(tmp_path: Path):
+    """Relative file paths in python_code should resolve against the workspace."""
+    workflow = {
+        "steps": [
+            {
+                "name": "write_file",
+                "task": "python_code",
+                "inputs": {
+                    "code": (
+                        "with open('test_relative.txt', 'w') as f:\n"
+                        "    f.write('hello')\n"
+                        "result = 'written'"
+                    )
+                },
+            }
+        ]
+    }
+    engine = WorkflowEngine(workflow, workspace=str(tmp_path))
+    status = engine.run()
+    assert status["status"] == "completed"
+    # The file should be in the workspace, not the process CWD
+    assert (tmp_path / "test_relative.txt").exists()
+    assert (tmp_path / "test_relative.txt").read_text() == "hello"

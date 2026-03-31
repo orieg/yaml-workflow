@@ -11,6 +11,7 @@ import os
 import pprint
 import subprocess
 import sys
+import threading
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -255,6 +256,11 @@ def _execute_module(
         raise TimeoutError(f"Module execution timed out after {timeout} seconds")
 
 
+# Lock to serialize CWD changes around exec() calls.  os.chdir() is
+# process-global, so parallel python_code tasks must not race on it.
+_cwd_lock = threading.Lock()
+
+
 def _execute_code(
     code: str, config: TaskConfig, result_variable: Optional[str] = None
 ) -> Any:
@@ -263,6 +269,7 @@ def _execute_code(
     exec_context = {
         "config": config,
         "context": config.context,
+        "workspace": config.workspace,
         "args": config.context.get("args", {}),
         "env": config.context.get("env", {}),
         "steps": config.context.get("steps", {}),
@@ -275,8 +282,16 @@ def _execute_code(
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
     try:
-        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-            exec(code, {}, exec_context)
+        # Change CWD to workspace so relative paths in python_code behave
+        # the same as in shell tasks (which use subprocess cwd=workspace).
+        with _cwd_lock:
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(str(config.workspace))
+                with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+                    exec(code, {}, exec_context)
+            finally:
+                os.chdir(old_cwd)
 
         # Log captured output
         captured_stdout = stdout_capture.getvalue()
