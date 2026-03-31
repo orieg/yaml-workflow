@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yaml-workflow"
-version = "0.9.0"
+version = "0.9.1"
 description = "A lightweight workflow engine for CI/CD pipelines, data processing, and DevOps automation — define tasks in YAML, run anywhere"
 readme = "README.md"
 requires-python = ">=3.10"
