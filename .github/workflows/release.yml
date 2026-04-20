@@ -56,14 +56,14 @@ jobs:
 
     - name: Create GitHub Release
       if: steps.vars.outputs.is_test != 'true'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: dist/*
         generate_release_notes: true
 
     - name: Create GitHub Pre-release
       if: steps.vars.outputs.is_test == 'true'
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         files: dist/*
         prerelease: true
