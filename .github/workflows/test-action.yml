@@ -19,7 +19,7 @@ jobs:
   test-action:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # ── Test 1: Simple workflow ──────────────────────────────────────
       - name: Create simple test workflow
