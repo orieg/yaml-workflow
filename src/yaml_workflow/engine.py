@@ -373,7 +373,7 @@ class WorkflowEngine:
         if self.context["args"]:
             self.logger.info("Default parameters loaded:")
             for name, value in self.context["args"].items():
-                self.logger.info(f"  {name}: {value}")
+                self.logger.info(f"  {name}: {self._mask_env_values(str(value))}")
 
         self.current_step = None  # Track current step for error handling
 
@@ -494,10 +494,14 @@ class WorkflowEngine:
     def _validate_secrets(self) -> None:
         """Validate that all required secret environment variables are set.
 
+        Also records the current values of the declared variables so that
+        log lines and dry-run previews can mask them (see _mask_env_values).
+
         Raises:
             ConfigurationError: If secrets is not a list or if required
                 environment variables are missing.
         """
+        self._masked_env_values: List[str] = []
         secrets = self.workflow.get("secrets", [])
         if not secrets:
             return
@@ -510,6 +514,18 @@ class WorkflowEngine:
             raise ConfigurationError(
                 f"Missing required secrets (environment variables): {', '.join(missing)}"
             )
+        # Longest values first so overlapping/nested values mask fully
+        self._masked_env_values = sorted(
+            (os.environ[name] for name in secrets if os.environ.get(name)),
+            key=len,
+            reverse=True,
+        )
+
+    def _mask_env_values(self, text: str) -> str:
+        """Replace values of env vars declared under 'secrets' with '***'."""
+        for value in self._masked_env_values:
+            text = text.replace(value, "***")
+        return text
 
     # Re-adding template resolution methods that were removed during refactoring
     def resolve_template(self, template_str: str) -> str:
@@ -1305,7 +1321,7 @@ class WorkflowEngine:
             if processed:
                 # Show a compact representation of inputs
                 for key, value in processed.items():
-                    val_str = str(value)
+                    val_str = self._mask_env_values(str(value))
                     if len(val_str) > 80:
                         val_str = val_str[:77] + "..."
                     print(f"    {key}: {val_str}")
