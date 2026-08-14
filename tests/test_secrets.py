@@ -87,13 +87,12 @@ def test_secrets_invalid_format(tmp_path):
 # ---------------------------------------------------------------------------
 # Masking tests
 #
-# NOTE: identifiers whose values flow into the engine (env var names, param
-# names, literal values) deliberately avoid the word "secret" so CodeQL's
-# cleartext-logging name heuristics don't flag the test fixtures themselves.
+# Identifiers whose values flow into the engine avoid the word "secret" for
+# the same CodeQL reason as the NOTE on _workflow_with_required_env above.
 # ---------------------------------------------------------------------------
 
 
-def _workflow_with_required_env(env_names, steps=None, params=None):
+def _masking_workflow(env_names, steps=None, params=None):
     """Return a workflow dict declaring env_names under the secrets key."""
     wf = {
         "name": "masking-test",
@@ -111,7 +110,7 @@ def _workflow_with_required_env(env_names, steps=None, params=None):
 def test_dry_run_preview_masks_declared_env_values(tmp_path, capsys):
     """Dry-run input previews replace declared env var values with ***."""
     env_val = "plain-value-12345"
-    wf = _workflow_with_required_env(
+    wf = _masking_workflow(
         ["REQUIRED_ENV_A"],
         steps=[
             {
@@ -134,7 +133,7 @@ def test_dry_run_preview_masks_only_declared_env(tmp_path, capsys):
     """Env vars not declared under the secrets key are shown unmasked."""
     declared_val = "declared-value-9876"
     other_val = "other-value-5432"
-    wf = _workflow_with_required_env(
+    wf = _masking_workflow(
         ["REQUIRED_ENV_A"],
         steps=[
             {
@@ -157,7 +156,7 @@ def test_dry_run_preview_masks_only_declared_env(tmp_path, capsys):
 def test_param_default_log_masks_declared_env_values(tmp_path):
     """Param-default logging masks values of env vars declared as secrets."""
     env_val = "plain-value-12345"
-    wf = _workflow_with_required_env(
+    wf = _masking_workflow(
         ["REQUIRED_ENV_A"],
         params={"conn_string": {"default": f"user:{env_val}@host"}},
     )
