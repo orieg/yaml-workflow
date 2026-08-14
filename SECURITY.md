@@ -3,12 +3,12 @@
 ## Supported versions
 
 yaml-workflow is pre-1.0 and follows a rolling-release model. Security fixes are
-applied to the latest released version on PyPI. Please upgrade to the latest
-`0.9.x` release before reporting an issue.
+applied to the latest release on PyPI. Please upgrade to the latest release
+before reporting an issue.
 
 | Version | Supported |
 | ------- | --------- |
-| Latest `0.9.x` | :white_check_mark: |
+| Latest release | :white_check_mark: |
 | Older releases | :x: |
 
 ## Reporting a vulnerability

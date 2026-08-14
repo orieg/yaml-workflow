@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Document remote-schema usage; correct the SchemaStore section (submission is
   planned, not yet complete)
 
+## [0.9.3] - 2026-08-14
+
 ### Security
 - Mask declared secrets in dry-run previews and parameter-default log lines
 - Clear 26 CodeQL clear-text-logging false positives across the engine

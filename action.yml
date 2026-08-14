@@ -45,11 +45,11 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
       run: |
         if [ -n "$INPUT_VERSION" ]; then
-          pip install "yaml-workflow==$INPUT_VERSION"
+          python -m pip install "yaml-workflow==$INPUT_VERSION"
         elif [ -f "$ACTION_PATH/pyproject.toml" ]; then
-          pip install "$ACTION_PATH"
+          python -m pip install "$ACTION_PATH"
         else
-          pip install yaml-workflow
+          python -m pip install yaml-workflow
         fi
 
     - name: Run workflow
@@ -63,7 +63,8 @@ runs:
         PARAMS=()
         if [ -n "$INPUT_PARAMS" ]; then
           while IFS= read -r line; do
-            [ -n "$line" ] && PARAMS+=("$line")
+            line="${line%$'\r'}"                       # strip trailing CR (Windows CRLF)
+            [ -n "${line//[[:space:]]/}" ] && PARAMS+=("$line")  # skip blank/whitespace-only lines
           done <<< "$INPUT_PARAMS"
         fi
 
