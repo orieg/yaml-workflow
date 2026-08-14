@@ -17,11 +17,13 @@ from yaml_workflow.validator import WorkflowValidator
 # ---------------------------------------------------------------------------
 
 
-# NOTE: deliberately named without "secret" in any identifier. CodeQL's
-# name-based taint heuristic otherwise marks the returned dict as sensitive
-# data, flagging every engine log statement it flows into as
-# py/clear-text-logging-sensitive-data (26 false positives). The values here
-# are env var *names*, never values.
+# NOTE: this helper's function and parameter names deliberately avoid the
+# word "secret" because CodeQL's name-based taint heuristic would otherwise
+# mark the returned dict as sensitive data, flagging every engine log
+# statement it flows into as py/clear-text-logging-sensitive-data (26 false
+# positives). Only identifiers whose values flow into the engine matter;
+# test function names like test_secrets_* are fine. The values here are env
+# var *names*, never values.
 def _workflow_with_required_env(env_var_names):
     """Return a minimal workflow dict that includes a secrets key."""
     wf = {
