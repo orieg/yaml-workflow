@@ -50,7 +50,7 @@ Most workflow tools require servers, databases, and complex infrastructure. **ya
 - Structured output (`--format json`) for CI integration and scripting
 - MCP server — expose workflows as AI agent tools (`pip install yaml-workflow[mcp]`)
 - Web dashboard — monitor runs and trigger workflows (`pip install yaml-workflow[serve]`)
-- GitHub Action — run workflows in CI with `uses: orieg/yaml-workflow-action`
+- GitHub Action — run workflows in CI with `uses: orieg/yaml-workflow`
 
 ## Use Cases
 
@@ -212,7 +212,7 @@ Run workflows in CI with the [yaml-workflow action](https://github.com/marketpla
 
 ```yaml
 - name: Run pipeline
-  uses: orieg/yaml-workflow@v0.9.1
+  uses: orieg/yaml-workflow@v0.9.3
   id: pipeline
   with:
     workflow: workflows/deploy.yaml

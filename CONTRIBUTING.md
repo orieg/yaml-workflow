@@ -4,8 +4,9 @@ Thanks for your interest in contributing! This document covers everything you
 need to get up and running, from setting up a dev environment to opening a
 pull request.
 
-A `CODE_OF_CONDUCT.md` should be added to this repository. Until then, please
-interact respectfully with all contributors and maintainers.
+This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By
+participating, you are expected to uphold it. Please report unacceptable
+behavior to nicolas@brousse.info.
 
 ---
 

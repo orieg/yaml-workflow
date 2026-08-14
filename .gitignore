@@ -66,3 +66,10 @@ logs/
 # Built documentation (deployed via GitHub Pages CI)
 site/
 output/
+
+# Test / benchmark scratch dirs
+test_workspace/
+.benchmarks/
+
+# AI coding agent local settings (project-level, not committed)
+.claude/

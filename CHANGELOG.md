@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `SECURITY.md` with a vulnerability-reporting process and the execution security
+  model (shell/Python/MCP trust boundaries)
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1)
+- Pull request template and issue-template `config.yml` (routes questions to
+  Discussions, security reports to private advisories)
+
+### Fixed
+- The JSON Schema (`workflow-schema.json`) is now included in the built wheel at
+  `yaml_workflow/schema/`; previously it shipped only in the sdist, so
+  `pip install` users could not resolve it locally
+- Correct the GitHub Action reference in the README (`orieg/yaml-workflow`, not
+  the non-existent `orieg/yaml-workflow-action`)
+- Harden the GitHub Action against shell injection by passing inputs through
+  `env:`; workflow parameters with spaces are now preserved correctly
+
+### Changed
+- Backfill CHANGELOG entries for 0.7.0 through 0.9.3
+- Add `Source` and `Changelog` project URLs and refine PyPI classifiers
+- Document remote-schema usage; correct the SchemaStore section (submission is
+  planned, not yet complete)
+
+### Security
+- Mask declared secrets in dry-run previews and parameter-default log lines
+- Clear 26 CodeQL clear-text-logging false positives across the engine
+
+## [0.9.2] - 2026-03-31
+
+### Fixed
+- `python_code` task now runs with its working directory set to the workspace,
+  matching `shell` task behavior
+
+## [0.9.1] - 2026-03-30
+
+### Added
+- `[all]` meta-extra that installs both `serve` and `mcp` dependencies
+
+### Changed
+- Clarified `pipx`/`pip` install instructions and extras in README and docs
+
+## [0.9.0] - 2026-03-30
+
+### Added
+- Official Docker image published to `ghcr.io/orieg/yaml-workflow` (multi-arch)
+- Helm chart (`helm/yaml-workflow`) with CronJob, Ingress, and PVC templates
+- Kubernetes / ArgoCD (GitOps) deployment support and guide
+
+## [0.8.3] - 2026-03-30
+
+### Security
+- Resolve CodeQL security alerts
+
+## [0.8.2] - 2026-03-30
+
+### Fixed
+- Strip leading `v` from release tags when comparing against the pyproject version
+
+## [0.8.1] - 2026-03-30
+
+### Changed
+- Release workflow now publishes full releases instead of pre-releases
+- Polished project positioning; added v0.8 docs and a GitHub Actions usage
+  example to the README
+
+## [0.8.0] - 2026-03-29
+
+### Added
+- Secrets validation — fail fast when required environment variables are missing
+- Structured output via `--format json` / `--output` for CI integration
+- Parallel step execution with `depends_on` — independent steps run concurrently
+- GitHub Action (`orieg/yaml-workflow`) for running workflows in CI, published
+  to the GitHub Actions Marketplace
+- MCP server (`yaml-workflow serve-mcp`) — expose workflows as AI agent tools
+- Web dashboard (`yaml-workflow serve`) — monitor runs and trigger workflows
+- Schema-validation and GitHub Action integration tests
+
+### Fixed
+- DAG mode preserves sequential order for steps without `depends_on`
+- Action separates stderr from stdout for clean JSON output
+- Cross-platform test compatibility for Windows CI
+
+## [0.7.0] - 2026-03-29
+
+### Added
+- JSON Schema (`schema/workflow-schema.json`) for editor validation and autocomplete
+- `validate` command `--strict` and `--format` flags
+- `http.request` task auth, retry, and SSL-verification options
+- `notify` task for workflow notifications
+- Meaningful real-world AI/LLM example pipelines (changelog generation, batch digest)
+- Plugin authoring guide, cookbook, and architecture diagram
+
 ## [0.6.0] - 2026-03-29
 
 ### Added
@@ -112,7 +203,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input/output variable management
 - Error handling with retry mechanisms
 
-[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/orieg/yaml-workflow/compare/v0.9.2...v0.9.3
+[0.9.2]: https://github.com/orieg/yaml-workflow/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/orieg/yaml-workflow/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/orieg/yaml-workflow/compare/v0.8.3...v0.9.0
+[0.8.3]: https://github.com/orieg/yaml-workflow/compare/v0.8.2...v0.8.3
+[0.8.2]: https://github.com/orieg/yaml-workflow/compare/v0.8.1...v0.8.2
+[0.8.1]: https://github.com/orieg/yaml-workflow/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/orieg/yaml-workflow/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/orieg/yaml-workflow/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/orieg/yaml-workflow/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/orieg/yaml-workflow/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/orieg/yaml-workflow/compare/v0.4.0...v0.4.1

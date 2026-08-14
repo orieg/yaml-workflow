@@ -40,11 +40,14 @@ runs:
 
     - name: Install yaml-workflow
       shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
-        if [ -n "${{ inputs.version }}" ]; then
-          pip install "yaml-workflow==${{ inputs.version }}"
-        elif [ -f "${{ github.action_path }}/pyproject.toml" ]; then
-          pip install "${{ github.action_path }}"
+        if [ -n "$INPUT_VERSION" ]; then
+          pip install "yaml-workflow==$INPUT_VERSION"
+        elif [ -f "$ACTION_PATH/pyproject.toml" ]; then
+          pip install "$ACTION_PATH"
         else
           pip install yaml-workflow
         fi
@@ -52,13 +55,19 @@ runs:
     - name: Run workflow
       id: run
       shell: bash
+      env:
+        INPUT_WORKFLOW: ${{ inputs.workflow }}
+        INPUT_PARAMS: ${{ inputs.params }}
+        INPUT_FORMAT: ${{ inputs.format }}
       run: |
-        PARAMS=""
-        if [ -n "${{ inputs.params }}" ]; then
-          PARAMS=$(echo "${{ inputs.params }}" | tr '\n' ' ')
+        PARAMS=()
+        if [ -n "$INPUT_PARAMS" ]; then
+          while IFS= read -r line; do
+            [ -n "$line" ] && PARAMS+=("$line")
+          done <<< "$INPUT_PARAMS"
         fi
 
-        OUTPUT=$(yaml-workflow run "${{ inputs.workflow }}" $PARAMS --format "${{ inputs.format }}" 2>/tmp/yaml-workflow-stderr.log)
+        OUTPUT=$(yaml-workflow run "$INPUT_WORKFLOW" "${PARAMS[@]}" --format "$INPUT_FORMAT" 2>/tmp/yaml-workflow-stderr.log)
         if [ -s /tmp/yaml-workflow-stderr.log ]; then
           echo "::debug::$(cat /tmp/yaml-workflow-stderr.log)"
         fi

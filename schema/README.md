@@ -42,9 +42,25 @@ pip install check-jsonschema
 check-jsonschema --schemafile schema/workflow-schema.json workflows/my_workflow.yaml
 ```
 
-## SchemaStore Auto-Detection
+## Remote schema (no local copy)
 
-The yaml-workflow schema is registered with [SchemaStore](https://www.schemastore.org/).
-Editors that support SchemaStore (VS Code with YAML extension, IntelliJ, etc.) will
-automatically validate and provide autocompletion for files matching `*workflow*.yaml`
-without any manual configuration.
+You can point your editor or validator at the schema over HTTPS instead of a
+local file — the canonical URL is the `$id` declared in the schema:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/orieg/yaml-workflow/main/schema/workflow-schema.json
+```
+
+```bash
+check-jsonschema \
+  --schemafile https://raw.githubusercontent.com/orieg/yaml-workflow/main/schema/workflow-schema.json \
+  workflows/my_workflow.yaml
+```
+
+## SchemaStore auto-detection (planned)
+
+Submitting this schema to [SchemaStore](https://www.schemastore.org/) is on the
+roadmap. Once accepted, editors that consume the SchemaStore catalog (VS Code
+with the Red Hat YAML extension, JetBrains IDEs, etc.) will validate and
+autocomplete matching workflow files with no manual configuration. Until then,
+use one of the setup methods above.

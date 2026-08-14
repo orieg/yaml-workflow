@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or discussion
+    url: https://github.com/orieg/yaml-workflow/discussions
+    about: Ask questions, share workflows, and discuss ideas in GitHub Discussions.
+  - name: Documentation
+    url: https://orieg.github.io/yaml-workflow/
+    about: Guides, task reference, and examples.
+  - name: Security vulnerability
+    url: https://github.com/orieg/yaml-workflow/security/advisories/new
+    about: Report security issues privately (do not open a public issue).
