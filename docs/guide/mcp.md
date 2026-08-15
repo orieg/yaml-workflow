@@ -82,10 +82,11 @@ automatically.
 
 ## Install from the MCP Registry
 
-yaml-workflow is published to the [official MCP Registry](https://registry.modelcontextprotocol.io)
-as `io.github.orieg/yaml-workflow`. Clients that browse the registry can install
-it directly. The registry launches it with [`uvx`](https://docs.astral.sh/uv/),
-pulling the `[mcp]` extra:
+yaml-workflow publishes its MCP server to the [official MCP Registry](https://registry.modelcontextprotocol.io)
+as `io.github.orieg/yaml-workflow` (available from the next release onward).
+Once listed, clients that browse the registry can install it directly. The
+registry launches it with [`uvx`](https://docs.astral.sh/uv/), pulling the
+`[mcp]` extra:
 
 ```bash
 uvx --from 'yaml-workflow[mcp]' yaml-workflow serve-mcp --dir workflows/
