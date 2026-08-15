@@ -1,5 +1,7 @@
 # YAML Workflow
 
+<!-- mcp-name: io.github.orieg/yaml-workflow -->
+
 [![PyPI version](https://img.shields.io/pypi/v/yaml-workflow.svg)](https://pypi.org/project/yaml-workflow/)
 [![Python versions](https://img.shields.io/pypi/pyversions/yaml-workflow.svg)](https://pypi.org/project/yaml-workflow/)
 [![CI](https://github.com/orieg/yaml-workflow/actions/workflows/ci.yml/badge.svg)](https://github.com/orieg/yaml-workflow/actions/workflows/ci.yml)
