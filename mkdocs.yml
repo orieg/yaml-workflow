@@ -97,6 +97,7 @@ nav:
       - Core Concepts: guide/concepts.md
       - Workflow Structure: workflow-structure.md
       - Configuration: guide/configuration.md
+      - Editor Integration: guide/editor-integration.md
       - CLI Usage: cli.md
       - Templating: guide/templating.md
       - State Management: state.md
