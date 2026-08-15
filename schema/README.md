@@ -57,10 +57,22 @@ check-jsonschema \
   workflows/my_workflow.yaml
 ```
 
-## SchemaStore auto-detection (planned)
+## Recommended file naming
 
-Submitting this schema to [SchemaStore](https://www.schemastore.org/) is on the
-roadmap. Once accepted, editors that consume the SchemaStore catalog (VS Code
-with the Red Hat YAML extension, JetBrains IDEs, etc.) will validate and
-autocomplete matching workflow files with no manual configuration. Until then,
-use one of the setup methods above.
+For zero-config auto-detection via SchemaStore (below), name workflow files with
+a distinctive `.yaml-workflow.yaml` (or `.yaml-workflow.yml`) suffix, e.g.
+`deploy.yaml-workflow.yaml`. Any filename still works with the modeline or the
+explicit editor mappings above — the suffix is only needed for SchemaStore
+auto-detection, and it avoids clashing with the many other tools that use
+generically-named `*.yaml` files.
+
+## SchemaStore auto-detection
+
+This schema is [submitted to SchemaStore](https://github.com/SchemaStore/schemastore/pull/6213).
+Once merged, editors that consume the SchemaStore catalog (VS Code with the Red
+Hat YAML extension, JetBrains IDEs, etc.) will validate and autocomplete files
+matching `*.yaml-workflow.yaml` / `*.yaml-workflow.yml` with no manual
+configuration.
+
+See the [Editor Integration guide](https://orieg.github.io/yaml-workflow/guide/editor-integration/)
+for full setup instructions.
