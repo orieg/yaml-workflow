@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-08-14
+
 ### Added
+- Publish the MCP server to the official [MCP Registry](https://registry.modelcontextprotocol.io)
+  as `io.github.orieg/yaml-workflow` — `server.json`, a README ownership marker,
+  and an OIDC-authenticated publish job that runs on release
+- Editor Integration guide and a recommended `.yaml-workflow.yaml` file-naming
+  convention for zero-config schema validation and autocomplete
+- Expanded MCP documentation: Claude Code, Claude Desktop, and Cursor configs,
+  plus a security note on agent-triggered execution
 - `SECURITY.md` with a vulnerability-reporting process and the execution security
   model (shell/Python/MCP trust boundaries)
 - `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1)
@@ -26,8 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Backfill CHANGELOG entries for 0.7.0 through 0.9.3
 - Add `Source` and `Changelog` project URLs and refine PyPI classifiers
-- Document remote-schema usage; correct the SchemaStore section (submission is
-  planned, not yet complete)
+- Document remote-schema usage and submit the schema to SchemaStore
 
 ## [0.9.3] - 2026-08-14
 
@@ -205,7 +213,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input/output variable management
 - Error handling with retry mechanisms
 
-[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.9.4...HEAD
+[0.9.4]: https://github.com/orieg/yaml-workflow/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/orieg/yaml-workflow/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/orieg/yaml-workflow/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/orieg/yaml-workflow/compare/v0.9.0...v0.9.1
