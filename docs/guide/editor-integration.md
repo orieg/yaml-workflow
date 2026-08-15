@@ -33,10 +33,12 @@ steps:
 ```
 
 Prefer a local copy (e.g. offline, or to pin a version)? Point at a schema file
-on disk with a path relative to the workflow file:
+on disk with a path **relative to the workflow file**. For example, if your
+workflows live in a `workflows/` directory and the schema is at the project
+root, use `../schema/...`:
 
 ```yaml
-# yaml-language-server: $schema=./schema/workflow-schema.json
+# yaml-language-server: $schema=../schema/workflow-schema.json
 ```
 
 The schema is also bundled inside the installed package (at
@@ -53,6 +55,7 @@ and map the schema to your workflow files in `.vscode/settings.json`:
   "yaml.schemas": {
     "https://raw.githubusercontent.com/orieg/yaml-workflow/main/schema/workflow-schema.json": [
       "**/*.yaml-workflow.yaml",
+      "**/*.yaml-workflow.yml",
       "workflows/**/*.yaml"
     ]
   }
