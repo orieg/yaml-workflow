@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yaml-workflow"
-version = "0.9.5"
+version = "0.9.6"
 description = "A lightweight workflow engine for CI/CD pipelines, data processing, and DevOps automation — define tasks in YAML, run anywhere"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -97,7 +97,9 @@ dev = [
     "twine>=4.0.0,<8.0.0",
 ]
 mcp = [
-    "mcp>=1.0,<3.0",
+    # Pinned to <2: the server uses the mcp 1.x low-level Server API
+    # (@server.list_tools()/@server.call_tool()), which mcp 2.0 removed.
+    "mcp>=1.0,<2.0",
 ]
 serve = [
     "fastapi>=0.100,<1.0",

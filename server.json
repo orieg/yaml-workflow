@@ -3,7 +3,7 @@
   "name": "io.github.orieg/yaml-workflow",
   "title": "YAML Workflow",
   "description": "Expose declarative YAML-defined workflows as MCP tools over stdio",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "repository": {
     "url": "https://github.com/orieg/yaml-workflow",
     "source": "github"
@@ -13,7 +13,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "yaml-workflow",
-      "version": "0.9.5",
+      "version": "0.9.6",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
