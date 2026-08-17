@@ -27,13 +27,26 @@ yaml-workflow serve-mcp --dir workflows/
 The server speaks MCP over stdio, so it is launched by the MCP client rather
 than run standalone (see the client configs below).
 
-## How it works
+## Tools
 
-- Scans the directory for workflow YAML files (any `*.yaml` with a `steps:` key).
-- Each workflow becomes an MCP tool, named after the workflow's `name`.
-- Workflow `params` become the tool's input parameters, with types and
-  descriptions carried through to the agent.
-- Calling a tool runs the workflow and returns the step outputs as JSON.
+The server exposes four **meta-tools** that work regardless of what is in the
+directory, so an agent can discover, check, preview, and run workflows:
+
+| Tool | Read-only? | What it does |
+|------|-----------|--------------|
+| `list_workflows` | ✅ | Lists the workflows in the directory with their names, descriptions, and declared parameters. |
+| `validate_workflow` | ✅ | Validates a workflow YAML file (by path) and returns structured errors/warnings. |
+| `dry_run_workflow` | ✅ | Previews the steps a workflow would run (and their resolved inputs) without executing anything. |
+| `run_workflow` | ❌ | Executes a workflow (by name or path) with optional params and returns each step's output. |
+
+In addition, **each workflow file in the directory becomes its own convenience
+tool** named after the workflow, so a workflow can be invoked directly with its
+declared parameters as typed inputs. `run_workflow` is the generic equivalent.
+
+Tools are annotated with MCP hints (`readOnlyHint` / `destructiveHint`) so clients
+can distinguish safe introspection (`list_workflows`, `validate_workflow`,
+`dry_run_workflow`) from execution (`run_workflow` and the per-workflow tools),
+which may run shell commands and Python — see [Security](#security).
 
 ## Client configuration
 
