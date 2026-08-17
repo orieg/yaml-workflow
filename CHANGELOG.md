@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-08-14
+
+### Added
+- MCP server: four always-present meta-tools — `list_workflows`,
+  `validate_workflow`, `dry_run_workflow` (read-only), and `run_workflow`
+  (destructive) — so an agent can discover, validate, preview, and run
+  workflows even before any workflow file exists. Per-workflow convenience
+  tools are still exposed. Tools carry MCP `readOnlyHint`/`destructiveHint`
+  annotations.
+- `glama.json` for Glama MCP server verification
+
+### Fixed
+- MCP server: pass workflow parameters correctly when running a workflow
+  (previously `run(**arguments)` could raise `TypeError` for parameterized
+  workflows)
+- MCP server: capture engine stdout so the dry-run preview cannot corrupt the
+  stdio JSON-RPC stream
+
 ## [0.9.4] - 2026-08-14
 
 ### Added
@@ -213,7 +231,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input/output variable management
 - Error handling with retry mechanisms
 
-[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.9.4...HEAD
+[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.9.5...HEAD
+[0.9.5]: https://github.com/orieg/yaml-workflow/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/orieg/yaml-workflow/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/orieg/yaml-workflow/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/orieg/yaml-workflow/compare/v0.9.1...v0.9.2
