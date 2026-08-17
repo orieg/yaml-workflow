@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-08-17
+
+### Fixed
+- Pin the `mcp` extra to `>=1.0,<2.0`. The MCP server uses the mcp 1.x
+  low-level `Server` API (`@server.list_tools()` / `@server.call_tool()`),
+  which mcp 2.0 removed. A fresh `pip install 'yaml-workflow[mcp]'` previously
+  resolved to mcp 2.0 and crashed on startup with
+  `'Server' object has no attribute 'list_tools'`; the pin restores a working
+  server.
+
 ## [0.9.5] - 2026-08-14
 
 ### Added
@@ -231,7 +241,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Input/output variable management
 - Error handling with retry mechanisms
 
-[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.9.5...HEAD
+[Unreleased]: https://github.com/orieg/yaml-workflow/compare/v0.9.6...HEAD
+[0.9.6]: https://github.com/orieg/yaml-workflow/compare/v0.9.5...v0.9.6
 [0.9.5]: https://github.com/orieg/yaml-workflow/compare/v0.9.4...v0.9.5
 [0.9.4]: https://github.com/orieg/yaml-workflow/compare/v0.9.3...v0.9.4
 [0.9.3]: https://github.com/orieg/yaml-workflow/compare/v0.9.2...v0.9.3
