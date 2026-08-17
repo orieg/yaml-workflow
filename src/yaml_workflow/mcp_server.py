@@ -242,13 +242,14 @@ async def serve(directory: str, base_dir: str = "runs") -> None:
                 name="list_workflows",
                 description=(
                     "List the workflows available in this server's workflow "
-                    "directory. Returns an array with one object per workflow, "
-                    "each containing `name` (its declared name), `description`, "
-                    "`path` (the YAML file), and `parameters` (declared inputs "
-                    "with types and defaults). Call this first to discover which "
-                    "workflows exist and what inputs each accepts before calling "
-                    "dry_run_workflow or run_workflow. Read-only: it only reads "
-                    "YAML files and never executes anything. Takes no arguments."
+                    "directory. Returns an object with `count` and `workflows` "
+                    "(one entry per workflow, each containing `name` (its declared "
+                    "name), `description`, `path` (the YAML file), and "
+                    "`parameters` (declared inputs with types and defaults)). Call "
+                    "this first to discover which workflows exist and what inputs "
+                    "each accepts before calling dry_run_workflow or run_workflow. "
+                    "Read-only: it only reads YAML files and never executes "
+                    "anything. Takes no arguments."
                 ),
                 inputSchema={"type": "object", "properties": {}},
                 annotations=read_only,
@@ -287,8 +288,9 @@ async def serve(directory: str, base_dir: str = "runs") -> None:
                     "would run with their resolved inputs (the same information as "
                     "the CLI's --dry-run). Use this to inspect side effects (shell "
                     "commands, file writes, HTTP calls) before running for real. "
-                    "Read-only: no shell or Python is executed and no files are "
-                    "written."
+                    "It does not execute any task — no shell or Python runs and "
+                    "none of the workflow's own side effects occur; only ephemeral "
+                    "logs are written to a temporary workspace."
                 ),
                 inputSchema=workflow_arg_schema,
                 annotations=read_only,

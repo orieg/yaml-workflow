@@ -36,7 +36,7 @@ directory, so an agent can discover, check, preview, and run workflows:
 |------|-----------|--------------|
 | `list_workflows` | ✅ | Lists the workflows in the directory with their names, descriptions, and declared parameters. |
 | `validate_workflow` | ✅ | Validates a workflow YAML file (by path) and returns structured errors/warnings. |
-| `dry_run_workflow` | ✅ | Previews the steps a workflow would run (and their resolved inputs) without executing anything. |
+| `dry_run_workflow` | ✅ | Previews the steps a workflow would run (and their resolved inputs) without executing any task; only ephemeral logs are written to a temporary workspace. |
 | `run_workflow` | ❌ | Executes a workflow (by name or path) with optional params and returns each step's output. |
 
 In addition, **each workflow file in the directory becomes its own convenience
