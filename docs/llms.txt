@@ -1,0 +1,46 @@
+# yaml-workflow
+
+> A lightweight Python workflow engine that runs tasks defined in YAML — shell, Python, file, template, HTTP, and batch — with Jinja2 templating, parallel execution, and resumable file-based state. Install with `pip install yaml-workflow`. Runs locally, in CI, and in Docker/Kubernetes, and can expose workflows to AI agents over the Model Context Protocol (MCP).
+
+A workflow is a YAML file with a `name`, optional `params`, and an ordered list of `steps`; each step runs a `task` with `inputs`. Values use Jinja2 templating over the `args`, `env`, `steps`, and `batch` namespaces. Validate a workflow with `yaml-workflow validate <file>` and preview it with `--dry-run`.
+
+## Getting started
+
+- [Getting Started](https://orieg.github.io/yaml-workflow/guide/getting-started/): Install and run your first workflow.
+- [Core Concepts](https://orieg.github.io/yaml-workflow/guide/concepts/): Steps, tasks, namespaces, and state.
+- [Workflow Structure](https://orieg.github.io/yaml-workflow/workflow-structure/): Full YAML reference — name, params, settings, imports, steps, flows.
+- [CLI Usage](https://orieg.github.io/yaml-workflow/cli/): Commands — run, list, validate, visualize, init, serve, serve-mcp.
+
+## Authoring workflows
+
+- [Templating](https://orieg.github.io/yaml-workflow/guide/templating/): Jinja2 variables and the args/env/steps/batch namespaces.
+- [Basic Tasks](https://orieg.github.io/yaml-workflow/guide/tasks/basic-tasks/): shell, python, file, and template tasks.
+- [Shell Tasks](https://orieg.github.io/yaml-workflow/guide/tasks/shell-tasks/): Run shell commands.
+- [Python Tasks](https://orieg.github.io/yaml-workflow/guide/tasks/python-tasks/): Run Python code, functions, modules, or scripts.
+- [Batch Tasks](https://orieg.github.io/yaml-workflow/guide/tasks/batch-tasks/): Parallel processing over collections.
+- [Flow Control](https://orieg.github.io/yaml-workflow/guide/flows/): Custom step sequences and conditions.
+- [Error Handling](https://orieg.github.io/yaml-workflow/guide/error-handling/): Retries and failure handling.
+- [Configuration](https://orieg.github.io/yaml-workflow/guide/configuration/): Settings, secrets validation, and namespaces.
+- [Editor Integration](https://orieg.github.io/yaml-workflow/guide/editor-integration/): JSON Schema validation and autocomplete.
+
+## Extending
+
+- [Task Development](https://orieg.github.io/yaml-workflow/guide/task-development/): Write custom task types with `@register_task`.
+- [Plugin Authoring](https://orieg.github.io/yaml-workflow/guide/plugins/): Package tasks as pip-installable plugins via entry points.
+
+## AI agents and automation
+
+- [MCP Integration](https://orieg.github.io/yaml-workflow/guide/mcp/): Expose workflows as MCP tools (list_workflows, validate_workflow, dry_run_workflow, run_workflow) for AI agents.
+- [Parallel Execution](https://orieg.github.io/yaml-workflow/guide/parallel/): Run independent steps concurrently with `depends_on`.
+- [State Management](https://orieg.github.io/yaml-workflow/state/): Persistence and resume after failure.
+
+## Examples
+
+- [Cookbook](https://orieg.github.io/yaml-workflow/examples/cookbook/): ETL, CI/CD, and deployment recipes.
+- [AI Integration](https://orieg.github.io/yaml-workflow/examples/ai-integration/): LLM pipeline examples.
+
+## Reference
+
+- [API Reference](https://orieg.github.io/yaml-workflow/reference/yaml_workflow/): Full API documentation.
+- [Source (GitHub)](https://github.com/orieg/yaml-workflow)
+- [PyPI](https://pypi.org/project/yaml-workflow/)
