@@ -32,8 +32,9 @@ mkdocs build                                            # build the docs site
 
 Apply formatting with `black src tests && isort --profile black src tests`. Run
 everything through the virtualenv (`source .venv/bin/activate`). CI runs black +
-isort + mypy as a gate **before** tests, across Linux/macOS/Windows and Python
-3.10–3.13, so a change must pass all four locally.
+isort + mypy as a gate on Ubuntu / Python 3.12 **before** the tests, and runs
+the test suite across Linux/macOS/Windows and Python 3.10–3.13 — so a change
+must pass all four checks locally.
 
 ## Code layout
 
