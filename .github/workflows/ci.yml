@@ -1,4 +1,5 @@
 name: CI
+
 permissions:
   contents: read
   pull-requests: write
@@ -9,96 +10,368 @@ on:
   pull_request:
     branches: ['main']
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  lint:
+  detect-changes:
+    name: Subsystems / Change Detection
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
     steps:
-    - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'schema/**'
+              - 'pyproject.toml'
+              - 'action.yml'
+              - '.github/workflows/ci.yml'
 
-    - name: Set up Python
-      uses: actions/setup-python@v7
-      with:
-        python-version: "3.12"
+  lint:
+    name: Lint & Standards
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.code == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[test,dev]"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-    - name: Check formatting
-      run: |
-        black --check src tests
-        isort --check-only --profile black src tests
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test,dev]"
 
-    - name: Type checking
-      run: mypy src
+      - name: Check formatting
+        run: |
+          black --check src tests
+          isort --check-only --profile black src tests
+
+      - name: Type checking
+        run: mypy src
+
+      - name: Lint Workflows (actionlint)
+        run: |
+          bash <(curl -s https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+          ./actionlint -color
+
+      - name: ShellCheck Scripts and Composite Action
+        run: |
+          if compgen -G "scripts/*.sh" > /dev/null; then
+            shellcheck scripts/*.sh
+          fi
+          python3 -c '
+          import yaml, subprocess, sys
+          with open("action.yml") as f:
+              action = yaml.safe_load(f)
+          steps = action.get("runs", {}).get("steps", [])
+          errors = 0
+          for i, step in enumerate(steps):
+              run_script = step.get("run")
+              if run_script:
+                  name = step.get("name", f"step_{i}")
+                  print(f"Checking action.yml step {i}: {name}")
+                  p = subprocess.run(["shellcheck", "-s", "bash", "-"], input=run_script, text=True, capture_output=True)
+                  if p.returncode != 0:
+                      print(p.stdout)
+                      print(p.stderr)
+                      errors += 1
+          if errors > 0:
+              sys.exit(1)
+          print("action.yml shellcheck passed!")
+          '
 
   test:
-    needs: lint
+    name: Test (${{ matrix.os }}, Py${{ matrix.python-version }})
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.code == 'true' || github.event_name != 'pull_request'
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         exclude:
-          # Reduce matrix: only test all Python versions on Linux
+          # Smart matrix pruning: retain full Python matrix (3.10..3.13) on Linux, prune Windows/macOS to LTS
           - os: windows-latest
             python-version: "3.10"
           - os: windows-latest
             python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.13"
           - os: macos-latest
             python-version: "3.10"
           - os: macos-latest
             python-version: "3.11"
+          - os: macos-latest
+            python-version: "3.13"
 
     steps:
-    - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v7
-      with:
-        python-version: ${{ matrix.python-version }}
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[test]"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
 
-    - name: Run tests
-      run: pytest tests/ --benchmark-disable --cov --cov-branch --cov=yaml_workflow --cov-report=xml
+      - name: Run tests
+        run: pytest tests/ --benchmark-disable --cov --cov-branch --cov=yaml_workflow --cov-report=xml
 
-    - name: Upload coverage to Codecov
-      if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
-      uses: codecov/codecov-action@v7
-      continue-on-error: true
-      with:
-        files: ./coverage.xml
-        fail_ci_if_error: false
-        token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v5
+        continue-on-error: true
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   benchmark:
-    needs: lint
+    name: Performance Benchmarks
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.code == 'true' || github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-    - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v7
-      with:
-        python-version: "3.12"
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e ".[test]"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[test]"
 
-    - name: Run benchmarks
-      run: pytest tests/test_performance.py --benchmark-json=benchmark-results.json -v
+      - name: Run benchmarks
+        run: pytest tests/test_performance.py --benchmark-json=benchmark-results.json -v
 
-    - name: Upload benchmark results
-      uses: actions/upload-artifact@v7
-      with:
-        name: benchmark-results
-        path: benchmark-results.json
-        retention-days: 90
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.json
+          retention-days: 90
+
+  test-action:
+    name: Action Runner Tests
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.code == 'true' || github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Test 1: Simple workflow ──────────────────────────────────────
+      - name: Create simple test workflow
+        run: |
+          cat > /tmp/test_simple.yaml << 'WORKFLOW'
+          name: Simple Action Test
+          params:
+            greeting:
+              type: string
+              default: World
+          steps:
+            - name: greet
+              task: echo
+              inputs:
+                message: "Hello, {{ args.greeting }}!"
+            - name: compute
+              task: python_code
+              inputs:
+                code: |
+                  result = {"message": "Action works", "param": args.get("greeting", "?")}
+          WORKFLOW
+
+      - name: Run simple workflow (text)
+        uses: ./
+        id: text_run
+        with:
+          workflow: /tmp/test_simple.yaml
+          params: greeting=CI
+          format: text
+
+      - name: Verify text output
+        run: |
+          echo "${{ steps.text_run.outputs.result }}"
+          test -n "${{ steps.text_run.outputs.result }}"
+
+      - name: Run simple workflow (JSON)
+        uses: ./
+        id: json_run
+        with:
+          workflow: /tmp/test_simple.yaml
+          params: greeting=CI
+          format: json
+
+      - name: Verify JSON output
+        run: |
+          echo '${{ steps.json_run.outputs.result }}' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data['status'] == 'success', f'Got {data[\"status\"]}'
+          assert 'outputs' in data
+          print('Simple test passed')
+          "
+
+      # ── Test 2: Complex workflow (shell, conditions, depends_on) ──
+      - name: Create complex test workflow
+        run: |
+          cat > /tmp/test_complex.yaml << 'WORKFLOW'
+          name: Complex Action Test
+          description: Exercises shell, python_code, conditions, depends_on, and notify.
+
+          params:
+            count:
+              type: integer
+              default: 5
+            mode:
+              type: string
+              default: full
+
+          steps:
+            - name: setup
+              task: python_code
+              inputs:
+                code: |
+                  import os, json
+                  os.makedirs(os.path.join(context["workspace"], "output"), exist_ok=True)
+                  result = {"ready": True, "count": int(args.get("count", 5))}
+
+            - name: fetch_data
+              task: shell
+              inputs:
+                command: "echo Fetched data with count={{ args.count }}"
+
+            - name: fetch_config
+              task: python_code
+              inputs:
+                code: |
+                  result = {"db": "postgres", "cache": True}
+
+            - name: process
+              task: python_code
+              depends_on: [fetch_data, fetch_config]
+              inputs:
+                code: |
+                  cfg = steps["fetch_config"]["result"]
+                  count = steps["setup"]["result"]["count"]
+                  records = [{"id": i, "value": i * 10} for i in range(count)]
+                  result = {"records": records, "total": len(records), "db": cfg["db"]}
+
+            - name: write_report
+              task: python_code
+              inputs:
+                code: |
+                  import os, json
+                  total = steps["process"]["result"]["total"]
+                  report = {"summary": "Processed " + str(total) + " records", "status": "complete"}
+                  path = os.path.join(context["workspace"], "output", "report.json")
+                  with open(path, "w") as f:
+                      json.dump(report, f)
+                  result = report
+
+            - name: optional_analytics
+              task: python_code
+              condition: "{{ args.mode == 'full' }}"
+              inputs:
+                code: |
+                  total = steps["process"]["result"]["total"]
+                  result = {"avg_value": 50 * (total - 1) / 2 if total > 0 else 0}
+
+            - name: notify_done
+              task: notify
+              inputs:
+                channel: log
+                level: info
+                message: "Pipeline complete: {{ steps.process.result.total }} records processed"
+          WORKFLOW
+
+      - name: Run complex workflow (JSON)
+        uses: ./
+        id: complex_run
+        with:
+          workflow: /tmp/test_complex.yaml
+          params: |
+            count=3
+            mode=full
+          format: json
+
+      - name: Verify complex workflow output
+        run: |
+          echo '${{ steps.complex_run.outputs.result }}' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data['status'] == 'success', f'Got {data[\"status\"]}'
+          outputs = data.get('outputs', {})
+          assert 'process' in outputs, 'Missing process step'
+          assert 'optional_analytics' in outputs, 'Conditional step should have run'
+          assert 'notify_done' in outputs, 'Notify step should have run'
+          print(f'Complex test passed: {len(outputs)} steps completed')
+          "
+
+      # ── Test 3: Validate command ───────────────────────────────────
+      - name: Validate the complex workflow
+        run: |
+          yaml-workflow validate /tmp/test_complex.yaml --format json | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data['valid'], 'Validation failed'
+          print('Validate test passed')
+          "
+
+  ci-gate:
+    name: CI Gate / All Checks Passed
+    if: always()
+    needs:
+      - detect-changes
+      - lint
+      - test
+      - benchmark
+      - test-action
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate Dependency Statuses
+        shell: bash
+        run: |
+          echo "Evaluating CI matrix health..."
+          STATUSES='${{ toJson(needs) }}'
+          FAILED=()
+
+          for job in $(echo "$STATUSES" | jq -r 'keys[]'); do
+            result=$(echo "$STATUSES" | jq -r --arg j "$job" '.[$j].result')
+            echo "  Job [$job]: $result"
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              FAILED+=("$job")
+            fi
+          done
+
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            echo "::error::The following required checks failed: ${FAILED[*]}"
+            exit 1
+          fi
+
+          echo "::notice::All applicable CI checks passed (or were cleanly skipped by path filters)."
+          exit 0

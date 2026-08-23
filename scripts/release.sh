@@ -44,8 +44,9 @@ compare_versions() {
     fi
     
     # Convert versions to comparable numbers
-    local v1=$(echo "$version1" | awk -F. '{ printf("%d%03d%03d", $1,$2,$3); }')
-    local v2=$(echo "$version2" | awk -F. '{ printf("%d%03d%03d", $1,$2,$3); }')
+    local v1 v2
+    v1=$(echo "$version1" | awk -F. '{ printf("%d%03d%03d", $1,$2,$3); }')
+    v2=$(echo "$version2" | awk -F. '{ printf("%d%03d%03d", $1,$2,$3); }')
     
     if [ "$v1" -le "$v2" ]; then
         echo "Error: New version ($version1) must be greater than current version ($version2)"
@@ -111,12 +112,12 @@ wait_for_workflow() {
     
     while [ $attempt -le $MAX_ATTEMPTS ]; do
         # Check if release exists
-        if gh release view $tag &> /dev/null; then
+        if gh release view "$tag" &> /dev/null; then
             echo "Release $tag has been created successfully!"
             return 0
         fi
         echo "Attempt $attempt/$MAX_ATTEMPTS: Release not ready yet, waiting ${WORKFLOW_CHECK_INTERVAL}s..."
-        sleep $WORKFLOW_CHECK_INTERVAL
+        sleep "$WORKFLOW_CHECK_INTERVAL"
         attempt=$((attempt + 1))
     done
 

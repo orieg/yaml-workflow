@@ -34,7 +34,7 @@ jobs:
         
       - name: Run tests
         run: |
-          pip install .[test]
+          pip install ".[test]"
           pytest
           
       - name: Publish to PyPI

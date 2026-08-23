@@ -25,11 +25,11 @@ jobs:
         # Strip v prefix: v0.8.2 → 0.8.2
         VERSION=${TAG#v}
         if [[ $TAG == *-test ]]; then
-          echo "is_test=true" >> $GITHUB_OUTPUT
-          echo "version=${VERSION%-test}" >> $GITHUB_OUTPUT
+          echo "is_test=true" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION%-test}" >> "$GITHUB_OUTPUT"
         else
-          echo "is_test=false" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_test=false" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
         fi
     
     - name: Verify tag version matches package version
