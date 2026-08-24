@@ -99,7 +99,7 @@ dev = [
 mcp = [
     # Pinned to <2: the server uses the mcp 1.x low-level Server API
     # (@server.list_tools()/@server.call_tool()), which mcp 2.0 removed.
-    "mcp>=1.0,<2.0",
+    "mcp>=1.0,<3.0",
 ]
 serve = [
     "fastapi>=0.100,<1.0",
