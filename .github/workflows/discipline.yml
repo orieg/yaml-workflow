@@ -14,9 +14,9 @@ jobs:
     name: Discipline Sentinel
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # merge base must be reachable
-      - uses: orieg/discipline@v0
+      - uses: orieg/discipline@5ab92597ac1c58d6566936cdf4166d4a2db80a07 # v0.2.0
         with:
           fail_on_warnings: true
