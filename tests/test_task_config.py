@@ -116,7 +116,7 @@ def test_task_config_nested_variables():
         },
         {
             "args": {"user": {"name": "test"}},
-            "env": {"paths": {"home": "/home/test"}},
+            "env": {"paths": {"home": "/home/user"}},
             "steps": {},
         },
         Path("/tmp"),
@@ -124,7 +124,7 @@ def test_task_config_nested_variables():
 
     processed = config.process_inputs()
     assert processed["command"] == "echo 'test'"
-    assert processed["env"] == {"HOME": "/home/test"}
+    assert processed["env"] == {"HOME": "/home/user"}
 
 
 def test_task_config_step_outputs():
