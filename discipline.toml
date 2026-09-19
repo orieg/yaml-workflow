@@ -1,0 +1,12 @@
+# discipline.toml — CI/CD gatekeeper and AI coding agent diff sentinel configuration.
+#
+# Every available gate is on at severity "error" by default.
+# Reference: https://github.com/orieg/discipline
+
+[meta]
+version = 1
+name = "yaml-workflow"
+description = "Lightweight Python workflow engine with YAML and Jinja2"
+
+[gates.pii]
+allowed_users = ["runner", "user", "username", "you", "me", "name", "example", "shared", "test"]

@@ -1,0 +1,22 @@
+name: CI Sentinel
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: ['main']
+
+permissions:
+  contents: read
+
+jobs:
+  discipline:
+    name: Discipline Sentinel
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # merge base must be reachable
+      - uses: orieg/discipline@v0
+        with:
+          fail_on_warnings: true
