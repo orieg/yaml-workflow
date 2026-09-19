@@ -40,6 +40,8 @@ jobs:
       - name: Publish to PyPI
         if: ${{ !contains(github.ref, '-test') }}
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true
         
       - name: Publish to TestPyPI
         if: contains(github.ref, '-test')
