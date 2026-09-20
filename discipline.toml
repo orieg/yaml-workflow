@@ -16,7 +16,8 @@ enabled = true
 groups = [
   { name = "project-version", sources = [
     { path = "pyproject.toml", regex = 'version = "([^"]+)"' },
-    { path = "server.json", regex = '"version": "([^"]+)"' }
+    { path = "server.json", regex = '(?m)^\s{2}"version":\s*"([^"]+)"' },
+    { path = "server.json", regex = '"identifier":\s*"yaml-workflow",\s*"version":\s*"([^"]+)"' }
   ]}
 ]
 
