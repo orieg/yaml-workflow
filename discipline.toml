@@ -10,3 +10,13 @@ description = "Lightweight Python workflow engine with YAML and Jinja2"
 
 [gates.pii]
 allowed_users = ["runner", "user", "username", "you", "me", "name", "example", "shared", "test"]
+
+[gates.version-lockstep]
+enabled = true
+groups = [
+  { name = "project-version", sources = [
+    { path = "pyproject.toml", regex = 'version = "([^"]+)"' },
+    { path = "server.json", regex = '"version": "([^"]+)"' }
+  ]}
+]
+
