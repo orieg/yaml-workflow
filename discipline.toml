@@ -1,7 +1,7 @@
 # discipline.toml — CI/CD gatekeeper and AI coding agent diff sentinel configuration.
 #
 # Every available gate is on at severity "error" by default.
-# Reference: https://github.com/orieg/discipline
+# Reference: https://github.com/orieg/discipline/blob/main/docs/CONFIGURATION.md
 
 [meta]
 version = 1
