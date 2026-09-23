@@ -17,8 +17,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # merge base must be reachable
-      - uses: orieg/discipline@c50785d58a3d7570c392245fee90af80ca695107 # v0.6.0
+      - uses: orieg/discipline@5db96e7c560450545e77b5086865687186939261 # v0.11.0
         with:
-          version: v0.6.0
+          version: v0.11.0
           fail_on_warnings: true
 
