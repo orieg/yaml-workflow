@@ -21,3 +21,7 @@ groups = [
   ]}
 ]
 
+[gates.vacuous-tests]
+# jsonschema.validate raises on invalid data; pytest-benchmark's fixture fails on an error.
+assert_helper_fns = ["jsonschema.validate", "benchmark"]
+
