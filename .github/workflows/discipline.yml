@@ -18,9 +18,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # merge base must be reachable
-      - uses: orieg/discipline@712239d775a189ce87a90ec9dd0395315146d5eb # v0.14.1
+      - uses: orieg/discipline@f251807952d0fb75e6b3a0a269edc96bf9a0d7b4 # v0.14.2
         with:
-          version: v0.14.1
+          version: v0.14.2
           fail_on_warnings: true
           # Judge a change by the base branch's discipline.toml, so a policy edit
           # takes effect only once merged (config-integrity still reports it).
