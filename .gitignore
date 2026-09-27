@@ -72,4 +72,7 @@ test_workspace/
 .benchmarks/
 
 # AI coding agent local settings (project-level, not committed)
-.claude/
+.claude/*
+# ...except the shared discipline hooks (discipline hook install --agent claude-code)
+!.claude/settings.json
+!.claude/hooks/
