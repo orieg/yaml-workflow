@@ -2,14 +2,14 @@
   "hooks": {
     "agentStop": [
       {
-        "bash": "discipline hook run --agent copilot --observe",
+        "bash": "discipline hook run --agent copilot",
         "timeoutSec": 120,
         "type": "command"
       }
     ],
     "postToolUse": [
       {
-        "bash": "discipline hook run --agent copilot --observe",
+        "bash": "discipline hook run --agent copilot",
         "matcher": "create|edit|str_replace_editor|apply_patch",
         "timeoutSec": 120,
         "type": "command"
