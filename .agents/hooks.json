@@ -9,7 +9,7 @@
     ],
     "Stop": [
       {
-        "command": "discipline hook run --agent agy --observe",
+        "command": "discipline hook run --agent agy",
         "timeout": 120,
         "type": "command"
       }
