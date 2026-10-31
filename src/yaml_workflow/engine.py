@@ -26,6 +26,7 @@ from .exceptions import (
     FlowNotFoundError,
     FunctionNotFoundError,
     InvalidFlowDefinitionError,
+    RequiredVariableError,
     StepExecutionError,
     StepNotInFlowError,
     TaskExecutionError,
@@ -735,9 +736,15 @@ class WorkflowEngine:
             max_retries: Global maximum number of retries for failed steps (default: 3)
 
         Returns:
-            dict: Workflow results
+            dict: Workflow results, with status "paused" when a resumable step
+                is missing a required function parameter.
         """
-        # Update context with provided parameters (overriding defaults)
+        if resume_from:
+            saved_args = self.state.get_namespace("args")
+            self.context.update(saved_args)
+            self.context["args"].update(saved_args)
+
+        # Update context with provided parameters (overriding defaults and saved args)
         if params:
             # Update both root (backward compatibility) and args namespace
             self.context.update(params)
@@ -825,10 +832,12 @@ class WorkflowEngine:
 
         # Handle workflow resumption vs fresh start
         if resume_from:
-            # Verify workflow is in failed state and step exists
+            # Verify workflow is failed or paused and step exists
             state = self.state.metadata["execution_state"]
-            if state["status"] != "failed" or not state["failed_step"]:
-                raise WorkflowError("Cannot resume: workflow is not in failed state")
+            if state["status"] not in ("failed", "paused") or (
+                state["status"] == "failed" and not state["failed_step"]
+            ):
+                raise WorkflowError("Cannot resume: workflow is not failed or paused")
             if not any(step.get("name") == resume_from for step in steps):
                 raise WorkflowError(
                     f"Cannot resume: step '{resume_from}' not found in workflow"
@@ -836,7 +845,7 @@ class WorkflowEngine:
 
             # Restore outputs from completed steps
             self.context.update(self.state.get_completed_outputs())
-            self.logger.info(f"Resuming workflow from failed step: {resume_from}")
+            self.logger.info(f"Resuming workflow from step: {resume_from}")
         else:
             # Reset state for fresh run
             self.state.reset_state()
@@ -847,6 +856,9 @@ class WorkflowEngine:
         # Initialize execution state if not resuming
         if not resume_from:
             self.state.initialize_execution()
+
+        # Save after fresh-run initialization, which clears persisted namespaces.
+        self.state.update_namespace("args", self.context["args"])
 
         # Restore step outputs from state if resuming or has previous state
         if self.state.metadata.get("execution_state", {}).get("step_outputs"):
@@ -883,8 +895,17 @@ class WorkflowEngine:
             )
             self.logger.info(f"Starting workflow from step: {start_from}")
 
+        # Preserve legacy handling of empty dependency lists outside resumable workflows.
+        resumable_workflow = any(step.get("resumable") for step in flow_steps)
+        has_dag = any(step.get("depends_on") for step in flow_steps) or (
+            resumable_workflow and any("depends_on" in step for step in flow_steps)
+        )
+        # A resumed DAG needs every dependency definition, including completed
+        # ancestors and paused siblings earlier than resume_from in YAML order.
+        steps_to_execute_initially = (
+            flow_steps if resume_from and has_dag else flow_steps[start_index:]
+        )
         # Apply initial skips only - runtime skips are handled in execute_step
-        steps_to_execute_initially = flow_steps[start_index:]
         initial_skip_set = set(skip_steps or [])
         steps_to_execute = [
             step
@@ -902,12 +923,6 @@ class WorkflowEngine:
 
         # Detect DAG mode: if any step has depends_on, use parallel execution
         executed_step_names: Set[str] = set(self.state.get_executed_steps())
-        has_dag = any(
-            step.get("depends_on")
-            for step in steps_to_execute
-            if isinstance(step, dict)
-        )
-
         if has_dag:
             self._run_dag(steps_to_execute, executed_step_names, flow=flow)
             # Skip the sequential loop -- DAG mode handled everything
@@ -930,6 +945,9 @@ class WorkflowEngine:
                     self.execute_step(step, max_retries)
                     executed_step_names.add(step_name)
                     current_index += 1
+                except RequiredVariableError:
+                    # execute_step recorded the missing input; return the paused run.
+                    break
                 except TaskExecutionError as e:
                     # Check if it was a retry request first!
                     if isinstance(e, RetryStepException):
@@ -1028,7 +1046,17 @@ class WorkflowEngine:
         # Save final state only if no exceptions occurred during the loop
         # Check status before marking completed
         final_state = cast(ExecutionState, self.state.metadata["execution_state"])
-        if final_state["status"] != "failed":
+        paused_steps = [
+            name
+            for name, data in final_state["step_outputs"].items()
+            if data.get("status") == "paused"
+        ]
+        if paused_steps:
+            # A parallel sibling may have completed after the pause was recorded.
+            final_state["status"] = "paused"
+            final_state["current_step_name"] = paused_steps[0]
+            self.state.save()
+        elif final_state["status"] != "failed":
             # Mark any remaining steps in the original planned list as skipped
             # (This handles jumps caused by on_error: next)
             all_planned_steps = {s["name"] for s in flow_steps}
@@ -1185,7 +1213,10 @@ class WorkflowEngine:
             if len(pending) == 1:
                 # Single step -- run directly (no thread overhead)
                 step = step_dict[pending[0]]
-                self.execute_step(step)
+                try:
+                    self.execute_step(step)
+                except RequiredVariableError:
+                    return
             else:
                 # Multiple steps -- run in parallel
                 self.logger.info(
@@ -1206,10 +1237,16 @@ class WorkflowEngine:
                         name = futures[future]
                         try:
                             future.result()
+                        except RequiredVariableError:
+                            # Drain this level, preserving successful sibling outputs.
+                            pass
                         except Exception as e:
                             errors.append((name, e))
 
                 if errors:
+                    if self.state.metadata["execution_state"].get("failed_step"):
+                        self.state.metadata["execution_state"]["status"] = "failed"
+                        self.state.save()
                     # Report the first error (matching sequential behavior)
                     name, error = errors[0]
                     if len(errors) > 1:
@@ -1218,6 +1255,15 @@ class WorkflowEngine:
                             f"{', '.join(n for n, _ in errors)}"
                         )
                     raise error
+
+                if any(
+                    self.state.metadata["execution_state"]["step_outputs"]
+                    .get(name, {})
+                    .get("status")
+                    == "paused"
+                    for name in pending
+                ):
+                    return
 
     def _execute_step_thread_safe(self, step):
         """Wrapper around execute_step that acquires the context lock for writes."""
@@ -1237,6 +1283,7 @@ class WorkflowEngine:
             TaskExecutionError: If step execution ultimately fails after retries.
             StepExecutionError: For issues preparing the step itself.
             RetryStepException: If step should be retried.
+            RequiredVariableError: If a resumable step is waiting for input.
         """
         step_name = step.get("name")
         if not step_name:
@@ -1247,13 +1294,15 @@ class WorkflowEngine:
 
         self.current_step = step_name
         self.logger.info(f"Executing step: {step_name}")
-        self.state.set_current_step(step_name)
+        with self._context_lock:
+            self.state.set_current_step(step_name)
 
         # Prepare task config
         task_config = TaskConfig(
             step=step,
             context=self.context,
             workspace=self.workspace,
+            resumable=step.get("resumable", False),
         )
 
         # Find the task handler
@@ -1337,6 +1386,19 @@ class WorkflowEngine:
             # --- Execute Task Handler ---
             result = handler(task_config)
             self.logger.debug(f"Step '{step_name}' completed successfully in handler.")
+
+        except RequiredVariableError as e:
+            if task_config.resumable:
+                self.logger.info(
+                    f"Pausing step '{step_name}': waiting for input '{e.variable_name}'"
+                )
+                with self._context_lock:
+                    self.state.mark_step_paused(step_name, e.variable_name)
+                raise
+            step_failed = True
+            step_error = TaskExecutionError(
+                step_name, original_error=e, task_config=step
+            )
 
         except TaskExecutionError as e:
             # --- Catch task execution errors (already properly typed) ---

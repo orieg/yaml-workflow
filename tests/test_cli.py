@@ -1114,7 +1114,7 @@ def test_cli_run_resume_not_failed_state(
         ]
     )
     assert exit_code == 1
-    assert "Cannot resume: workflow is not in failed state" in err
+    assert "Cannot resume: workflow is not failed or paused" in err
 
 
 def test_cli_run_resume_missing_execution_state(
@@ -1373,3 +1373,136 @@ def test_cli_run_output_file(run_cli, sample_workflow_file, tmp_path):
 
 
 # --- Tests for other commands/edge cases ---
+
+
+@pytest.mark.parametrize("fmt", ["text", "json", "yaml"])
+def test_cli_paused_status_and_resume(run_cli, tmp_path, fmt):
+    calls = []
+
+    @register_task("cli_pause_input")
+    def task(answer: str) -> str:
+        calls.append(answer)
+        return answer
+
+    workflow = {
+        "name": "CLI pause",
+        "params": {"prefix": {"default": "default"}},
+        "steps": [
+            {
+                "name": "before",
+                "task": "cli_pause_input",
+                "inputs": {"answer": "{{ args.prefix }}"},
+            },
+            {"name": "waiting", "task": "cli_pause_input", "resumable": True},
+            {
+                "name": "after",
+                "task": "cli_pause_input",
+                "inputs": {
+                    "answer": "{{ steps.before.result }} / {{ steps.waiting.result }}"
+                },
+            },
+        ],
+    }
+    path = tmp_path / "workflow.yaml"
+    path.write_text(yaml.safe_dump(workflow))
+    workspace = tmp_path / "workspace"
+    command = [
+        "run",
+        str(path),
+        "--workspace",
+        str(workspace),
+        "--base-dir",
+        str(tmp_path),
+        "--format",
+        fmt,
+    ]
+    code, out, err = run_cli([*command, "prefix=saved"])
+    assert code == 0, err
+    if fmt == "text":
+        assert "Workflow paused" in out
+        assert "Step 'waiting' needs input 'answer'" in out
+        assert "completed successfully" not in out
+    else:
+        data = json.loads(out) if fmt == "json" else yaml.safe_load(out)
+        assert data["status"] == "paused"
+        assert data["paused_steps"]["waiting"]["missing_input"] == "answer"
+        assert data["outputs"] == {"before": "saved"}
+        assert data["workspace"] == str(workspace)
+    assert calls == ["saved"]
+
+    # Resuming without the answer must remain paused, without rerunning prior work.
+    code, out, err = run_cli([*command, "--resume"])
+    assert code == 0, err
+    assert calls == ["saved"]
+    if fmt == "text":
+        assert "Workflow paused" in out
+        assert "completed successfully" not in out
+    else:
+        data = json.loads(out) if fmt == "json" else yaml.safe_load(out)
+        assert data["status"] == "paused"
+
+    code, out, err = run_cli([*command, "--resume", "answer=submitted"])
+    assert code == 0, err
+    assert calls == ["saved", "submitted", "saved / submitted"]
+    if fmt == "text":
+        assert "resumed from 'waiting' and completed successfully" in out
+    else:
+        data = json.loads(out) if fmt == "json" else yaml.safe_load(out)
+        assert data["status"] == "success"
+        assert data["outputs"]["after"] == "saved / submitted"
+
+
+def test_cli_resume_without_workspace_preserves_fresh_run_behavior(
+    run_cli, sample_workflow_file, tmp_path
+):
+    code, out, err = run_cli(
+        [
+            "run",
+            str(sample_workflow_file),
+            "name=World",
+            "--resume",
+            "--base-dir",
+            str(tmp_path / "runs"),
+            "--format",
+            "json",
+        ]
+    )
+    assert code == 0, err
+    result = json.loads(out)
+    assert result["status"] == "success"
+    assert result["outputs"]["step1"] == "Hello, World!"
+    assert Path(result["workspace"]).is_dir()
+
+
+def test_cli_resume_requires_paused_step(
+    run_cli, sample_workflow_file, workspace_setup
+):
+    path = workspace_setup / ".workflow_metadata.json"
+    metadata = json.loads(path.read_text())
+    metadata["execution_state"]["status"] = "paused"
+    path.write_text(json.dumps(metadata))
+    code, out, err = run_cli(
+        [
+            "run",
+            str(sample_workflow_file),
+            "--resume",
+            "--workspace",
+            str(workspace_setup),
+        ]
+    )
+    assert code == 1
+    assert "No paused step found" in err
+
+
+def test_cli_watch_returns_when_paused(run_cli, sample_workflow_file, monkeypatch):
+    from unittest.mock import Mock
+
+    run = Mock(return_value={"status": "paused"})
+    monkeypatch.setattr("yaml_workflow.cli._run_workflow_impl", run)
+    monkeypatch.setattr(
+        "yaml_workflow.cli.time.sleep",
+        lambda _: pytest.fail("Watch must return on pause"),
+    )
+    code, out, err = run_cli(["run", str(sample_workflow_file), "--watch"])
+    assert code == 0
+    run.assert_called_once()

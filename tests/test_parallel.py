@@ -2,6 +2,7 @@
 
 import time
 from pathlib import Path
+from threading import get_ident
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,6 +10,7 @@ import yaml
 
 from yaml_workflow.engine import WorkflowEngine
 from yaml_workflow.exceptions import ConfigurationError, WorkflowError
+from yaml_workflow.tasks import register_task
 from yaml_workflow.validator import WorkflowValidator
 
 
@@ -21,6 +23,123 @@ def _run_workflow(workflow_dict, workspace):
     """Helper to run a workflow dict and return results."""
     engine = WorkflowEngine(workflow_dict, base_dir=str(workspace))
     return engine.run()
+
+
+@pytest.mark.parametrize("restart", [False, True])
+def test_resume_parallel_pauses_keeps_full_graph(tmp_path, restart):
+    calls = []
+
+    @register_task("parallel_resume_record")
+    def record(value: str) -> str:
+        calls.append(value)
+        return value
+
+    workflow = {
+        "steps": [
+            {
+                "name": "prepare",
+                "task": "parallel_resume_record",
+                "inputs": {"value": "prepared"},
+            },
+            {
+                "name": "first",
+                "task": "parallel_resume_record",
+                "resumable": True,
+                "depends_on": ["prepare"],
+            },
+            {
+                "name": "second",
+                "task": "parallel_resume_record",
+                "resumable": True,
+                "depends_on": ["prepare"],
+            },
+            {
+                "name": "sibling",
+                "task": "parallel_resume_record",
+                "depends_on": ["prepare"],
+                "inputs": {"value": "sibling"},
+            },
+            {
+                "name": "join",
+                "task": "parallel_resume_record",
+                "depends_on": ["first", "second", "sibling"],
+                "inputs": {
+                    "value": "{{ steps.prepare.result }}:{{ steps.first.result }}:{{ steps.second.result }}"
+                },
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=str(tmp_path))
+    assert engine.run()["status"] == "paused"
+    assert calls == ["prepared", "sibling"]
+    workspace = engine.workspace
+
+    # Resuming the later step must not drop the earlier unanswered step.
+    workflow["steps"][2]["inputs"] = {"value": "two"}
+    if restart:
+        engine = WorkflowEngine(
+            workflow, workspace=str(workspace), base_dir=str(tmp_path)
+        )
+    result = engine.run(resume_from="second")
+    assert result["status"] == "paused"
+    assert result["steps_state"]["first"]["status"] == "paused"
+    assert result["outputs"]["second"]["result"] == "two"
+    assert "join" not in result["steps_state"]
+
+    workflow["steps"][1]["inputs"] = {"value": "one"}
+    if restart:
+        engine = WorkflowEngine(
+            workflow, workspace=str(workspace), base_dir=str(tmp_path)
+        )
+    result = engine.run(resume_from="first")
+    assert result["status"] == "completed"
+    assert calls == ["prepared", "sibling", "two", "one", "prepared:one:two"]
+    assert result["outputs"]["join"]["result"] == "prepared:one:two"
+
+
+def test_empty_dependencies_preserve_nonresumable_sequential_behavior(tmp_path):
+    @register_task("parallel_legacy_thread")
+    def task() -> int:
+        return get_ident()
+
+    engine = WorkflowEngine(
+        {
+            "steps": [
+                {"name": "first", "task": "parallel_legacy_thread", "depends_on": []},
+                {"name": "second", "task": "parallel_legacy_thread", "depends_on": []},
+            ]
+        },
+        base_dir=str(tmp_path),
+    )
+    result = engine.run()
+    assert result["status"] == "completed"
+    assert result["outputs"]["first"]["result"] == get_ident()
+    assert result["outputs"]["second"]["result"] == get_ident()
+
+
+def test_explicit_empty_dependencies_allow_sibling_to_finish(tmp_path):
+    @register_task("parallel_empty_dependencies")
+    def task(value: str) -> str:
+        return value
+
+    engine = WorkflowEngine(
+        {
+            "steps": [
+                {
+                    "name": "waiting",
+                    "task": "parallel_empty_dependencies",
+                    "resumable": True,
+                    "depends_on": [],
+                },
+                {"name": "sibling", "task": "noop", "depends_on": []},
+            ]
+        },
+        base_dir=str(tmp_path),
+    )
+    result = engine.run()
+    assert result["status"] == "paused"
+    assert result["steps_state"]["waiting"]["status"] == "paused"
+    assert "sibling" in result["outputs"]
 
 
 class TestDependencyGraph:

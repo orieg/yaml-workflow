@@ -84,7 +84,7 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
                 exec_state = meta.get("execution_state", {})
                 runs.append(
                     {
-                        "id": run_dir.name,
+                        "id": meta.get("dashboard_run_id", run_dir.name),
                         "path": str(run_dir),
                         "workflow": meta.get("workflow", run_dir.name),
                         "status": exec_state.get("status", "unknown"),
@@ -133,6 +133,8 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
                 "completed_steps": exec_state.get("completed_steps", []),
                 "step_outputs": exec_state.get("step_outputs", {}),
                 "failed_step": exec_state.get("failed_step"),
+                "current_step_name": exec_state.get("current_step_name"),
+                "workflow_file": meta.get("workflow_file"),
                 "logs": logs,
             }
         except (json.JSONDecodeError, OSError):
@@ -177,6 +179,7 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             "running": "bg-blue-100 text-blue-800",
             "in_progress": "bg-blue-100 text-blue-800",
             "pending": "bg-gray-100 text-gray-800",
+            "paused": "bg-yellow-100 text-yellow-800",
         }
         cls = colors.get(status, "bg-gray-100 text-gray-800")
         return f'<span class="px-2 py-1 rounded-full text-xs font-medium {cls}">{html.escape(str(status))}</span>'
@@ -367,6 +370,15 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
                 <pre class="text-xs text-gray-600 mt-1 overflow-x-auto">{html.escape(result_str)}</pre>
             </div>"""
 
+        for step_name, step_data in run.get("step_outputs", {}).items():
+            if step_data.get("status") == "paused":
+                missing = html.escape(str(step_data.get("missing_input", "")))
+                steps_html += f"""
+                <div class="border-l-4 border-yellow-400 pl-4 py-2 mb-3">
+                    <div class="font-medium text-sm">{html.escape(str(step_name))} {_status_badge('paused')}</div>
+                    <p class="text-xs mt-1">Waiting for input: {missing}</p>
+                </div>"""
+
         failed = run.get("failed_step")
         if failed:
             fname = (
@@ -382,6 +394,15 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             </div>"""
 
         logs_html = html.escape(run.get("logs", ""))
+        resume_form = ""
+        if run.get("status") in ("paused", "failed") and run.get("workflow_file"):
+            resume_form = f"""
+            <form method="POST" action="/api/runs/{html.escape(run_id)}/resume"
+                  class="bg-white rounded-lg shadow p-4 mb-6">
+                <label class="block text-sm font-medium mb-2">Additional parameters (JSON)</label>
+                <textarea name="params" class="border rounded w-full p-2 font-mono" required>{{}}</textarea>
+                <button type="submit" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded">Resume</button>
+            </form>"""
 
         content = f"""
         <div class="flex items-center gap-3 mb-6">
@@ -390,6 +411,7 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             {_status_badge(run.get('status', 'unknown'))}
         </div>
         <p class="text-sm text-gray-500 mb-6">ID: {html.escape(str(run_id))} &bull; Created: {html.escape(run.get('created_at', '-')[:19])}</p>
+        {resume_form}
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
@@ -411,6 +433,33 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
     # ------------------------------------------------------------------
     # API routes
     # ------------------------------------------------------------------
+
+    def _run_in_bg(
+        run_id: str,
+        workflow_path: str,
+        params: Dict[str, Any],
+        workspace: Optional[str] = None,
+        resume_from: Optional[str] = None,
+    ) -> None:
+        try:
+            from yaml_workflow.engine import WorkflowEngine
+
+            engine = WorkflowEngine(
+                workflow_path, base_dir=base_dir, workspace=workspace
+            )
+            # Preserve the public run ID and workflow reference across dashboard restarts.
+            engine.state.metadata["dashboard_run_id"] = run_id
+            engine.state.metadata["workflow_file"] = str(Path(workflow_path).resolve())
+            engine.state.save()
+            results = engine.run(params=params, resume_from=resume_from)
+            live_runs[run_id]["status"] = results["status"]
+            live_runs[run_id]["step_outputs"] = results["steps_state"]
+            live_runs[run_id]["completed_steps"] = results["execution_state"][
+                "completed_steps"
+            ]
+        except Exception as e:
+            live_runs[run_id]["status"] = "failed"
+            live_runs[run_id]["logs"] = str(e)
 
     @app.post("/api/run")
     async def trigger_run(request: Request):
@@ -446,29 +495,68 @@ def create_app(workflow_dir: str = "workflows", base_dir: str = "runs") -> FastA
             "logs": "",
         }
 
-        def _run_in_bg():
-            try:
-                from yaml_workflow.engine import WorkflowEngine
-
-                engine = WorkflowEngine(workflow_path, base_dir=base_dir)
-                results = engine.run(**params)
-                live_runs[run_id]["status"] = "completed"
-                if results and results.get("outputs"):
-                    live_runs[run_id]["step_outputs"] = results["outputs"]
-                    live_runs[run_id]["completed_steps"] = list(
-                        results["outputs"].keys()
-                    )
-            except Exception as e:
-                live_runs[run_id]["status"] = "failed"
-                live_runs[run_id]["logs"] = str(e)
-
-        thread = threading.Thread(target=_run_in_bg, daemon=True)
+        thread = threading.Thread(
+            target=lambda: _run_in_bg(run_id, workflow_path, params), daemon=True
+        )
         thread.start()
 
         # If request came from HTML form, redirect to dashboard
         accept = request.headers.get("accept", "")
         if "text/html" in accept:
             return RedirectResponse(url="/", status_code=303)
+        return JSONResponse({"run_id": run_id, "status": "started"})
+
+    @app.post("/api/runs/{run_id}/resume")
+    async def resume_run(run_id: str, request: Request):
+        """Supply parameters and continue a known run in its saved workspace."""
+        try:
+            if request.headers.get("content-type", "").startswith("application/json"):
+                body = await request.json()
+                params = body.get("params", {}) if isinstance(body, dict) else None
+            else:
+                form = await request.form()
+                params = json.loads(str(form.get("params", "{}")))
+        except ValueError:
+            return JSONResponse({"error": "Invalid JSON parameters"}, status_code=400)
+        if not isinstance(params, dict):
+            return JSONResponse({"error": "params must be an object"}, status_code=400)
+
+        run = _get_run(run_id)
+        if run is None:
+            return JSONResponse({"error": "Run not found"}, status_code=404)
+        if live_runs.get(run_id, {}).get("status") == "running" or run[
+            "status"
+        ] not in ("paused", "failed"):
+            return JSONResponse(
+                {"error": "Run is not paused or failed"}, status_code=409
+            )
+        workflow = next(
+            (
+                wf
+                for wf in _scan_workflows()
+                if str(Path(wf["path"]).resolve()) == run.get("workflow_file")
+            ),
+            None,
+        )
+        if workflow is None:
+            return JSONResponse({"error": "Workflow not found"}, status_code=404)
+        resume_from = (
+            (run.get("failed_step") or {}).get("step_name")
+            if run["status"] == "failed"
+            else run.get("current_step_name")
+        )
+        if not resume_from:
+            return JSONResponse({"error": "No step to resume"}, status_code=409)
+        live_runs[run_id] = {**run, "status": "running"}
+        thread = threading.Thread(
+            target=lambda: _run_in_bg(
+                run_id, workflow["path"], params, run["path"], resume_from
+            ),
+            daemon=True,
+        )
+        thread.start()
+        if "text/html" in request.headers.get("accept", ""):
+            return RedirectResponse(url=f"/runs/{run_id}", status_code=303)
         return JSONResponse({"run_id": run_id, "status": "started"})
 
     @app.get("/api/runs")

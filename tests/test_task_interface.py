@@ -1,11 +1,12 @@
 """Tests for the task interface and TaskConfig class."""
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from yaml_workflow.engine import WorkflowEngine
-from yaml_workflow.exceptions import TemplateError
+from yaml_workflow.exceptions import RequiredVariableError, TemplateError
 from yaml_workflow.tasks import TaskConfig, get_task_handler, register_task
 
 
@@ -55,6 +56,74 @@ def task_with_args_and_config(message: str, config: TaskConfig) -> str:
     # Accessing config.workspace.path as an example if needed
     # print(f"Workspace path from config: {config.workspace.path}")
     return f"Processed: {message}"
+
+
+@pytest.mark.parametrize("resumable", [False, True])
+def test_missing_required_parameter(tmp_path, resumable):
+    called = False
+
+    @register_task("test_missing_required_parameter")
+    def task(message: str) -> str:
+        nonlocal called
+        called = True
+        return message
+
+    config = TaskConfig(
+        {"name": "waiting_step", "inputs": {}}, {}, tmp_path, resumable=resumable
+    )
+    if resumable:
+        with pytest.raises(RequiredVariableError) as exc:
+            task(config)
+        assert exc.value.variable_name == "message"
+        assert exc.value.step_name == "waiting_step"
+    else:
+        with pytest.raises(ValueError, match="Missing required parameter: message"):
+            task(config)
+    assert not called
+
+
+@pytest.mark.parametrize("value", [None, False, 0, ""])
+def test_resumable_supplied_parameter(tmp_path, value):
+    @register_task("test_resumable_supplied_parameter")
+    def task(message: Any, optional: str = "default") -> tuple:
+        return message, optional
+
+    config = TaskConfig(
+        {"name": "ready_step", "inputs": {"message": value}},
+        {},
+        tmp_path,
+        resumable=True,
+    )
+    assert task(config) == (value, "default")
+
+
+@pytest.mark.parametrize("value", [None, False, 0, "", "answer"])
+def test_task_parameters_fall_back_to_args(tmp_path, value):
+    @register_task("test_parameter_args_fallback")
+    def task(message: Any, optional: str = "default") -> tuple:
+        return message, optional
+
+    config = TaskConfig(
+        {"name": "from_args", "inputs": {}},
+        {"args": {"message": value}},
+        tmp_path,
+        resumable=True,
+    )
+    assert task(config) == (value, "default")
+
+
+@pytest.mark.parametrize("value", [None, False, 0, "", "step input"])
+def test_task_inputs_take_precedence_over_args(tmp_path, value):
+    @register_task("test_parameter_input_precedence")
+    def task(message: Any, optional: str = "default") -> tuple:
+        return message, optional
+
+    config = TaskConfig(
+        {"name": "explicit_input", "inputs": {"message": value}},
+        {"args": {"message": "from args", "optional": "also from args"}},
+        tmp_path,
+    )
+    assert task(config) == (value, "also from args")
 
 
 def test_task_config_initialization(basic_step, context_with_namespaces, workspace):

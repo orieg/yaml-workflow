@@ -148,7 +148,8 @@ def create_workspace(
         "base_dir": str(base_path.absolute()),
     }
 
-    save_metadata(workspace, metadata)
+    if not (workspace / METADATA_FILE).exists():
+        save_metadata(workspace, metadata)
 
     return workspace
 

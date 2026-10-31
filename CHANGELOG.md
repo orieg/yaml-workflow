@@ -8,7 +8,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `TaskConfig` input lookups fall back to `args`; required dictionary-key access
+  pauses resumable handlers when a value is missing. Optional `.get()` retains defaults.
+- Named task parameters fall back to matching workflow parameters in `args` when
+  absent from step inputs, allowing resume answers through existing `params` APIs.
+- Resumable task configurations report missing required function parameters with
+  `RequiredVariableError`, including the parameter and step names.
+- The engine pauses steps marked `resumable: true` when required function inputs
+  are missing, bypassing retries and error handlers and preserving completed outputs.
+- `WorkflowEngine.run(resume_from=...)` also accepts paused runs.
+- Run parameters are saved in the `args` namespace and restored on resume;
+  explicitly supplied parameters override saved values.
+- CLI resume accepts paused runs, reports missing inputs in text and structured
+  output, and returns from watch mode when a run pauses.
+- MCP execution returns workspace and paused-step details; `run_workflow` accepts
+  `workspace` and `resume_from` to continue failed or paused runs.
+- The dashboard can resume paused or failed runs through the run detail form or
+  `POST /api/runs/{run_id}/resume`, supplying additional parameters.
 - CI sentinel workflow integrating `orieg/discipline` for automated diff inspection and quality gates.
+
+### Fixed
+- The web dashboard preserves paused run status and displays missing inputs
+  instead of reporting the run completed.
+- Parallel resume retains the full dependency graph and skips completed steps,
+  including when multiple steps are paused. Empty `depends_on` lists enable DAG
+  execution for resumable workflows; other workflows retain their existing behavior.
+- Opening an existing workspace no longer overwrites its saved metadata and execution state.
 
 ## [0.9.6] - 2026-08-17
 

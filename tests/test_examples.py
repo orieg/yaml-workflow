@@ -408,7 +408,7 @@ def test_resume_workflow(run_cli, example_workflows_dir, workspace_dir):
     )
 
     assert exit_code != 0, "Resuming completed workflow should fail"
-    assert "Cannot resume: workflow is not in failed state" in err
+    assert "Cannot resume: workflow is not failed or paused" in err
 
 
 def test_complex_flow_error_handling(run_cli, example_workflows_dir, workspace_dir):

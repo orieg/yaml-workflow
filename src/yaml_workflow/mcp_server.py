@@ -19,6 +19,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from .state import METADATA_FILE
+
 logger = logging.getLogger(__name__)
 
 
@@ -151,6 +153,8 @@ def _execute_workflow(
     params: Optional[dict],
     base_dir: str,
     dry_run: bool,
+    workspace: Optional[str] = None,
+    resume_from: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run (or dry-run) a workflow, returning a compact JSON-friendly result.
 
@@ -159,10 +163,18 @@ def _execute_workflow(
     """
     from .engine import WorkflowEngine
 
+    if resume_from:
+        if dry_run:
+            raise ValueError("Cannot resume during a dry run")
+        if not workspace or not (Path(workspace) / METADATA_FILE).is_file():
+            raise ValueError("Resume requires an existing workspace")
+
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
-        engine = WorkflowEngine(path, base_dir=base_dir, dry_run=dry_run)
-        result = engine.run(params=params or {})
+        engine = WorkflowEngine(
+            path, base_dir=base_dir, dry_run=dry_run, workspace=workspace
+        )
+        result = engine.run(params=params or {}, resume_from=resume_from)
 
     outputs: Dict[str, Any] = {}
     for step_name, data in (result.get("outputs") or {}).items():
@@ -174,7 +186,15 @@ def _execute_workflow(
     response: Dict[str, Any] = {
         "status": result.get("status", "unknown"),
         "outputs": outputs,
+        "workspace": str(engine.workspace),
     }
+    paused_steps = {
+        name: data
+        for name, data in result.get("steps_state", {}).items()
+        if data.get("status") == "paused"
+    }
+    if paused_steps:
+        response["paused_steps"] = paused_steps
     if dry_run:
         preview = buffer.getvalue().strip()
         if preview:
@@ -215,7 +235,7 @@ async def serve(directory: str, base_dir: str = "runs") -> None:
         openWorldHint=True,
     )
 
-    workflow_arg_schema = {
+    workflow_arg_schema: Dict[str, Any] = {
         "type": "object",
         "properties": {
             "workflow": {
@@ -234,6 +254,20 @@ async def serve(directory: str, base_dir: str = "runs") -> None:
             },
         },
         "required": ["workflow"],
+    }
+    run_arg_schema = {
+        **workflow_arg_schema,
+        "properties": {
+            **workflow_arg_schema["properties"],
+            "workspace": {
+                "type": "string",
+                "description": "Run workspace; required when resuming an existing run.",
+            },
+            "resume_from": {
+                "type": "string",
+                "description": "Step to resume in a failed or paused run, preserving completed outputs.",
+            },
+        },
     }
 
     def _meta_tools() -> List["Tool"]:
@@ -300,14 +334,17 @@ async def serve(directory: str, base_dir: str = "runs") -> None:
                 description=(
                     "Execute a workflow and return its results. Give a `workflow` "
                     "(a name from list_workflows or a file path) and optional "
-                    "`params`; runs it to completion and returns "
-                    "`{status, workflow, outputs}` where `outputs` maps each step "
-                    "name to its result. DESTRUCTIVE: a workflow may run arbitrary "
+                    "`params`; returns `{status, workflow, outputs, workspace}` "
+                    "where `outputs` maps each completed step name to its result. "
+                    "A paused run also returns `paused_steps` with missing inputs. "
+                    "After supplying the step inputs, use `workspace` and "
+                    "`resume_from` to continue the same run. "
+                    "DESTRUCTIVE: a workflow may run arbitrary "
                     "shell commands and Python, write files, and make HTTP "
                     "requests — call dry_run_workflow first if you need to preview "
                     "side effects, and only run workflows you trust."
                 ),
-                inputSchema=workflow_arg_schema,
+                inputSchema=run_arg_schema,
                 annotations=destructive,
             ),
         ]
@@ -381,6 +418,12 @@ async def serve(directory: str, base_dir: str = "runs") -> None:
                     params,
                     base_dir=base_dir,
                     dry_run=(name == "dry_run_workflow"),
+                    workspace=(
+                        arguments.get("workspace") if name == "run_workflow" else None
+                    ),
+                    resume_from=(
+                        arguments.get("resume_from") if name == "run_workflow" else None
+                    ),
                 )
                 result["workflow"] = workflow
                 return _text(result)

@@ -2,6 +2,8 @@ import os
 import sys
 import time
 from pathlib import Path
+from threading import Event
+from unittest.mock import Mock
 
 import pytest
 
@@ -2035,3 +2037,288 @@ def test_steps_dict_format_normalization(tmp_path):
     state = engine.state.get_state()
     assert state["steps"]["step_one"]["status"] == "completed"
     assert state["steps"]["step_two"]["status"] == "completed"
+
+
+@pytest.mark.parametrize("action", ["fail", "continue", "next"])
+def test_resumable_missing_input_pauses_without_error_handling(
+    tmp_path, action, monkeypatch
+):
+    calls = []
+
+    @register_task("pause_test_input")
+    def needs_input(answer: str) -> str:
+        calls.append(answer)
+        return answer
+
+    on_error = {"retry": 5, "action": action}
+    if action == "next":
+        on_error = {"retry": 5, "next": "after"}
+    engine = WorkflowEngine(
+        {
+            "steps": [
+                {"name": "before", "task": "noop"},
+                {
+                    "name": "waiting",
+                    "task": "pause_test_input",
+                    "resumable": True,
+                    "on_error": on_error,
+                },
+                {"name": "after", "task": "noop"},
+            ]
+        },
+        base_dir=str(tmp_path),
+    )
+    execute = Mock(wraps=engine.execute_step)
+    monkeypatch.setattr(engine, "execute_step", execute)
+    result = engine.run()
+    assert result["status"] == "paused"
+    assert execute.call_count == 2
+    assert calls == []
+    state = result["execution_state"]
+    assert state["completed_steps"] == ["before"]
+    assert state["completed_at"] is None
+    assert state["failed_step"] is None
+    assert state["retry_counts"] == {}
+    assert state["error_flow_target"] is None
+    assert state["current_step_name"] == "waiting"
+    assert result["steps_state"]["waiting"] == {
+        "status": "paused",
+        "missing_input": "answer",
+    }
+    assert "after" not in result["steps_state"]
+    assert "before" in result["outputs"]
+    assert "waiting" not in result["outputs"]
+    saved = WorkflowState(engine.workspace).get_state()
+    assert saved["execution_state"]["status"] == "paused"
+    assert saved["steps"]["waiting"]["missing_input"] == "answer"
+
+
+def test_resumable_supplied_input_runs_normally(tmp_path):
+    @register_task("pause_test_ready")
+    def ready(answer: str) -> str:
+        return answer
+
+    engine = WorkflowEngine(
+        {
+            "steps": [
+                {
+                    "name": "ready",
+                    "task": "pause_test_ready",
+                    "resumable": True,
+                    "inputs": {"answer": "yes"},
+                },
+            ]
+        },
+        base_dir=str(tmp_path),
+    )
+    result = engine.run()
+    assert result["status"] == "completed"
+    assert result["outputs"]["ready"]["result"] == "yes"
+
+
+@pytest.mark.parametrize("restart", [False, True])
+@pytest.mark.parametrize("input_source", ["inputs", "params"])
+def test_resume_paused_workflow_preserves_completed_steps(
+    tmp_path, restart, input_source
+):
+    calls = []
+
+    @register_task("pause_test_resume")
+    def task(answer: str) -> str:
+        calls.append(answer)
+        return answer
+
+    engine = WorkflowEngine(
+        {
+            "steps": [
+                {
+                    "name": "before",
+                    "task": "pause_test_resume",
+                    "inputs": {"answer": "first"},
+                },
+                {"name": "waiting", "task": "pause_test_resume", "resumable": True},
+                {
+                    "name": "after",
+                    "task": "pause_test_resume",
+                    "inputs": {
+                        "answer": "{{ steps.before.result }} / {{ steps.waiting.result }}"
+                    },
+                },
+            ]
+        },
+        base_dir=str(tmp_path),
+    )
+    assert engine.run()["status"] == "paused"
+    assert engine.state.metadata["execution_state"]["failed_step"] is None
+    resume_params = None
+    if input_source == "inputs":
+        engine.workflow["steps"][1]["inputs"] = {"answer": "submitted"}
+    else:
+        resume_params = {"answer": "submitted"}
+    if restart:
+        workflow = engine.workflow
+        workspace = engine.workspace
+        del engine
+        engine = WorkflowEngine(
+            workflow, workspace=str(workspace), base_dir=str(tmp_path)
+        )
+        assert engine.state.metadata["execution_state"]["status"] == "paused"
+        assert engine.context["steps"]["before"]["result"] == "first"
+    result = engine.run(resume_from="waiting", params=resume_params)
+    assert result["status"] == "completed"
+    assert calls == ["first", "submitted", "first / submitted"]
+    assert result["outputs"]["before"]["result"] == "first"
+    assert result["outputs"]["waiting"]["result"] == "submitted"
+
+
+@pytest.mark.parametrize("override", [None, {"owner": "updated"}])
+def test_resume_restores_saved_parameters_after_restart(tmp_path, override):
+    @register_task("pause_test_saved_parameters")
+    def task(answer: str) -> str:
+        return answer
+
+    workflow = {
+        "params": {
+            "owner": {"default": "default"},
+            "project": {"required": True},
+        },
+        "steps": [
+            {
+                "name": "waiting",
+                "task": "pause_test_saved_parameters",
+                "resumable": True,
+            },
+            {
+                "name": "after",
+                "task": "pause_test_saved_parameters",
+                "inputs": {"answer": "{{ args.owner }} / {{ project }}"},
+            },
+        ],
+    }
+    engine = WorkflowEngine(workflow, base_dir=str(tmp_path))
+    assert (
+        engine.run(params={"owner": "original", "project": "build"})["status"]
+        == "paused"
+    )
+    workspace = engine.workspace
+    assert WorkflowState(workspace).get_namespace("args") == {
+        "owner": "original",
+        "project": "build",
+    }
+    del engine
+
+    workflow["steps"][0]["inputs"] = {"answer": "submitted"}
+    engine = WorkflowEngine(workflow, workspace=str(workspace), base_dir=str(tmp_path))
+    result = engine.run(resume_from="waiting", params=override)
+    expected_owner = "updated" if override else "original"
+    assert result["status"] == "completed"
+    assert result["outputs"]["after"]["result"] == f"{expected_owner} / build"
+    assert engine.state.get_namespace("args") == {
+        "owner": expected_owner,
+        "project": "build",
+    }
+
+
+@pytest.mark.parametrize("processed", [False, True])
+def test_config_handler_pauses_and_resumes_with_args(tmp_path, processed):
+    calls = []
+
+    @register_task("pause_test_config_handler")
+    def task(config: TaskConfig) -> str:
+        inputs = config.process_inputs() if processed else config.inputs
+        answer = inputs["answer"]
+        calls.append(answer)
+        return answer
+
+    workflow = {
+        "steps": [
+            {"name": "before", "task": "noop"},
+            {
+                "name": "waiting",
+                "task": "pause_test_config_handler",
+                "resumable": True,
+                "on_error": {"retry": 2, "action": "continue"},
+            },
+            {"name": "after", "task": "noop"},
+        ]
+    }
+    engine = WorkflowEngine(workflow, base_dir=str(tmp_path))
+    result = engine.run()
+    assert result["status"] == "paused"
+    assert calls == []
+    assert result["execution_state"]["retry_counts"] == {}
+    assert result["execution_state"]["failed_step"] is None
+    assert result["execution_state"]["completed_steps"] == ["before"]
+    assert result["steps_state"]["waiting"]["missing_input"] == "answer"
+    workspace = engine.workspace
+    del engine
+
+    engine = WorkflowEngine(workflow, workspace=str(workspace), base_dir=str(tmp_path))
+    result = engine.run(resume_from="waiting", params={"answer": "submitted"})
+    assert result["status"] == "completed"
+    assert calls == ["submitted"]
+    assert result["outputs"]["waiting"]["result"] == "submitted"
+
+
+def test_nonresumable_missing_input_still_fails(tmp_path):
+    @register_task("pause_test_not_resumable")
+    def task(answer: str) -> str:
+        return answer
+
+    engine = WorkflowEngine(
+        {
+            "steps": [
+                {"name": "failing", "task": "pause_test_not_resumable"},
+            ]
+        },
+        base_dir=str(tmp_path),
+    )
+    with pytest.raises(WorkflowError, match="Missing required parameter: answer"):
+        engine.run(max_retries=0)
+    assert engine.state.get_state()["execution_state"]["status"] == "failed"
+
+
+def test_parallel_pause_preserves_successful_sibling(tmp_path, monkeypatch):
+    paused = Event()
+
+    @register_task("pause_test_parallel_input")
+    def needs_input(answer: str) -> str:
+        pytest.fail("Missing inputs must be detected before calling the task")
+
+    @register_task("pause_test_parallel_sibling")
+    def sibling() -> str:
+        assert paused.wait(timeout=5)
+        return "saved"
+
+    engine = WorkflowEngine(
+        {
+            "steps": [
+                {
+                    "name": "waiting",
+                    "task": "pause_test_parallel_input",
+                    "resumable": True,
+                    "depends_on": [],
+                },
+                {
+                    "name": "sibling",
+                    "task": "pause_test_parallel_sibling",
+                    "depends_on": [],
+                },
+                {"name": "after", "task": "noop", "depends_on": ["waiting", "sibling"]},
+            ]
+        },
+        base_dir=str(tmp_path),
+    )
+    mark_paused = engine.state.mark_step_paused
+
+    def record_pause(step_name: str, missing_input: str) -> None:
+        mark_paused(step_name, missing_input)
+        paused.set()
+
+    monkeypatch.setattr(engine.state, "mark_step_paused", record_pause)
+    result = engine.run()
+    assert result["status"] == "paused"
+    assert result["execution_state"]["current_step_name"] == "waiting"
+    assert result["outputs"]["sibling"]["result"] == "saved"
+    assert result["execution_state"]["completed_steps"] == ["sibling"]
+    assert "after" not in result["steps_state"]
