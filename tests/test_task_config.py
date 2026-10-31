@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from yaml_workflow.exceptions import TemplateError
+from yaml_workflow.exceptions import RequiredVariableError, TemplateError
 from yaml_workflow.tasks import TaskConfig
 
 
@@ -63,6 +63,59 @@ def test_task_config_process_inputs(task_config):
     assert processed["command"] == "echo 'Hello World'"
     assert processed["working_dir"] == "/tmp"
     assert processed["env"] == {"PATH": "/usr/bin", "USER": "test"}
+
+
+@pytest.mark.parametrize("processed", [False, True])
+@pytest.mark.parametrize("resumable", [False, True])
+def test_required_input_lookup(tmp_path, processed, resumable):
+    config = TaskConfig(
+        {"name": "waiting", "inputs": {}}, {}, tmp_path, resumable=resumable
+    )
+    inputs = config.process_inputs() if processed else config.inputs
+    if resumable:
+        with pytest.raises(RequiredVariableError) as exc:
+            inputs["answer"]
+        assert exc.value.variable_name == "answer"
+        assert exc.value.step_name == "waiting"
+    else:
+        with pytest.raises(KeyError, match="answer"):
+            inputs["answer"]
+    assert inputs.get("answer") is None
+    assert inputs.get("answer", "optional") == "optional"
+
+
+@pytest.mark.parametrize("processed", [False, True])
+@pytest.mark.parametrize("value", [None, False, 0, "", "answer"])
+def test_config_input_args_fallback_and_precedence(tmp_path, processed, value):
+    config = TaskConfig(
+        {"name": "ready", "inputs": {"explicit": value}},
+        {"args": {"explicit": "ignored", "answer": value}},
+        tmp_path,
+        resumable=True,
+    )
+    inputs = config.process_inputs() if processed else config.inputs
+    assert inputs["explicit"] == value
+    assert inputs.get("explicit", "default") == value
+    assert inputs["answer"] == value
+    assert inputs.get("answer", "default") == value
+    # Workflow arguments are not added to the explicit inputs or forwarded as extras.
+    assert list(inputs) == ["explicit"]
+
+
+def test_processed_inputs_setter_keeps_required_lookup(tmp_path):
+    config = TaskConfig({"name": "waiting"}, {}, tmp_path, resumable=True)
+    config.processed_inputs = {"present": "value"}
+    assert config.process_inputs()["present"] == "value"
+    with pytest.raises(RequiredVariableError):
+        config.processed_inputs["answer"]
+
+
+def test_nested_missing_key_is_not_a_missing_task_input(tmp_path):
+    config = TaskConfig(
+        {"name": "nested", "inputs": {"data": {}}}, {}, tmp_path, resumable=True
+    )
+    with pytest.raises(KeyError):
+        config.process_inputs()["data"]["answer"]
 
 
 def test_task_config_undefined_variable():

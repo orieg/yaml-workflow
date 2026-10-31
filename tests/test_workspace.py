@@ -61,6 +61,29 @@ def test_create_workspace_custom_dir(tmp_path: Path):
     assert metadata["base_dir"] == str(Path("runs").absolute())
 
 
+def test_create_workspace_preserves_existing_metadata(tmp_path: Path):
+    workspace = create_workspace("test_workflow", base_dir=str(tmp_path))
+    metadata = {
+        "workflow_name": "test_workflow",
+        "created_at": "2026-01-01T00:00:00",
+        "run_number": 7,
+        "execution_state": {
+            "status": "paused",
+            "completed_steps": ["before"],
+            "step_outputs": {"before": {"status": "completed", "result": "saved"}},
+        },
+    }
+    save_metadata(workspace, metadata)
+    original = (workspace / METADATA_FILE).read_bytes()
+
+    reopened = create_workspace(
+        "test_workflow", custom_dir=str(workspace), base_dir=str(tmp_path)
+    )
+
+    assert reopened == workspace
+    assert (workspace / METADATA_FILE).read_bytes() == original
+
+
 def test_create_workspace_next_run_number(tmp_path: Path):
     """Test correct run number increment (covers lines 80-90)."""
     base_dir = tmp_path / "runs_increment"

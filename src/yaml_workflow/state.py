@@ -19,7 +19,7 @@ class ExecutionState(TypedDict):
     failed_step: Optional[Dict[str, str]]
     step_outputs: Dict[str, Any]
     last_updated: str
-    status: Literal["not_started", "in_progress", "completed", "failed"]
+    status: Literal["not_started", "in_progress", "completed", "failed", "paused"]
     flow: Optional[str]
     retry_counts: Dict[str, int]
     completed_at: Optional[str]
@@ -199,6 +199,18 @@ class WorkflowState:
         if state["failed_step"] and state["failed_step"]["step_name"] == step_name:
             state["failed_step"] = None
         self.reset_step_retries(step_name)
+        self.save()
+
+    def mark_step_paused(self, step_name: str, missing_input: str) -> None:
+        """Record a missing input without marking the step failed or completed."""
+        state = cast(ExecutionState, self.metadata["execution_state"])
+        state["step_outputs"][step_name] = {
+            "status": "paused",
+            "missing_input": missing_input,
+        }
+        state["status"] = "paused"
+        state["current_step_name"] = step_name
+        state["completed_at"] = None
         self.save()
 
     def mark_step_failed(self, step_name: str, error: str) -> None:

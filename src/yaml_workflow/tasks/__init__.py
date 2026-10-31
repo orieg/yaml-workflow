@@ -12,6 +12,7 @@ from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, TypeVar, Union
 
+from ..exceptions import RequiredVariableError
 from ..types import TaskHandler
 from .config import TaskConfig
 
@@ -80,7 +81,11 @@ def register_task(
                 if name in processed:
                     kwargs[name] = processed[name]
                     del unmapped_inputs[name]  # Mark as mapped
+                elif name in config.context.get("args", {}):
+                    kwargs[name] = config.context["args"][name]
                 elif param.default is inspect.Parameter.empty:
+                    if config.resumable:
+                        raise RequiredVariableError(name, step_name=config.name)
                     # Check if required named param is missing from inputs
                     raise ValueError(f"Missing required parameter: {name}")
                 # else: use default value (implicitly handled by function call)

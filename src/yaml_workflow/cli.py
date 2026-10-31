@@ -120,7 +120,9 @@ def _run_with_watch(args) -> None:
 
     # First run
     try:
-        _run_workflow_impl(args)
+        result = _run_workflow_impl(args)
+        if result and result.get("status") == "paused":
+            return
     except SystemExit:
         pass  # Don't exit on workflow errors in watch mode
 
@@ -140,7 +142,9 @@ def _run_with_watch(args) -> None:
                 print(f"{'=' * 60}\n")
 
                 try:
-                    _run_workflow_impl(args)
+                    result = _run_workflow_impl(args)
+                    if result and result.get("status") == "paused":
+                        return
                 except SystemExit:
                     pass  # Don't exit on workflow errors in watch mode
     except KeyboardInterrupt:
@@ -158,6 +162,7 @@ def run_workflow(args):
 def _run_workflow_impl(args):
     """Run a workflow once (implementation used by both normal and watch mode)."""
     try:
+        fmt = getattr(args, "format", "text")
         try:
             param_dict = parse_params(args.params)
         except ValueError as e:
@@ -200,13 +205,29 @@ def _run_workflow_impl(args):
                         if failed_step:
                             resume_from = failed_step["step_name"]
                             print(
-                                f"Found failed workflow state, resuming from step: {resume_from}"
+                                f"Found failed workflow state, resuming from step: {resume_from}",
+                                file=(
+                                    sys.stderr
+                                    if fmt in ("json", "yaml")
+                                    else sys.stdout
+                                ),
                             )
                         else:
                             raise ValueError("No failed step found to resume from.")
+                    elif metadata["execution_state"].get("status") == "paused":
+                        state = metadata["execution_state"]
+                        resume_from = state.get("current_step_name")
+                        if (
+                            not resume_from
+                            or state.get("step_outputs", {})
+                            .get(resume_from, {})
+                            .get("status")
+                            != "paused"
+                        ):
+                            raise ValueError("No paused step found to resume from.")
                     else:
                         raise ValueError(
-                            "Cannot resume: workflow is not in failed state"
+                            "Cannot resume: workflow is not failed or paused"
                         )
                 else:
                     raise ValueError("Cannot resume: No workflow metadata found")
@@ -267,6 +288,11 @@ def _run_workflow_impl(args):
             skip_steps=skip_step_list,
             flow=args.flow,
         )
+        paused_steps = {
+            name: data
+            for name, data in results.get("steps_state", {}).items()
+            if data.get("status") == "paused"
+        }
 
         # In dry-run mode, the engine already printed the summary
         if not getattr(args, "dry_run", False):
@@ -276,11 +302,17 @@ def _run_workflow_impl(args):
             if fmt in ("json", "yaml"):
                 # Build structured result
                 structured = {
-                    "status": "success",
+                    "status": (
+                        "success"
+                        if results["status"] == "completed"
+                        else results["status"]
+                    ),
                     "workflow": engine.workflow.get("name", ""),
                     "workspace": str(engine.workspace),
                     "outputs": {},
                 }
+                if paused_steps:
+                    structured["paused_steps"] = paused_steps
 
                 # Extract step outputs
                 if results and results.get("outputs"):
@@ -307,7 +339,11 @@ def _run_workflow_impl(args):
                 # Existing text output
                 # Print completion status
                 print("\n=== Workflow Status ===")
-                if resume_from:
+                if results["status"] == "paused":
+                    print("Workflow paused: waiting for external input")
+                    for name, data in paused_steps.items():
+                        print(f"• Step '{name}' needs input '{data['missing_input']}'")
+                elif resume_from:
                     print(
                         f"✓ Workflow resumed from '{resume_from}' and completed successfully"
                     )
@@ -355,6 +391,8 @@ def _run_workflow_impl(args):
                 print(f"• Location: {engine.workspace}")
                 run_number = engine.state.metadata.get("run_number", "unknown")
                 print(f"• Run number: {run_number}")
+
+        return results
 
     except (WorkflowError, Exception) as e:
         fmt = getattr(args, "format", "text")
@@ -831,7 +869,7 @@ Commands:
         "--base-dir", default="runs", help="Base directory for workflow runs"
     )
     run_parser.add_argument(
-        "--resume", action="store_true", help="Resume workflow from last failed step"
+        "--resume", action="store_true", help="Resume a failed or paused workflow"
     )
     run_parser.add_argument(
         "--start-from", help="Start workflow execution from specified step"

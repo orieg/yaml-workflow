@@ -8,15 +8,43 @@ from typing import Any, Dict, List, Optional
 
 from jinja2 import UndefinedError
 
-from ..exceptions import TaskExecutionError, TemplateError
+from ..exceptions import RequiredVariableError, TaskExecutionError, TemplateError
 from ..template import TemplateEngine
 from .error_handling import ErrorContext, handle_task_error
+
+
+class _TaskInputs(dict[str, Any]):
+    """Input mapping with args fallback and resumable required-key lookup."""
+
+    def __init__(self, values: Dict[str, Any], config: "TaskConfig") -> None:
+        super().__init__(values)
+        self._config = config
+
+    def __missing__(self, key: str) -> Any:
+        args = self._config.context.get("args", {})
+        if key in args:
+            return args[key]
+        if self._config.resumable:
+            raise RequiredVariableError(key, step_name=self._config.name)
+        raise KeyError(key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """Optional lookups fall back to args, then the caller's default."""
+        if key in self:
+            return self[key]
+        return self._config.context.get("args", {}).get(key, default)
 
 
 class TaskConfig:
     """Configuration class for task handlers with namespace support."""
 
-    def __init__(self, step: Dict[str, Any], context: Dict[str, Any], workspace: Path):
+    def __init__(
+        self,
+        step: Dict[str, Any],
+        context: Dict[str, Any],
+        workspace: Path,
+        resumable: bool = False,
+    ):
         """
         Initialize task configuration.
 
@@ -24,15 +52,22 @@ class TaskConfig:
             step: Step configuration from workflow
             context: Execution context with namespaces
             workspace: Workspace path
+            resumable: Whether missing required parameters can be supplied later
         """
         self.step = step  # Store the full step configuration
         self.name = step.get("name")
         self.type = step.get("task")
-        self.inputs = step.get("inputs", {})
+        self._resumable = resumable
         self._context = context
+        self.inputs = _TaskInputs(step.get("inputs", {}), self)
         self.workspace = workspace
-        self._processed_inputs: Dict[str, Any] = {}
+        self._processed_inputs: Dict[str, Any] = _TaskInputs({}, self)
         self._template_engine = TemplateEngine()
+
+    @property
+    def resumable(self) -> bool:
+        """Whether this task allows missing inputs to be supplied later."""
+        return self._resumable
 
     @property
     def context(self) -> Dict[str, Any]:
@@ -46,7 +81,7 @@ class TaskConfig:
 
     @processed_inputs.setter
     def processed_inputs(self, value: Dict[str, Any]) -> None:
-        self._processed_inputs = value
+        self._processed_inputs = _TaskInputs(value, self)
 
     def get_variable(self, name: str, namespace: Optional[str] = None) -> Any:
         """
@@ -102,7 +137,7 @@ class TaskConfig:
                 },
             }
 
-            self._processed_inputs = self._process_value(self.inputs, template_context)
+            self.processed_inputs = self._process_value(self.inputs, template_context)
         return self._processed_inputs
 
     def _process_value(self, value: Any, template_context: Dict[str, Any]) -> Any:

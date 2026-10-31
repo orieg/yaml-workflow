@@ -139,6 +139,44 @@ def context_aware_task(config: TaskConfig) -> Dict[str, Any]:
 
 ### Error Handling
 
+For tasks with named function parameters, a workflow step can set
+`resumable: true`. If a required parameter is absent from both its resolved
+inputs and workflow `args`,
+the engine records the step as `paused` with a `missing_input` name and returns
+`status: paused` without invoking the task function, retrying, or running its
+error handler. Completed step outputs remain in state. In parallel execution,
+the current level finishes before the workflow returns; later levels do not run.
+Non-resumable steps retain their existing error behavior.
+Run parameters are persisted in the `args` namespace and restored when calling
+`run(resume_from=...)`, including with a new engine using the same workspace.
+Parameters supplied on resume override their saved values.
+Named task parameters use explicit step inputs first, then matching workflow
+parameters from `args`, then function defaults. A missing required value pauses
+a resumable step only when neither inputs nor `args` supplies it. For example,
+`run(resume_from="approval", params={"answer": "yes"})` supplies a missing
+`answer` parameter without changing the workflow YAML. Explicit values such as
+`None`, `False`, zero, and empty strings count as supplied.
+
+For `TaskConfig` handlers, required top-level input lookups also fall back to
+workflow `args`:
+
+```python
+@register_task("my_plugin.approval")
+def approval(config: TaskConfig) -> Dict[str, Any]:
+    inputs = config.process_inputs()
+    answer = inputs["answer"]
+    return {"approved": answer}
+```
+
+On a resumable step, `inputs["answer"]` raises the pause signal when neither
+explicit inputs nor `args` contains the key. Detection occurs when the handler
+accesses the key. The handler starts again from the beginning on resume, so read
+required inputs before performing side effects. `config.inputs` has the same
+lookup behavior without template processing. Use `.get("optional", default)`
+for optional inputs; it checks inputs and `args`, then returns the default
+without pausing. Missing keys inside nested dictionaries and invalid templates
+remain ordinary errors.
+
 ```python
 from yaml_workflow.exceptions import TaskExecutionError
 from yaml_workflow.tasks.error_handling import ErrorContext, handle_task_error

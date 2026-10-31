@@ -118,6 +118,13 @@ steps:
 
 ## Limitations
 
+A resumable step missing a required named input pauses the run after the current
+parallel level finishes. Completed sibling outputs are preserved, and no later
+level starts. After supplying inputs, resume using `run(resume_from="step_name")`
+or the CLI's `--resume --workspace`. The engine retains the full dependency graph
+and skips completed steps. If only some paused steps receive inputs, the others
+remain paused and dependent levels continue to wait.
+
 - `on_error.next` (jump to another step) is not supported in parallel levels.
 - All steps in a parallel level must complete before the next level starts.
 - The thread pool uses Python threads; for I/O-heavy work, consider batch task parallelism.

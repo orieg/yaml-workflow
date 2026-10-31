@@ -56,8 +56,8 @@ yaml-workflow run workflows/hello_world.yaml name=Alice
 # Run a specific flow
 yaml-workflow run workflows/multi_flow.yaml --flow data_collection
 
-# Resume from last failed step
-yaml-workflow run workflows/hello_world.yaml --resume
+# Resume a failed or paused run in its existing workspace
+yaml-workflow run workflows/hello_world.yaml --resume --workspace ./my-run
 
 # Start from a specific step
 yaml-workflow run workflows/pipeline.yaml --start-from process_data
@@ -71,6 +71,17 @@ yaml-workflow run workflows/hello_world.yaml --workspace ./my-run
 # Custom base directory for runs
 yaml-workflow run workflows/hello_world.yaml --base-dir ./output
 ```
+
+#### Paused workflows
+
+A step marked `resumable: true` pauses if a required named task parameter is
+missing. The CLI reports the step and missing input and exits successfully,
+without reporting workflow completion. JSON/YAML output uses `status: paused`
+and includes `paused_steps`. Supply the missing value as a workflow parameter,
+for example `--resume --workspace ./my-run answer=yes`, or in the step's `inputs`.
+Explicit step inputs take precedence over matching workflow parameters.
+Completed steps are not rerun.
+As before, `--resume` without `--workspace` starts a fresh run.
 
 #### Dry-run mode
 
@@ -106,7 +117,7 @@ Automatically re-run the workflow when the YAML file (or any imported files) cha
 yaml-workflow run workflows/hello_world.yaml name=Alice --watch
 ```
 
-The engine polls file modification times every 1.5 seconds. On change, it prints a separator and re-runs. Press `Ctrl+C` to stop.
+The engine polls file modification times every 1.5 seconds. On change, it prints a separator and re-runs. Press `Ctrl+C` to stop. If a run pauses for input, watch mode returns so the run can be resumed explicitly.
 
 #### Structured output
 
@@ -335,7 +346,7 @@ Requires: `pip install 'yaml-workflow[mcp]'`
 | `run` | `params` | Parameters as `name=value` pairs |
 | `run` | `--workspace` | Custom workspace directory |
 | `run` | `--base-dir` | Base directory for runs (default: `runs`) |
-| `run` | `--resume` | Resume from last failed step |
+| `run` | `--resume` | Resume a failed or paused run in the supplied `--workspace` |
 | `run` | `--start-from` | Start from a specific step |
 | `run` | `--skip-steps` | Comma-separated steps to skip |
 | `run` | `--flow` | Flow name to execute |

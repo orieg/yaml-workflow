@@ -194,7 +194,14 @@ def test_batch_validation(workspace, basic_context):
         },
     }
 
-    config = TaskConfig(step, basic_context, workspace)
+    # Required inputs can now come from args, so omit items from both sources.
+    missing_items_context = {
+        **basic_context,
+        "args": {
+            key: value for key, value in basic_context["args"].items() if key != "items"
+        },
+    }
+    config = TaskConfig(step, missing_items_context, workspace)
     # Expect TaskExecutionError because config errors are now wrapped
     with pytest.raises(TaskExecutionError, match="'items' parameter is required"):
         batch_task(config)

@@ -43,6 +43,17 @@ In addition, **each workflow file in the directory becomes its own convenience
 tool** named after the workflow, so a workflow can be invoked directly with its
 declared parameters as typed inputs. `run_workflow` is the generic equivalent.
 
+Execution results include the run's `workspace`. When a resumable step is missing
+a required named input, the result has `status: paused` and a `paused_steps`
+mapping identifying the missing input. Completed outputs remain available.
+Call the generic `run_workflow` tool with the same `workflow`, the returned
+`workspace`, `resume_from` set to the paused step name, and the answer in `params`
+(for example `{"answer": "yes"}`). Explicit step inputs take precedence over
+matching workflow parameters. Saved parameters and completed outputs are
+restored; supplied `params` override saved parameter values. The same options
+can resume a failed run. Convenience tools start new runs; use `run_workflow` to
+resume. Dry-run tools do not resume existing runs.
+
 Tools are annotated with MCP hints (`readOnlyHint` / `destructiveHint`) so clients
 can distinguish safe introspection (`list_workflows`, `validate_workflow`,
 `dry_run_workflow`) from execution (`run_workflow` and the per-workflow tools),
